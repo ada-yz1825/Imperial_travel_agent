@@ -264,7 +264,47 @@ const places = [
   },
 ];
 
+const API_BASE_STORAGE_KEY = "imperialNavigatorApiBase";
+
 const $ = (id) => document.getElementById(id);
+
+function normalizeApiBase(value) {
+  return String(value || "").trim().replace(/\/+$/, "");
+}
+
+function isLocalPage() {
+  return ["", "localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+}
+
+function getConfiguredApiBase() {
+  const params = new URLSearchParams(window.location.search);
+  const explicitApiBase = normalizeApiBase(params.get("api") || params.get("apiBase"));
+  if (explicitApiBase) {
+    window.localStorage.setItem(API_BASE_STORAGE_KEY, explicitApiBase);
+    return explicitApiBase;
+  }
+
+  if (isLocalPage()) return "";
+
+  const storedApiBase = normalizeApiBase(window.localStorage.getItem(API_BASE_STORAGE_KEY));
+  if (storedApiBase) return storedApiBase;
+
+  return "http://localhost:8001";
+}
+
+const apiBase = getConfiguredApiBase();
+
+function apiUrl(path) {
+  return `${apiBase}${path}`;
+}
+
+function apiFetch(path, options) {
+  return fetch(apiUrl(path), options);
+}
+
+function apiBaseLabel() {
+  return apiBase || window.location.origin;
+}
 
 const controls = {
   scenario: $("scenario"),
@@ -528,7 +568,7 @@ async function answerQuestion(question, options = {}) {
   renderLoadingAnswer("Generating results");
 
   try {
-    const response = await fetch("/api/chat", {
+    const response = await apiFetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -562,7 +602,8 @@ async function answerQuestion(question, options = {}) {
     $("agentAnswer").innerHTML = `
       <strong>The local language model is not connected yet</strong>
       <br />${escapeHtml(error.message)}
-      <br />This app uses Ollama by default. Run <code>ollama run qwen3</code>, then keep <code>python3 server.py</code> running.
+      <br />This app uses Ollama by default. Run <code>ollama run qwen3</code>, then keep <code>PORT=8001 python3 server.py</code> running.
+      <br />Current API endpoint: <code>${escapeHtml(apiBaseLabel())}</code>
     `;
   } finally {
     setAsking(false);
@@ -571,7 +612,7 @@ async function answerQuestion(question, options = {}) {
 
 async function classifyIntent(question) {
   try {
-    const response = await fetch("/api/intent", {
+    const response = await apiFetch("/api/intent", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question, contextStart: currentStartContext(), history: chatHistory.slice(-6) }),
@@ -602,7 +643,7 @@ async function answerNavigationQuestion(question, options = {}) {
   }, 8000);
 
   try {
-    const response = await fetch("/api/navigate", {
+    const response = await apiFetch("/api/navigate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query: question, contextStart: currentStartContext(), history: chatHistory.slice(-6) }),
@@ -635,6 +676,7 @@ async function answerNavigationQuestion(question, options = {}) {
       <strong>Navigation is not available yet</strong>
       <br />${escapeHtml(error.message)}
       <br />Check that <code>GOOGLE_MAPS_API_KEY</code> is set and that Routes API is enabled in Google Cloud.
+      <br />Current API endpoint: <code>${escapeHtml(apiBaseLabel())}</code>
     `;
   } finally {
     window.clearTimeout(routeSummaryTimer);
@@ -1162,7 +1204,7 @@ function updateStartMapStatus() {
 
 async function refreshIntegrationStatus() {
   try {
-    const response = await fetch("/api/health");
+    const response = await apiFetch("/api/health");
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Health check failed");
     integrationStatus = {
@@ -1177,10 +1219,11 @@ async function refreshIntegrationStatus() {
     }
   } catch (error) {
     integrationStatus = {
-      llm: "Unknown",
-      google: "Unknown",
+      llm: "Local API offline",
+      google: "Local API offline",
       tools: integrationStatus.tools || "Conversation",
     };
+    $("startMapStatus").innerHTML = `Local API not connected. Run <code>PORT=8001 python3 server.py</code>, or open this page with <code>?api=http://localhost:8002</code> if you use another port.`;
   }
   render();
 }
@@ -1195,7 +1238,7 @@ async function refreshRoutes() {
   render();
 
   try {
-    const response = await fetch("/api/routes", {
+    const response = await apiFetch("/api/routes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

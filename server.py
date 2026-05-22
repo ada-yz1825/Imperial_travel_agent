@@ -71,6 +71,10 @@ def get_google_maps_api_key():
     return get_env_value("GOOGLE_MAPS_API_KEY")
 
 
+def get_google_maps_browser_key():
+    return get_env_value("GOOGLE_MAPS_BROWSER_KEY") or get_google_maps_api_key()
+
+
 def check_llm_health():
     if LLM_PROVIDER == "openai":
         configured = bool(os.environ.get("OPENAI_API_KEY"))
@@ -193,6 +197,16 @@ STUDY_PLACES = [
 
 
 class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
+    def do_OPTIONS(self):
+        if self.path.startswith("/api/"):
+            self.send_response(204)
+            self.send_cors_headers()
+            self.send_header("Access-Control-Max-Age", "86400")
+            self.end_headers()
+            return
+
+        self.send_error(404, "Not found")
+
     def do_GET(self):
         if self.path == "/api/health":
             llm_status = check_llm_health()
@@ -206,7 +220,7 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
                     "llmConnected": llm_status["connected"],
                     "llmStatus": llm_status["label"],
                     "googleMapsConfigured": bool(get_google_maps_api_key()),
-                    "googleMapsBrowserKey": get_google_maps_api_key(),
+                    "googleMapsBrowserKey": get_google_maps_browser_key(),
                 }
             )
             return
@@ -393,9 +407,15 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_cors_headers()
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def send_cors_headers(self):
+        self.send_header("Access-Control-Allow-Origin", get_cors_origin(self.headers.get("Origin")))
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
     def stream_json(self, payload):
         line = json.dumps(payload, ensure_ascii=False).encode("utf-8") + b"\n"
@@ -406,6 +426,7 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
         self.send_header("Cache-Control", "no-cache")
+        self.send_cors_headers()
         self.end_headers()
 
         try:
@@ -422,6 +443,33 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
             self.stream_json({"error": "无法连接本地 Ollama 服务。请确认 Ollama 已安装并正在运行。"})
         except Exception as error:
             self.stream_json({"error": f"服务端错误：{error}"})
+
+
+def get_cors_origin(request_origin):
+    if not request_origin:
+        return "*"
+
+    allowed_origins = get_env_value("CORS_ALLOWED_ORIGINS")
+    if allowed_origins == "*":
+        return "*"
+
+    origins = {origin.strip() for origin in allowed_origins.split(",") if origin.strip()} or default_cors_origins()
+    if request_origin in origins:
+        return request_origin
+
+    return "null"
+
+
+def default_cors_origins():
+    return {
+        "https://ada-yz1825.github.io",
+        "http://localhost:8000",
+        "http://localhost:8001",
+        "http://localhost:8002",
+        "http://127.0.0.1:8000",
+        "http://127.0.0.1:8001",
+        "http://127.0.0.1:8002",
+    }
 
 
 def call_google_route_matrix(api_key, start, destinations):

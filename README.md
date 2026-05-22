@@ -40,6 +40,44 @@ The app supports English and Chinese. It answers in the same language as the use
 
 The app is dependency-light and uses Python's built-in HTTP server stack. There is no npm install step.
 
+## GitHub Pages Mode
+
+GitHub Pages can host only the static files in this repository. It cannot run `server.py`, Ollama, or private environment variables. The Pages version therefore keeps the frontend static and connects back to your local machine for the API.
+
+1. On your laptop, keep Ollama running:
+
+```bash
+ollama run qwen3
+```
+
+2. Start the local API backend from this repository:
+
+```bash
+PORT=8001 python3 server.py
+```
+
+3. Open the GitHub Pages URL for this repository. When the page is not running on localhost, the frontend automatically calls:
+
+```text
+http://localhost:8001
+```
+
+If you use a different local port, add an API override to the Pages URL:
+
+```text
+https://ada-yz1825.github.io/Imperial_travel_agent/?api=http://localhost:8002
+```
+
+The override is saved in browser local storage for hosted Pages visits, so future hosted visits will keep using that API base until you open the page with another `?api=...` value or clear site data. Localhost development still uses same-origin `/api` calls.
+
+`server.py` enables CORS for `/api/*` endpoints so the GitHub Pages origin can call your local backend. To restrict allowed origins, add this to `.env`:
+
+```bash
+CORS_ALLOWED_ORIGINS="https://ada-yz1825.github.io"
+```
+
+Your Google Maps key still lives in local `.env`; the backend exposes it to the browser only so Google Maps JavaScript can load. For a public Pages demo, restrict that key in Google Cloud by HTTP referrer and API scope.
+
 ## Setup
 
 1. Install Ollama from <https://ollama.com/>.
@@ -57,6 +95,14 @@ GOOGLE_MAPS_API_KEY="your_google_maps_api_key"
 ```
 
 Make sure the Google Cloud project has the Routes API enabled. The same key is also exposed to the browser so the frontend can load Google Maps; restrict the key appropriately before public deployment.
+
+For better separation, you can optionally use a second browser-only key:
+
+```bash
+GOOGLE_MAPS_BROWSER_KEY="your_maps_javascript_api_browser_key"
+```
+
+`GOOGLE_MAPS_API_KEY` is used by the local backend for Routes API calls. `GOOGLE_MAPS_BROWSER_KEY`, when present, is sent to the browser for Google Maps JavaScript. If `GOOGLE_MAPS_BROWSER_KEY` is empty, the app falls back to `GOOGLE_MAPS_API_KEY`.
 
 ## Run Locally
 
@@ -125,13 +171,13 @@ For navigation, the backend extracts origin and destination from free text. If t
 
 ## Notes on Deployment
 
-This project can run locally or behind a temporary tunnel such as ngrok/Cloudflare Tunnel for demos. For public deployment, use a hosted server or cloud platform and set environment variables securely.
+This project can run locally, on GitHub Pages plus a local backend, or behind a temporary tunnel such as ngrok/Cloudflare Tunnel for demos. For a fully public deployment that does not require your laptop, use a hosted server or cloud platform and set environment variables securely.
 
 Important deployment considerations:
 
 - Do not commit real API keys.
 - Restrict Google Maps keys by domain/IP and API scope.
-- Ollama must be running on the server if using local model mode.
+- Ollama must be running wherever `server.py` runs if using local model mode.
 - For a permanently available public app, deploy to a cloud VM or app platform rather than relying on a personal laptop.
 
 See `DEPLOYMENT.md` for more deployment notes.
