@@ -465,6 +465,9 @@ button:hover {
   padding: 24px 14px;
   color: #303b48;
   line-height: 1.65;
+  max-height: min(52vh, 520px);
+  overflow: auto;
+  overflow-wrap: anywhere;
 }
 
 .left-section-title {
@@ -487,6 +490,35 @@ button:hover {
   border-radius: 8px;
   overflow: hidden;
   background: #fff;
+}
+
+.route-preview.route-preview--pop {
+  animation: route-preview-pop 340ms var(--ease-out) both;
+  transform-origin: top center;
+}
+
+@keyframes route-preview-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.975);
+    filter: blur(2px);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-1px) scale(1.01);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-preview.route-preview--pop {
+    animation: none;
+  }
 }
 
 .route-preview-header {
@@ -772,6 +804,9 @@ button:hover {
   border-radius: 8px;
   padding: 10px 12px;
   line-height: 1.55;
+  max-height: 320px;
+  overflow: auto;
+  overflow-wrap: anywhere;
 }
 
 .chat-message.user {

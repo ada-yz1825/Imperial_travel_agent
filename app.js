@@ -408,6 +408,7 @@ let routePolyline = null;
 let routeMarkers = [];
 let pendingRoutePreview = null;
 let activeRoutePreview = null;
+let routePreviewRevealTimer = null;
 let googleMapsLoading = false;
 let routesKeyConfigured = false;
 let latestNavigationData = null;
@@ -684,9 +685,9 @@ async function answerQuestion(question, options = {}) {
       renderChatModalHistory();
     }
     const contentType = response.headers.get("Content-Type") || "";
-    const answer = contentType.includes("application/x-ndjson")
+    const answer = sanitizeModelOutput(contentType.includes("application/x-ndjson")
       ? await readStreamingAnswer(response)
-      : await readJsonAnswer(response);
+      : await readJsonAnswer(response));
 
     chatHistory.push({ role: "assistant", content: answer });
     trimChatHistory();
@@ -696,9 +697,9 @@ async function answerQuestion(question, options = {}) {
   } catch (error) {
     hideAgentActions();
     $("agentAnswer").innerHTML = `
-      <strong>The local language model is not connected yet</strong>
+      <strong>The backend LLM request failed</strong>
       <br />${escapeHtml(error.message)}
-      <br />This app now uses the backend LLM provider configured in <code>.env</code>. For Groq, set <code>LLM_PROVIDER=groq</code> and <code>GROQ_API_KEY</code>, then keep <code>PORT=8001 python3 server.py</code> running.
+      <br />This app now uses the backend LLM provider configured in <code>.env</code> or your deployed backend. If Groq returns a rate limit, wait a few seconds and try again, or lower the request size.
       <br />Current API endpoint: <code>${escapeHtml(apiBaseLabel())}</code>
     `;
   } finally {
@@ -762,11 +763,12 @@ async function answerNavigationQuestion(question, options = {}) {
       chatHistory.push({ role: "user", content: question });
       renderChatModalHistory();
     }
-    chatHistory.push({ role: "assistant", content: data.answer });
+    const answer = sanitizeModelOutput(data.answer);
+    chatHistory.push({ role: "assistant", content: answer });
     trimChatHistory();
-    latestNavigationData = data;
-    renderStreamingAnswer(data.answer);
-    renderRoutePreview(data);
+    latestNavigationData = { ...data, answer };
+    renderStreamingAnswer(answer);
+    showRoutePreviewAfterDelay(data, 500);
     renderAgentActions(data, data.recommended);
     renderChatModalHistory();
   } catch (error) {
@@ -783,6 +785,13 @@ async function answerNavigationQuestion(question, options = {}) {
     window.clearTimeout(routeMapTimer);
     setAsking(false);
   }
+}
+
+function showRoutePreviewAfterDelay(data, delayMs = 500) {
+  window.clearTimeout(routePreviewRevealTimer);
+  routePreviewRevealTimer = window.setTimeout(() => {
+    renderRoutePreview(data);
+  }, delayMs);
 }
 
 function currentStartContext() {
@@ -893,7 +902,7 @@ function renderStreamingAnswer(answer) {
     renderLoadingAnswer("Generating answer");
     return;
   }
-  const text = answer;
+  const text = sanitizeModelOutput(answer);
   $("agentAnswer").innerHTML = renderMarkdown(text);
 }
 
@@ -913,11 +922,21 @@ function renderLoadingAnswer(message) {
 }
 
 function renderMarkdown(value) {
-  return escapeHtml(value)
+  return escapeHtml(sanitizeModelOutput(value))
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>')
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/^\s*[-*]\s+(.+)$/gm, "• $1")
     .replace(/\n/g, "<br />");
+}
+
+function sanitizeModelOutput(value) {
+  return String(value || "")
+    .replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, "")
+    .replace(/<think\b[^>]*>[\s\S]*$/gi, "")
+    .replace(/^[\s\S]*?<\/think>/gi, "")
+    .replace(/^\s*(reasoning|thinking|thought process|analysis|scratchpad|chain of thought|思考过程|推理过程|思路|分析)\s*[:：][\s\S]*?(?:\n\s*\n|(?=final answer\s*[:：])|(?=最终答案\s*[:：])|$)/i, "")
+    .replace(/^\s*(final answer|最终答案)\s*[:：]\s*/i, "")
+    .trim();
 }
 
 function trimChatHistory() {
@@ -1112,6 +1131,9 @@ function drawRoutePreview(data, recommended) {
   pendingRoutePreview = data;
   const preview = $("routePreview");
   preview.hidden = false;
+  preview.classList.remove("route-preview--pop");
+  void preview.offsetWidth;
+  preview.classList.add("route-preview--pop");
   $("routePreviewTitle").textContent = `Route map: ${recommended.modeLabel || recommended.mode || "route"}`;
   const distance = Number.isFinite(recommended.distanceKm) ? `, ${recommended.distanceKm} km` : "";
   $("routePreviewMeta").textContent = `${recommended.durationMinutes} min${distance}`;
@@ -1158,10 +1180,15 @@ function drawRoutePreview(data, recommended) {
 }
 
 function clearRoutePreview() {
+  window.clearTimeout(routePreviewRevealTimer);
+  routePreviewRevealTimer = null;
   pendingRoutePreview = null;
   activeRoutePreview = null;
   const preview = $("routePreview");
-  if (preview) preview.hidden = true;
+  if (preview) {
+    preview.classList.remove("route-preview--pop");
+    preview.hidden = true;
+  }
   if (routePolyline) {
     routePolyline.setMap(null);
     routePolyline = null;

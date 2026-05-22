@@ -21,10 +21,13 @@ GOOGLE_COMPUTE_ROUTES_API_URL = "https://routes.googleapis.com/directions/v2:com
 OLLAMA_API_URL = os.environ.get("OLLAMA_API_URL", "http://localhost:11434/api/chat")
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama").lower()
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5.2")
-GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "qwen/qwen3-32b")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3")
-OLLAMA_NUM_PREDICT = int(os.environ.get("OLLAMA_NUM_PREDICT", "180"))
+OLLAMA_NUM_PREDICT = int(os.environ.get("OLLAMA_NUM_PREDICT", "240"))
 CHAT_HISTORY_LIMIT = int(os.environ.get("CHAT_HISTORY_LIMIT", "6"))
+GROQ_MAX_COMPLETION_TOKENS = int(os.environ.get("GROQ_MAX_COMPLETION_TOKENS", "750"))
+GROQ_JSON_MAX_COMPLETION_TOKENS = int(os.environ.get("GROQ_JSON_MAX_COMPLETION_TOKENS", "1500"))
+GROQ_NAVIGATION_MAX_COMPLETION_TOKENS = int(os.environ.get("GROQ_NAVIGATION_MAX_COMPLETION_TOKENS", "1500"))
 GOOGLE_TRAVEL_MODE = os.environ.get("GOOGLE_TRAVEL_MODE", "TRANSIT")
 IMPERIAL_SHUTTLE_URL = "https://www.imperial.ac.uk/admin-services/property/travel/shuttle-bus/"
 IMPERIAL_SHUTTLE_CAMPUSES = {
@@ -129,7 +132,7 @@ def check_llm_health():
         configured = bool(get_groq_api_key())
         return {
             "connected": configured,
-            "label": f"Groq {get_groq_model()}" if configured else "Groq key missing",
+            "label": get_groq_model() if configured else "Groq key missing",
         }
 
     try:
@@ -371,7 +374,7 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
             self.stream_ollama(payload)
         except urllib.error.HTTPError as error:
             message = error.read().decode("utf-8", errors="replace")
-            self.write_json({"error": f"模型 API 请求失败：{message}"}, status=error.code)
+            self.write_json({"error": format_model_http_error(message)}, status=error.code)
         except urllib.error.URLError:
             self.write_json(
                 {
@@ -802,7 +805,7 @@ def extract_navigation_request_with_llm(query, history=None):
                 api_key,
                 "Extract navigation intent and route endpoints. Return JSON only.",
                 prompt,
-                max_completion_tokens=1200,
+                max_completion_tokens=GROQ_JSON_MAX_COMPLETION_TOKENS,
             )
         else:
             raw = call_ollama_once(
@@ -992,7 +995,7 @@ def classify_agent_intent_with_llm(question, route_request):
                     {"role": "system", "content": "You are an intent classifier. Return compact JSON only, with no markdown."},
                     {"role": "user", "content": prompt},
                 ],
-                max_completion_tokens=1200,
+                max_completion_tokens=GROQ_JSON_MAX_COMPLETION_TOKENS,
                 temperature=0,
             )
         else:
@@ -1427,7 +1430,7 @@ def call_navigation_llm(query, route_request, routes, errors, study_options):
                 },
                 {"role": "user", "content": prompt},
             ],
-            max_completion_tokens=1200,
+            max_completion_tokens=GROQ_NAVIGATION_MAX_COMPLETION_TOKENS,
             temperature=0.15,
         )
     return call_ollama_once(
@@ -1476,9 +1479,9 @@ def navigation_prompt(query, route_request, routes, errors, study_options):
             "Never use sample or unrelated places such as 清华大学, 帝国理工学院, London, Oxford, or White City unless they appear in the origin/destination fields or the user's question.",
             "If the requested mode is available, discuss it first even if another mode is faster.",
             "Recommend the best practical option, not only the shortest number.",
-            "After the navigation advice, add one short sentence recommending one nearby Imperial library or study space from near_destination_study_options only if that list is not empty.",
-            "Place the study-place suggestion before any other closing note.",
-            "If near_destination_study_options is empty, do not mention Imperial libraries, Imperial campuses, study spaces, or the absence of them.",
+            "Do not add a destination introduction in this answer; a separate follow-up will handle that.",
+            "If near_destination_study_options is not empty and relevant, you may mention one nearby Imperial library or study space, but do not make that the only possible closing.",
+            "If near_destination_study_options is empty, simply skip Imperial-specific study-space comments.",
             "If origin_source is 'context', avoid explicitly naming the origin; refer to it as the selected start point or omit it, focusing on the destination.",
             "If the user's query contains only one place, treat that place as the destination and phrase the answer as travel to that destination (do not invent or name an origin).",
             f"If imperial_weekday_shuttle.applies is true, mention briefly that Imperial runs a weekday shuttle between the relevant campuses, and include this clickable Markdown link for the timetable: [Imperial shuttle]({IMPERIAL_SHUTTLE_URL}).",
@@ -1488,35 +1491,6 @@ def navigation_prompt(query, route_request, routes, errors, study_options):
         ],
     }
     return "/no_think\nWrite the final answer only.\n" + json.dumps(payload, ensure_ascii=False)
-
-
-def call_ollama_once(messages):
-    request_body = json.dumps(
-        {
-            "model": OLLAMA_MODEL,
-            "messages": messages,
-            "stream": False,
-            "think": False,
-            "keep_alive": "10m",
-            "options": {
-                "temperature": 0.15,
-                "num_predict": OLLAMA_NUM_PREDICT,
-                "num_ctx": 2048,
-            },
-        },
-        ensure_ascii=False,
-    ).encode("utf-8")
-
-    request = urllib.request.Request(
-        OLLAMA_API_URL,
-        data=request_body,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-
-    with urllib.request.urlopen(request, timeout=90) as response:
-        data = json.loads(response.read().decode("utf-8", errors="replace"))
-    return extract_ollama_text(data)
 
 
 def summarize_routes_for_prompt(routes, language):
@@ -1615,57 +1589,107 @@ def normalize_place_match_text(value):
 
 
 def finalize_navigation_answer(answer, route_request, routes, study_options):
+    answer = strip_reasoning_text(answer)
     answer = remove_bad_route_opening(answer, route_request)
     if not study_options:
         answer = remove_unavailable_study_note(answer)
-    with_study_context = append_study_context_note(answer, route_request, study_options)
-    with_shuttle_context = append_imperial_shuttle_note(with_study_context, route_request)
-    return append_navigation_source_note(with_shuttle_context, route_request, routes)
+    with_source_note = append_navigation_source_note(answer, route_request, routes)
+    with_destination_context = append_destination_context_note(with_source_note, route_request)
+    return strip_reasoning_text(append_imperial_shuttle_note(with_destination_context, route_request))
 
 
-def append_study_context_note(answer, route_request, study_options):
-    if not study_options:
+def append_destination_context_note(answer, route_request):
+    destination = route_request.get("destination") or {}
+    destination_name = str(destination.get("name", "")).strip()
+    if not destination_name:
         return answer
-    primary = study_options[0]
-    if study_option_already_mentioned(answer, primary):
+
+    if destination_context_already_mentioned(answer, destination_name):
         return answer
 
-    if route_request.get("language") == "Chinese":
-        tags = "、".join(localize_study_tag(tag, "Chinese") for tag in primary.get("tags", [])[:2])
-        note = f"到达后，如果你是去学习，可以优先看看附近的 {primary['name']}，它比较适合{tags}。"
-    else:
-        tags = ", ".join(primary.get("tags", [])[:2])
-        note = f"Once you arrive, {primary['name']} is the nearby Imperial study option I would check first, especially for {tags}."
+    language = route_request.get("language")
+    note = generate_destination_context_note(route_request, destination_name, language)
+    if not note:
+        note = destination_context_fallback(destination_name, language)
+    note = strip_reasoning_text(note)
+    if not note:
+        return answer
 
     return f"{answer.rstrip()}\n\n{note}"
 
 
-def study_option_already_mentioned(answer, primary):
+def destination_context_already_mentioned(answer, destination_name):
     normalized_answer = normalize_text_for_match(answer)
-    normalized_name = normalize_text_for_match(primary["name"])
-    if normalized_name and normalized_name in normalized_answer:
-        return True
+    normalized_destination = normalize_text_for_match(destination_name)
+    if normalized_destination and normalized_destination in normalized_answer:
+        context_markers = [
+            r"famous for",
+            r"known for",
+            r"worth exploring",
+            r"historic",
+            r"大学城",
+            r"闻名",
+            r"值得",
+            r"可逛",
+        ]
+        return any(re.search(pattern, str(answer), flags=re.IGNORECASE) for pattern in context_markers)
+    return False
 
-    aliases = {
-        "Hammersmith Campus Library": [
-            "Hammersmith campus library",
-            "Hammersmith 校区的图书馆",
-            "Hammersmith 校区图书馆",
-            "哈默史密斯校区图书馆",
-            "哈默史密斯校区的图书馆",
-        ],
-        "South Kensington Campus": [
-            "South Kensington campus",
-            "南肯校区",
-            "南肯辛顿校区",
-        ],
-        "Abdus Salam Library": [
-            "Abdus Salam",
-            "主图书馆",
-            "中央图书馆",
-        ],
-    }
-    return any(normalize_text_for_match(alias) in normalized_answer for alias in aliases.get(primary["name"], []))
+
+def generate_destination_context_note(route_request, destination_name, language):
+    provider = get_llm_provider()
+    prompt = build_destination_context_prompt(destination_name, language)
+    developer_text = (
+        "You are a travel assistant. Write a short, free-form introduction to the destination as a place to visit. "
+        "You may mention what it is known for, its atmosphere, a landmark, history, or a traveler-facing overview. "
+        "Do not mention routes, transport times, maps, Imperial, or the fact that this was generated as a follow-up. "
+        "Answer in the same language as the user. Do not output hidden reasoning, analysis, scratchpad text, or <think> tags."
+    )
+
+    try:
+        if provider == "openai":
+            api_key = get_openai_api_key()
+            if not api_key:
+                return ""
+            return call_openai_text(api_key, developer_text, prompt, max_output_tokens=260, temperature=0.7)
+        if provider == "groq":
+            api_key = get_groq_api_key()
+            if not api_key:
+                return ""
+            return call_groq_text(api_key, developer_text, prompt, max_completion_tokens=260, temperature=0.7)
+        return call_ollama_once(
+            [
+                {"role": "system", "content": developer_text},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.7,
+            num_predict=260,
+        )
+    except Exception:
+        return ""
+
+
+def build_destination_context_prompt(destination_name, language):
+    if language == "Chinese":
+        return (
+            f"请用中文写一段 2 到 4 句的自由介绍，介绍 {destination_name} 这个地方。"
+            "你可以提到它的气质、著名地标、历史背景、当地氛围，或者为什么值得去。"
+            "不要提路线、交通时间、地图、Imperial，也不要说这是补充说明。"
+            "尽量像真人给朋友介绍目的地一样自然。"
+        )
+
+    return (
+        f"Write a 2 to 4 sentence free-form introduction to {destination_name} as a place to visit. "
+        "You can mention its atmosphere, notable landmarks, history, local character, or why people go there. "
+        "Do not mention routes, travel time, maps, Imperial, or that this is a follow-up. "
+        "Sound natural, like a human recommending the place to a friend."
+    )
+
+
+def destination_context_fallback(destination_name, language):
+    if language == "Chinese":
+        return f"到达后也可以顺便花一点时间了解一下 {destination_name} 的当地环境和周边街区。"
+    return f"Once you arrive, you can also take a little time to get to know {destination_name} and the surrounding area."
 
 
 def normalize_text_for_match(value):
@@ -1768,8 +1792,36 @@ def append_navigation_source_note(answer, route_request, routes):
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
     if note in cleaned:
         return cleaned
-    joiner = "" if route_request.get("language") == "Chinese" else " "
-    return f"{cleaned.rstrip()}{joiner}{note}"
+    return insert_navigation_source_note(cleaned, note, route_request.get("language"))
+
+
+def insert_navigation_source_note(answer, note, language):
+    paragraphs = re.split(r"\n\s*\n", str(answer or "").strip())
+    paragraphs = [paragraph.strip() for paragraph in paragraphs if paragraph.strip()]
+    if not paragraphs:
+        return note
+
+    insert_before = next(
+        (index for index, paragraph in enumerate(paragraphs) if is_study_context_paragraph(paragraph, language)),
+        None,
+    )
+    target_index = max(0, insert_before - 1) if insert_before is not None else len(paragraphs) - 1
+    joiner = "" if language == "Chinese" else " "
+    paragraphs[target_index] = f"{paragraphs[target_index].rstrip()}{joiner}{note}"
+    return "\n\n".join(paragraphs)
+
+
+def is_study_context_paragraph(paragraph, language):
+    text = str(paragraph or "")
+    if language == "Chinese":
+        return bool(
+            re.search(r"(此外|另外|附近|周边).{0,40}(图书馆|学习空间|自习|安静学习|Hammersmith Campus Library|Abdus Salam Library|GoStudy)", text)
+            or re.search(r"(Imperial|帝国理工).{0,40}(图书馆|学习空间|library|study)", text, flags=re.IGNORECASE)
+        )
+    return bool(
+        re.search(r"\b(nearby|also|additionally|once you arrive)\b.{0,80}\b(library|study space|study option|quiet study)\b", text, flags=re.IGNORECASE)
+        or re.search(r"\bImperial\b.{0,80}\b(library|study|campus)\b", text, flags=re.IGNORECASE)
+    )
 
 
 def nearby_study_places(destination, limit=2, max_distance_km=None):
@@ -1928,7 +1980,7 @@ def call_openai_navigation(api_key, prompt):
                 },
                 {"role": "user", "content": [{"type": "input_text", "text": prompt}]},
             ],
-            "max_output_tokens": 420,
+            "max_output_tokens": 520,
         },
         ensure_ascii=False,
     ).encode("utf-8")
@@ -1983,7 +2035,40 @@ def call_openai_json(api_key, developer_text, prompt, max_output_tokens=220):
     return extract_openai_text(data)
 
 
-def call_groq_json(api_key, developer_text, prompt, max_completion_tokens=1200):
+def call_openai_text(api_key, developer_text, prompt, max_output_tokens=220, temperature=0.7):
+    request_body = json.dumps(
+        {
+            "model": OPENAI_MODEL,
+            "input": [
+                {
+                    "role": "developer",
+                    "content": [{"type": "input_text", "text": developer_text}],
+                },
+                {"role": "user", "content": [{"type": "input_text", "text": prompt}]},
+            ],
+            "max_output_tokens": max_output_tokens,
+            "temperature": temperature,
+        },
+        ensure_ascii=False,
+    ).encode("utf-8")
+
+    request = urllib.request.Request(
+        OPENAI_API_URL,
+        data=request_body,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": f"{APP_NAME}/1.0",
+        },
+        method="POST",
+    )
+
+    with urllib.request.urlopen(request, timeout=45) as response:
+        data = json.loads(response.read().decode("utf-8"))
+    return extract_openai_text(data)
+
+def call_groq_json(api_key, developer_text, prompt, max_completion_tokens=GROQ_MAX_COMPLETION_TOKENS):
     return call_groq_messages(
         api_key,
         [
@@ -1994,6 +2079,17 @@ def call_groq_json(api_key, developer_text, prompt, max_completion_tokens=1200):
         temperature=0,
     )
 
+
+def call_groq_text(api_key, developer_text, prompt, max_completion_tokens=220, temperature=0.7):
+    return call_groq_messages(
+        api_key,
+        [
+            {"role": "system", "content": developer_text},
+            {"role": "user", "content": prompt},
+        ],
+        max_completion_tokens=max_completion_tokens,
+        temperature=temperature,
+    )
 
 def call_groq(api_key, payload):
     prompt = build_agent_prompt(payload)
@@ -2007,10 +2103,10 @@ def call_groq(api_key, payload):
             messages.append({"role": role, "content": content})
 
     messages.append({"role": "user", "content": prompt})
-    return call_groq_messages(api_key, messages, max_completion_tokens=1200, temperature=0.2)
+    return call_groq_messages(api_key, messages, max_completion_tokens=GROQ_MAX_COMPLETION_TOKENS, temperature=0.2)
 
 
-def call_groq_messages(api_key, messages, max_completion_tokens=1200, temperature=0.2):
+def call_groq_messages(api_key, messages, max_completion_tokens=GROQ_MAX_COMPLETION_TOKENS, temperature=0.2):
     request_body = json.dumps(
         {
             "model": get_groq_model(),
@@ -2044,8 +2140,24 @@ def extract_groq_text(data):
         message = choices[0].get("message", {})
         content = message.get("content")
         if isinstance(content, str) and content.strip():
-            return content.strip()
+            return strip_reasoning_text(content)
     return "模型没有返回文本结果。"
+
+
+def strip_reasoning_text(text):
+    cleaned = strip_thinking(str(text or ""))
+    cleaned = re.sub(
+        r"(?is)^\s*(?:reasoning|thinking|thought process|思考过程|推理过程)\s*[:：].*?(?:\n\s*\n|(?=final answer\s*[:：])|(?=最终答案\s*[:：])|$)",
+        "",
+        cleaned,
+    )
+    cleaned = re.sub(
+        r"(?is)^\s*(?:analysis|scratchpad|chain of thought|思路|分析)\s*[:：].*?(?:\n\s*\n|(?=final answer\s*[:：])|(?=最终答案\s*[:：])|$)",
+        "",
+        cleaned,
+    )
+    cleaned = re.sub(r"(?is)^\s*(?:final answer|最终答案)\s*[:：]\s*", "", cleaned)
+    return cleaned.strip()
 
 
 def format_navigation_failure(route_request, errors):
@@ -2147,7 +2259,7 @@ def call_openai(api_key, payload):
         {
             "model": OPENAI_MODEL,
             "input": model_input,
-            "max_output_tokens": 650,
+            "max_output_tokens": 800,
         },
         ensure_ascii=False,
     ).encode("utf-8")
@@ -2179,6 +2291,7 @@ def call_ollama_stream(payload):
             messages.append({"role": role, "content": content})
 
     messages.append({"role": "user", "content": build_agent_prompt(payload, no_think=True)})
+
     request_body = json.dumps(
         {
             "model": OLLAMA_MODEL,
@@ -2187,7 +2300,7 @@ def call_ollama_stream(payload):
             "think": False,
             "keep_alive": "10m",
             "options": {
-                "temperature": 0.2,
+                "temperature": 0.15,
                 "num_predict": OLLAMA_NUM_PREDICT,
                 "num_ctx": 2048,
             },
@@ -2202,17 +2315,52 @@ def call_ollama_stream(payload):
         method="POST",
     )
 
+    buffer = ""
+    emitted = ""
     with urllib.request.urlopen(request, timeout=120) as response:
         for raw_line in response:
             line = raw_line.decode("utf-8", errors="replace").strip()
             if not line:
                 continue
             data = json.loads(line)
-            chunk = strip_thinking(str(data.get("message", {}).get("content", "")))
-            if chunk:
-                yield chunk
+            buffer += str(data.get("message", {}).get("content", ""))
+            cleaned = strip_reasoning_text(buffer)
+            if len(cleaned) > len(emitted):
+                delta = cleaned[len(emitted):]
+                emitted = cleaned
+                if delta:
+                    yield delta
             if data.get("done"):
                 break
+
+
+def call_ollama_once(messages, temperature=0.15, num_predict=OLLAMA_NUM_PREDICT):
+    request_body = json.dumps(
+        {
+            "model": OLLAMA_MODEL,
+            "messages": messages,
+            "stream": False,
+            "think": False,
+            "keep_alive": "10m",
+            "options": {
+                "temperature": temperature,
+                "num_predict": num_predict,
+                "num_ctx": 2048,
+            },
+        },
+        ensure_ascii=False,
+    ).encode("utf-8")
+
+    request = urllib.request.Request(
+        OLLAMA_API_URL,
+        data=request_body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    with urllib.request.urlopen(request, timeout=90) as response:
+        data = json.loads(response.read().decode("utf-8", errors="replace"))
+    return extract_ollama_text(data)
 
 
 def extract_ollama_text(data):
@@ -2355,9 +2503,11 @@ def is_study_related_question(question):
 
 
 def strip_thinking(text):
-    if "</think>" in text:
-        return text.split("</think>", 1)[1].strip()
-    return text
+    cleaned = str(text or "")
+    cleaned = re.sub(r"(?is)<think\b[^>]*>.*?</think>", "", cleaned)
+    cleaned = re.sub(r"(?is)<think\b[^>]*>.*$", "", cleaned)
+    cleaned = re.sub(r"(?is)^.*?</think>", "", cleaned)
+    return cleaned.strip()
 
 
 def extract_openai_text(data):

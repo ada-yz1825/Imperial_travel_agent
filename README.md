@@ -48,7 +48,7 @@ GitHub Pages can host only the static files in this repository. It cannot safely
 ```bash
 LLM_PROVIDER=groq
 GROQ_API_KEY="your_groq_api_key"
-GROQ_MODEL="llama-3.3-70b-versatile"
+GROQ_MODEL="qwen/qwen3-32b"
 GOOGLE_MAPS_API_KEY="your_google_maps_api_key"
 GOOGLE_MAPS_BROWSER_KEY="your_google_maps_browser_key"
 ```
@@ -76,7 +76,7 @@ Keep the backend Routes key and browser Maps key separate. The backend uses `GOO
 ```bash
 LLM_PROVIDER="groq"
 GROQ_API_KEY="your_groq_api_key"
-GROQ_MODEL="llama-3.3-70b-versatile"
+GROQ_MODEL="qwen/qwen3-32b"
 GOOGLE_MAPS_API_KEY="your_google_maps_api_key"
 GOOGLE_MAPS_BROWSER_KEY="your_google_maps_browser_key"
 ```
