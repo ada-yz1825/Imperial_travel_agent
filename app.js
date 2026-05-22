@@ -81,6 +81,10 @@ const startOffsets = {
     royalBrompton: 8,
     stMarys: 17,
     silwoodPark: 62,
+    britishLibrary: 0,
+    wellcomeCollection: 0,
+    barbican: 0,
+    whitechapel: 0,
   },
   whiteCity: {
     label: "White City",
@@ -95,6 +99,10 @@ const startOffsets = {
     royalBrompton: 21,
     stMarys: 18,
     silwoodPark: 58,
+    britishLibrary: 8,
+    wellcomeCollection: 7,
+    barbican: 11,
+    whitechapel: 12,
   },
   hammersmith: {
     label: "Hammersmith",
@@ -109,6 +117,10 @@ const startOffsets = {
     royalBrompton: 17,
     stMarys: 20,
     silwoodPark: 61,
+    britishLibrary: 8,
+    wellcomeCollection: 8,
+    barbican: 12,
+    whitechapel: 14,
   },
   stMarys: {
     label: "St Mary's",
@@ -123,6 +135,10 @@ const startOffsets = {
     royalBrompton: 18,
     stMarys: -4,
     silwoodPark: 58,
+    britishLibrary: -4,
+    wellcomeCollection: -5,
+    barbican: 7,
+    whitechapel: 10,
   },
 };
 
@@ -134,6 +150,7 @@ const places = [
     lat: 51.498356,
     lng: -0.176894,
     image: "./assets/library-images/abdus-salam-library.jpg",
+    website: "https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/abdus-salam-library/",
     distance: 0.2,
     transitMinutes: 4,
     walkMinutes: 3,
@@ -149,6 +166,7 @@ const places = [
     lat: 51.4984,
     lng: -0.1752,
     image: "./assets/library-images/gostudy-student-space.jpg",
+    website: "https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/gostudy/",
     distance: 0.4,
     transitMinutes: 6,
     walkMinutes: 5,
@@ -164,6 +182,7 @@ const places = [
     lat: 51.4872,
     lng: -0.2197,
     image: "./assets/library-images/charing-cross-library.jpg",
+    website: "https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/charing-cross-campus-library/",
     distance: 6.2,
     transitMinutes: 28,
     walkMinutes: 8,
@@ -179,6 +198,7 @@ const places = [
     lat: 51.4846,
     lng: -0.1819,
     image: "./assets/library-images/chelsea-westminster-library.jpg",
+    website: "https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/chelsea-and-westminster-campus-library/",
     distance: 3.0,
     transitMinutes: 18,
     walkMinutes: 9,
@@ -194,6 +214,7 @@ const places = [
     lat: 51.51742,
     lng: -0.234721,
     image: "./assets/library-images/hammersmith-library.jpg",
+    website: "https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/hammersmith-campus-library/",
     distance: 6.6,
     transitMinutes: 31,
     walkMinutes: 7,
@@ -203,27 +224,13 @@ const places = [
     tags: ["quiet", "wifi", "indoor", "medicine", "campus"],
   },
   {
-    name: "White City Campus Library Services",
-    zone: "whiteCity",
-    type: "Campus library services",
-    lat: 51.515768,
-    lng: -0.224009,
-    image: "./assets/library-images/white-city-collabor-88.jpg",
-    distance: 7.4,
-    transitMinutes: 34,
-    walkMinutes: 6,
-    crowd: 45,
-    comfort: 77,
-    budget: 100,
-    tags: ["wifi", "indoor", "services", "campus", "transit"],
-  },
-  {
     name: "Royal Brompton Campus Library",
     zone: "royalBrompton",
     type: "Medical library",
     lat: 51.4892,
     lng: -0.1708,
     image: "./assets/library-images/royal-brompton-library.jpg",
+    website: "https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/royal-brompton-campus-library/",
     distance: 1.7,
     transitMinutes: 15,
     walkMinutes: 14,
@@ -239,6 +246,7 @@ const places = [
     lat: 51.517403,
     lng: -0.174169,
     image: "./assets/library-images/st-marys-library.jpg",
+    website: "https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/st-marys-campus-library/",
     distance: 5.2,
     transitMinutes: 27,
     walkMinutes: 6,
@@ -254,6 +262,7 @@ const places = [
     lat: 51.4113,
     lng: -0.6415,
     image: "./assets/library-images/silwood-park-library.jpg",
+    website: "https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/silwood-park-campus-library/",
     distance: 42.0,
     transitMinutes: 78,
     walkMinutes: 5,
@@ -261,6 +270,70 @@ const places = [
     comfort: 82,
     budget: 100,
     tags: ["quiet", "wifi", "indoor", "green", "calm"],
+  },
+  {
+    name: "British Library",
+    zone: "britishLibrary",
+    type: "National library",
+    lat: 51.529972,
+    lng: -0.127675,
+    image: "https://commons.wikimedia.org/wiki/Special:FilePath/British%20Library%20%2B%20St%20Pancras%207527-31hug.jpg?width=900",
+    website: "https://www.bl.uk/visit",
+    distance: 6.8,
+    transitMinutes: 26,
+    walkMinutes: 8,
+    crowd: 62,
+    comfort: 86,
+    budget: 100,
+    tags: ["quiet", "wifi", "indoor", "public", "research", "central"],
+  },
+  {
+    name: "Wellcome Collection Library",
+    zone: "wellcomeCollection",
+    type: "Public research library",
+    lat: 51.5259,
+    lng: -0.134,
+    image: "https://commons.wikimedia.org/wiki/Special:FilePath/View%20of%20the%20Wellcome%20library%2C%20ground%20floor%20Wellcome%20M0013088.jpg?width=900",
+    website: "https://wellcomecollection.org/visit-us/the-library",
+    distance: 6.2,
+    transitMinutes: 24,
+    walkMinutes: 6,
+    crowd: 48,
+    comfort: 84,
+    budget: 100,
+    tags: ["quiet", "wifi", "indoor", "public", "medicine", "research"],
+  },
+  {
+    name: "Barbican Library",
+    zone: "barbican",
+    type: "Public library",
+    lat: 51.519811,
+    lng: -0.093919,
+    image: "https://commons.wikimedia.org/wiki/Special:FilePath/Barbican%20library%20%287049041697%29.jpg?width=900",
+    website: "https://www.cityoflondon.gov.uk/services/libraries/barbican-library",
+    distance: 8.2,
+    transitMinutes: 32,
+    walkMinutes: 7,
+    crowd: 52,
+    comfort: 78,
+    budget: 100,
+    tags: ["wifi", "indoor", "public", "study-space", "arts", "group"],
+  },
+  {
+    name: "Idea Store Whitechapel",
+    zone: "whitechapel",
+    type: "Public library and learning centre",
+    lat: 51.519853,
+    lng: -0.057958,
+    image: "https://commons.wikimedia.org/wiki/Special:FilePath/Ideas%20Store%20Whitechapel%20%2832550032767%29.jpg?width=900",
+    website: "https://ideastore.towerhamlets.gov.uk/digital-content/idea-stores/whitechapel",
+    distance: 9.8,
+    transitMinutes: 38,
+    walkMinutes: 5,
+    crowd: 56,
+    comfort: 76,
+    budget: 100,
+    tags: ["wifi", "indoor", "public", "study-space", "learning", "community"],
   },
 ];
 
@@ -461,7 +534,7 @@ function render() {
 
   $("weatherSignal").textContent = integrationStatus.llm;
   $("trafficSignal").textContent = integrationStatus.google;
-  $("airSignal").textContent = integrationStatus.tools;
+  updateAgentModeSignal(integrationStatus.tools, false);
 
   latestRanked = places
     .map((place) => scorePlace(place, context))
@@ -492,8 +565,11 @@ function renderCard(place, index) {
   const tagLabels = visibleTags
     .map((tag) => `<span class="tag">${tagLabel(tag)}</span>`)
     .join("");
+  const websiteAttributes = place.website
+    ? ` data-website="${escapeHtml(place.website)}" role="link" tabindex="0" aria-label="Open ${escapeHtml(place.name)} official website"`
+    : "";
   return `
-    <article class="place-card">
+    <article class="place-card"${websiteAttributes}>
       <div class="place-image" style="background-image: url('${place.image}')"></div>
       <div class="place-body">
         <div class="place-heading">
@@ -535,6 +611,12 @@ function tagLabel(tag) {
   return labels[tag] ?? tag;
 }
 
+function openPlaceWebsiteFromCard(card) {
+  const website = card?.dataset?.website;
+  if (!website) return;
+  showExternalConfirm(website);
+}
+
 function updateOutputs() {
   $("walkOutput").textContent = `${controls.walkTolerance.value} min`;
 }
@@ -546,6 +628,7 @@ async function answerQuestion(question, options = {}) {
     return;
   }
 
+  setAgentMode("Pending");
   renderLoadingAnswer("Understanding your request");
   const intent = await classifyIntent(cleaned);
   if (intent.mode === "navigation") {
@@ -635,12 +718,16 @@ async function classifyIntent(question) {
 async function answerNavigationQuestion(question, options = {}) {
   setAsking(true);
   renderLoadingAnswer("Checking Google Routes for accurate navigation");
+  const ROUTE_SUMMARY_DELAY_MS = 4000;
+  const ROUTE_MAP_DELAY_MS = 8000;
+
   const routeSummaryTimer = window.setTimeout(() => {
     renderLoadingAnswer("Generating routes to your destination");
-  }, 6000);
+  }, ROUTE_SUMMARY_DELAY_MS);
+
   const routeMapTimer = window.setTimeout(() => {
     renderLoadingAnswer("Generating summary and map, this may take a while");
-  }, 8000);
+  }, ROUTE_MAP_DELAY_MS);
 
   try {
     const response = await apiFetch("/api/navigate", {
@@ -814,6 +901,7 @@ function renderLoadingAnswer(message) {
 
 function renderMarkdown(value) {
   return escapeHtml(value)
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>')
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/^\s*[-*]\s+(.+)$/gm, "• $1")
     .replace(/\n/g, "<br />");
@@ -884,7 +972,20 @@ function setAsking(isAsking) {
 
 function setAgentMode(mode) {
   integrationStatus.tools = mode;
+  updateAgentModeSignal(mode);
   render();
+}
+
+function updateAgentModeSignal(mode, animate = true) {
+  const signal = $("airSignal");
+  if (!signal) return;
+  const changed = signal.textContent !== mode;
+  signal.textContent = mode;
+  signal.dataset.mode = mode.toLowerCase().replace(/\s+/g, "-");
+  if (!animate || !changed) return;
+  signal.classList.remove("mode-changed");
+  void signal.offsetWidth;
+  signal.classList.add("mode-changed");
 }
 
 function escapeHtml(value) {
@@ -993,6 +1094,8 @@ function drawRoutePreview(data, recommended) {
   $("routePreviewTitle").textContent = `Route map: ${recommended.modeLabel || recommended.mode || "route"}`;
   const distance = Number.isFinite(recommended.distanceKm) ? `, ${recommended.distanceKm} km` : "";
   $("routePreviewMeta").textContent = `${recommended.durationMinutes} min${distance}`;
+  $("routeOriginLabel").textContent = data.origin || "Origin";
+  $("routeDestinationLabel").textContent = data.destination || "Destination";
   updateGoogleMapsLink(data, recommended);
 
   if (!window.google?.maps) return;
@@ -1109,6 +1212,19 @@ function closeChatModal() {
   });
 }
 
+function shouldShowRouteMapButton(item, index) {
+  return (
+    item.role === "assistant" &&
+    index === chatHistory.length - 1 &&
+    Boolean(latestNavigationData?.origin && latestNavigationData?.destination) &&
+    !$("routePreview").hidden
+  );
+}
+
+function routeMapButtonHtml() {
+  return `<button class="chat-route-map-button" type="button" data-chat-route-map="true">Close to view route map</button>`;
+}
+
 function renderChatModalHistory(isLoading = false) {
   const history = $("chatModalHistory");
   if (!history) return;
@@ -1118,9 +1234,10 @@ function renderChatModalHistory(isLoading = false) {
   }
 
   const messages = chatHistory
-    .map((item) => {
+    .map((item, index) => {
       const role = item.role === "user" ? "user" : "assistant";
-      return `<div class="chat-message ${role}">${renderMarkdown(item.content)}</div>`;
+      const routeMapButton = shouldShowRouteMapButton(item, index) ? routeMapButtonHtml() : "";
+      return `<div class="chat-message ${role}">${renderMarkdown(item.content)}${routeMapButton}</div>`;
     })
     .join("");
   const loading = isLoading
@@ -1128,6 +1245,13 @@ function renderChatModalHistory(isLoading = false) {
     : "";
   history.innerHTML = messages + loading;
   history.scrollTop = history.scrollHeight;
+}
+
+function showRouteMapFromChat() {
+  closeChatModal();
+  window.setTimeout(() => {
+    $("routePreview")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, 220);
 }
 
 function decodePolyline(encoded) {
@@ -1169,8 +1293,10 @@ function decodePolylineValue(encoded, startIndex) {
 }
 
 function setMapStartPoint(latLng) {
-  const lat = latLng.lat();
-  const lng = latLng.lng();
+  setMapStartCoordinates(latLng.lat(), latLng.lng());
+}
+
+function setMapStartCoordinates(lat, lng, statusMessage = "") {
   startOffsets.mapSelection = {
     label: "Map selection",
     lat,
@@ -1180,7 +1306,9 @@ function setMapStartPoint(latLng) {
   controls.startPoint.value = "mapSelection";
   if (startMarker) startMarker.setPosition({ lat, lng });
   if (startMap) startMap.panTo({ lat, lng });
-  updateStartMapStatus();
+  updateStartMapStatus(statusMessage);
+  render();
+  if (controls.scenario.value === "nearest") refreshRoutes();
 }
 
 function selectCampusStart(key) {
@@ -1192,14 +1320,123 @@ function selectCampusStart(key) {
     startMap.setZoom(13);
   }
   updateStartMapStatus();
+  render();
+  if (controls.scenario.value === "nearest") refreshRoutes();
 }
 
-function updateStartMapStatus() {
+function updateStartMapStatus(statusMessage = "") {
   const start = getStartPoint();
   const label = controls.startPoint.value === "mapSelection"
     ? `Map point ${start.lat.toFixed(5)}, ${start.lng.toFixed(5)}`
     : `${start.label} selected`;
-  $("startMapStatus").textContent = `${label}. Click the map or drag the marker to choose any start.`;
+  const guidance = statusMessage || "Click the map, drag the marker, or use your current location.";
+  $("startMapStatus").textContent = `${label}. ${guidance}`;
+}
+
+function geolocationErrorMessage(error) {
+  if (!window.isSecureContext) {
+    return "Location requires HTTPS or localhost.";
+  }
+  if (!error) return "Could not read your current location.";
+  if (error.code === error.PERMISSION_DENIED) return "Location permission was denied.";
+  if (error.code === error.POSITION_UNAVAILABLE) return "Current location is unavailable.";
+  if (error.code === error.TIMEOUT) return "Location request timed out.";
+  return "Could not read your current location.";
+}
+
+function setLocationButtonLoading(isLoading) {
+  const button = $("useCurrentLocation");
+  if (!button) return;
+  button.disabled = isLoading;
+  button.textContent = isLoading ? "Locating..." : "Or use current location";
+}
+
+function getCurrentPositionWithTimeout(options, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject({ code: 3, message: "Location request timed out." });
+    }, timeoutMs);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timer);
+        resolve(position);
+      },
+      (error) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timer);
+        reject(error);
+      },
+      options,
+    );
+  });
+}
+
+async function readGeolocationPermissionState() {
+  if (!navigator.permissions?.query) return "";
+  try {
+    const permission = await navigator.permissions.query({ name: "geolocation" });
+    return permission.state || "";
+  } catch (error) {
+    return "";
+  }
+}
+
+async function requestCurrentLocation() {
+  if (!navigator.geolocation) {
+    $("startMapStatus").textContent = "This browser does not support current location.";
+    return;
+  }
+
+  setLocationButtonLoading(true);
+  const permissionState = await readGeolocationPermissionState();
+  if (permissionState === "denied") {
+    $("startMapStatus").textContent = "Location permission is blocked. Enable it in your browser site settings.";
+    setLocationButtonLoading(false);
+    return;
+  }
+
+  $("startMapStatus").textContent = permissionState === "prompt"
+    ? "Waiting for browser location permission..."
+    : "Reading your current location...";
+
+  try {
+    let position;
+    try {
+      position = await getCurrentPositionWithTimeout(
+        {
+          enableHighAccuracy: true,
+          timeout: 8000,
+          maximumAge: 30000,
+        },
+        10000,
+      );
+    } catch (firstError) {
+      $("startMapStatus").textContent = "High-accuracy location is slow; trying a faster approximate location...";
+      position = await getCurrentPositionWithTimeout(
+        {
+          enableHighAccuracy: false,
+          timeout: 7000,
+          maximumAge: 300000,
+        },
+        9000,
+      );
+    }
+
+    const { latitude, longitude, accuracy } = position.coords;
+    const accuracyText = Number.isFinite(accuracy) ? ` Accuracy about ${Math.round(accuracy)} m.` : "";
+    setMapStartCoordinates(latitude, longitude, `Using your current location.${accuracyText}`);
+  } catch (error) {
+    $("startMapStatus").textContent = geolocationErrorMessage(error);
+  } finally {
+    setLocationButtonLoading(false);
+  }
 }
 
 async function refreshIntegrationStatus() {
@@ -1292,6 +1529,19 @@ $("updateRecommendations").addEventListener("click", () => {
   render();
   if (controls.scenario.value === "nearest") refreshRoutes();
 });
+$("recommendations").addEventListener("click", (event) => {
+  const card = event.target.closest(".place-card[data-website]");
+  if (!card) return;
+  openPlaceWebsiteFromCard(card);
+});
+$("recommendations").addEventListener("keydown", (event) => {
+  if (!["Enter", " "].includes(event.key)) return;
+  const card = event.target.closest(".place-card[data-website]");
+  if (!card) return;
+  event.preventDefault();
+  openPlaceWebsiteFromCard(card);
+});
+$("useCurrentLocation").addEventListener("click", requestCurrentLocation);
 $("questionForm").addEventListener("submit", (event) => {
   event.preventDefault();
   answerQuestion($("userQuestion").value);
@@ -1307,6 +1557,7 @@ $("openChatButton").addEventListener("click", openChatModal);
 $("closeChatButton").addEventListener("click", closeChatModal);
 $("chatModal").addEventListener("click", (event) => {
   if (event.target === $("chatModal")) closeChatModal();
+  if (event.target?.matches("[data-chat-route-map]")) showRouteMapFromChat();
 });
 // External Google Maps link: show confirm modal before leaving
 const externalConfirmModalEl = $("externalConfirmModal");

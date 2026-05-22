@@ -24,6 +24,12 @@ OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3")
 OLLAMA_NUM_PREDICT = int(os.environ.get("OLLAMA_NUM_PREDICT", "180"))
 CHAT_HISTORY_LIMIT = int(os.environ.get("CHAT_HISTORY_LIMIT", "6"))
 GOOGLE_TRAVEL_MODE = os.environ.get("GOOGLE_TRAVEL_MODE", "TRANSIT")
+IMPERIAL_SHUTTLE_URL = "https://www.imperial.ac.uk/admin-services/property/travel/shuttle-bus/"
+IMPERIAL_SHUTTLE_CAMPUSES = {
+    "south kensington": "South Kensington",
+    "white city": "White City",
+    "hammersmith": "Hammersmith",
+}
 COMMAND_PLACE_TEXTS = {
     "导航",
     "路线",
@@ -127,6 +133,19 @@ KNOWN_LOCATIONS = {
     "chelsea and westminster": {"name": "Chelsea and Westminster Campus Library", "lat": 51.4846, "lng": -0.1819},
     "royal brompton": {"name": "Royal Brompton Campus Library", "lat": 51.4892, "lng": -0.1708},
     "silwood park": {"name": "Silwood Park Campus Library", "lat": 51.4113, "lng": -0.6415},
+    "british library": {"name": "British Library", "lat": 51.529972, "lng": -0.127675},
+    "大英图书馆": {"name": "British Library", "lat": 51.529972, "lng": -0.127675},
+    "wellcome collection": {"name": "Wellcome Collection Library", "lat": 51.525900, "lng": -0.134000},
+    "wellcome collection library": {"name": "Wellcome Collection Library", "lat": 51.525900, "lng": -0.134000},
+    "wellcome library": {"name": "Wellcome Collection Library", "lat": 51.525900, "lng": -0.134000},
+    "惠康图书馆": {"name": "Wellcome Collection Library", "lat": 51.525900, "lng": -0.134000},
+    "barbican": {"name": "Barbican Library", "lat": 51.519811, "lng": -0.093919},
+    "barbican library": {"name": "Barbican Library", "lat": 51.519811, "lng": -0.093919},
+    "巴比肯图书馆": {"name": "Barbican Library", "lat": 51.519811, "lng": -0.093919},
+    "idea store whitechapel": {"name": "Idea Store Whitechapel", "lat": 51.519853, "lng": -0.057958},
+    "whitechapel idea store": {"name": "Idea Store Whitechapel", "lat": 51.519853, "lng": -0.057958},
+    "idea store": {"name": "Idea Store Whitechapel", "lat": 51.519853, "lng": -0.057958},
+    "白教堂学习中心": {"name": "Idea Store Whitechapel", "lat": 51.519853, "lng": -0.057958},
 }
 
 STUDY_PLACES = [
@@ -143,13 +162,6 @@ STUDY_PLACES = [
         "lat": 51.4984,
         "lng": -0.1752,
         "tags": ["group study", "student workspace", "South Kensington"],
-    },
-    {
-        "name": "White City Campus Library Services",
-        "type": "campus library services",
-        "lat": 51.515768,
-        "lng": -0.224009,
-        "tags": ["White City", "campus support", "study access"],
     },
     {
         "name": "Hammersmith Campus Library",
@@ -192,6 +204,34 @@ STUDY_PLACES = [
         "lat": 51.4113,
         "lng": -0.6415,
         "tags": ["green setting", "quiet study", "Silwood Park"],
+    },
+    {
+        "name": "British Library",
+        "type": "national library",
+        "lat": 51.529972,
+        "lng": -0.127675,
+        "tags": ["public study space", "reading rooms", "research", "free wifi"],
+    },
+    {
+        "name": "Wellcome Collection Library",
+        "type": "public research library",
+        "lat": 51.525900,
+        "lng": -0.134000,
+        "tags": ["public study space", "quiet study", "medicine", "research"],
+    },
+    {
+        "name": "Barbican Library",
+        "type": "public library",
+        "lat": 51.519811,
+        "lng": -0.093919,
+        "tags": ["public library", "study space", "free wifi", "arts"],
+    },
+    {
+        "name": "Idea Store Whitechapel",
+        "type": "public library and learning centre",
+        "lat": 51.519853,
+        "lng": -0.057958,
+        "tags": ["public library", "learning centre", "study space", "community"],
     },
 ]
 
@@ -1319,6 +1359,7 @@ def navigation_prompt(query, route_request, routes, errors, study_options):
         "available_routes": routes,
         "route_summary": summarize_routes_for_prompt(routes, response_language),
         "near_destination_study_options": study_options,
+        "imperial_weekday_shuttle": imperial_shuttle_context(route_request),
         "route_errors": errors[:4],
         "instructions": [
             "Answer in response_language.",
@@ -1333,6 +1374,7 @@ def navigation_prompt(query, route_request, routes, errors, study_options):
             "If near_destination_study_options is empty, do not mention Imperial libraries, Imperial campuses, study spaces, or the absence of them.",
             "If origin_source is 'context', avoid explicitly naming the origin; refer to it as the selected start point or omit it, focusing on the destination.",
             "If the user's query contains only one place, treat that place as the destination and phrase the answer as travel to that destination (do not invent or name an origin).",
+            f"If imperial_weekday_shuttle.applies is true, mention briefly that Imperial runs a weekday shuttle between the relevant campuses, and include this clickable Markdown link for the timetable: [Imperial shuttle]({IMPERIAL_SHUTTLE_URL}).",
             "If no routes are available, apologize gently, mention the origin/destination understood, and suggest checking Google Maps directly or trying a more specific place name.",
             "Use a natural conversational style. Avoid a fixed report template.",
             "Produce a complete, self-contained answer; do not end mid-sentence or insert a fixed source sentence."
@@ -1470,14 +1512,15 @@ def finalize_navigation_answer(answer, route_request, routes, study_options):
     if not study_options:
         answer = remove_unavailable_study_note(answer)
     with_study_context = append_study_context_note(answer, route_request, study_options)
-    return append_navigation_source_note(with_study_context, route_request, routes)
+    with_shuttle_context = append_imperial_shuttle_note(with_study_context, route_request)
+    return append_navigation_source_note(with_shuttle_context, route_request, routes)
 
 
 def append_study_context_note(answer, route_request, study_options):
     if not study_options:
         return answer
     primary = study_options[0]
-    if primary["name"] in answer:
+    if study_option_already_mentioned(answer, primary):
         return answer
 
     if route_request.get("language") == "Chinese":
@@ -1487,6 +1530,83 @@ def append_study_context_note(answer, route_request, study_options):
         tags = ", ".join(primary.get("tags", [])[:2])
         note = f"Once you arrive, {primary['name']} is the nearby Imperial study option I would check first, especially for {tags}."
 
+    return f"{answer.rstrip()}\n\n{note}"
+
+
+def study_option_already_mentioned(answer, primary):
+    normalized_answer = normalize_text_for_match(answer)
+    normalized_name = normalize_text_for_match(primary["name"])
+    if normalized_name and normalized_name in normalized_answer:
+        return True
+
+    aliases = {
+        "Hammersmith Campus Library": [
+            "Hammersmith campus library",
+            "Hammersmith 校区的图书馆",
+            "Hammersmith 校区图书馆",
+            "哈默史密斯校区图书馆",
+            "哈默史密斯校区的图书馆",
+        ],
+        "South Kensington Campus": [
+            "South Kensington campus",
+            "南肯校区",
+            "南肯辛顿校区",
+        ],
+        "Abdus Salam Library": [
+            "Abdus Salam",
+            "主图书馆",
+            "中央图书馆",
+        ],
+    }
+    return any(normalize_text_for_match(alias) in normalized_answer for alias in aliases.get(primary["name"], []))
+
+
+def normalize_text_for_match(value):
+    return re.sub(r"\s+", " ", str(value or "").lower().replace("’", "'")).strip()
+
+
+def imperial_shuttle_context(route_request):
+    origin_campus = campus_for_shuttle_place(route_request.get("origin"))
+    destination_campus = campus_for_shuttle_place(route_request.get("destination"))
+    applies = bool(origin_campus and destination_campus and origin_campus != destination_campus)
+    return {
+        "applies": applies,
+        "operates": "weekdays",
+        "campuses": ["South Kensington", "White City", "Hammersmith"],
+        "origin_campus": origin_campus,
+        "destination_campus": destination_campus,
+        "schedule_link_label": "Imperial shuttle",
+        "schedule_url": IMPERIAL_SHUTTLE_URL,
+    }
+
+
+def campus_for_shuttle_place(place):
+    if not place:
+        return None
+    name = str(place.get("name", "")).lower()
+    for key, label in IMPERIAL_SHUTTLE_CAMPUSES.items():
+        if key in name:
+            return label
+    return None
+
+
+def append_imperial_shuttle_note(answer, route_request):
+    context = imperial_shuttle_context(route_request)
+    if not context["applies"]:
+        return answer
+    if re.search(r"\bshuttle\b|班车|穿梭巴士|校车", answer, flags=re.IGNORECASE):
+        return answer
+
+    if route_request.get("language") == "Chinese":
+        note = (
+            "另外，Imperial 在工作日运营连接 South Kensington、White City 和 Hammersmith 的班车；"
+            f"如果你需要，可以使用下方链接查看具体时间表：[Imperial shuttle]({IMPERIAL_SHUTTLE_URL})。"
+        )
+    else:
+        note = (
+            "Also, Imperial runs a weekday shuttle connecting South Kensington, White City and Hammersmith; "
+            f"use [Imperial shuttle]({IMPERIAL_SHUTTLE_URL}) to check the timetable."
+        )
     return f"{answer.rstrip()}\n\n{note}"
 
 

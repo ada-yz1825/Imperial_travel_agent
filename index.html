@@ -11,9 +11,9 @@
       <section class="hero-panel" aria-label="Imperial study space planner">
         <div class="hero-copy">
           <p class="eyebrow">Imperial Study Navigator</p>
-          <h1>Start Planning your journey across Imperial</h1>
+          <h1>Start Planning your journey</h1>
           <p class="hero-text">
-            Compare Imperial libraries and study spaces with live Google route times, crowding estimates, comfort and your own study preferences.
+            Start by selecting your location on the map, then ask the agent to plan your travel route, recommend study spaces, or just any question.
           </p>
         </div>
         <div class="city-signal" aria-label="live campus signals">
@@ -30,19 +30,27 @@
 
       <section class="workspace">
         <aside class="control-panel" aria-label="planning settings">
-          <div class="field-group">
+          <div class="control-module start-module">
             <h3 class="left-section-title compact">Choose where to start</h3>
             <label for="startPoint">Starting location</label>
             <div class="campus-map" id="startMap" aria-label="Pick any starting point on Google Map"></div>
             <div class="map-status" id="startMapStatus">Loading Google Map...</div>
-            <span class="select-note">or select campus</span>
-            <select id="startPoint">
-              <option value="mapSelection">Map selection</option>
-              <option value="southKensington">South Kensington</option>
-              <option value="whiteCity">White City</option>
-              <option value="hammersmith">Hammersmith</option>
-              <option value="stMarys">St Mary's</option>
-            </select>
+            <div class="start-choice-row">
+              <div class="campus-choice">
+                <span class="select-note">or select campus</span>
+                <select id="startPoint">
+                  <option value="mapSelection">Map selection</option>
+                  <option value="southKensington">South Kensington</option>
+                  <option value="whiteCity">White City</option>
+                  <option value="hammersmith">Hammersmith</option>
+                  <option value="stMarys">St Mary's</option>
+                </select>
+              </div>
+              <button id="useCurrentLocation" class="location-action" type="button">Or use current location</button>
+            </div>
+          </div>
+
+          <div class="control-module recommendation-module">
             <h3 class="left-section-title">Study space recommendations</h3>
             <div class="field-group">
               <label for="scenario">Study goal</label>
@@ -54,16 +62,16 @@
                 <option value="nearest">Nearest seat</option>
               </select>
             </div>
-          </div>
 
-          <div class="field-row">
-            <span>Walking comfort limit</span>
-            <output id="walkOutput">15 min</output>
-          </div>
-          <input id="walkTolerance" type="range" min="5" max="35" value="15" step="5" />
-          <button id="updateRecommendations" class="secondary-action" type="button">Update recommendations</button>
+            <div class="field-row">
+              <span>Walking comfort limit</span>
+              <output id="walkOutput">15 min</output>
+            </div>
+            <input id="walkTolerance" type="range" min="5" max="35" value="15" step="5" />
+            <button id="updateRecommendations" class="secondary-action" type="button">Update recommendations</button>
 
-          <div class="recommendation-grid" id="recommendations"></div>
+            <div class="recommendation-grid" id="recommendations"></div>
+          </div>
         </aside>
 
         <section class="decision-area" aria-live="polite">
@@ -94,7 +102,7 @@
             <div class="quick-prompts" aria-label="quick questions">
               <button type="button" data-question="I want a quiet Imperial library for focused study. Where should I go?">Quiet study</button>
               <button type="button" data-question="How do I get to White City Campus from my current selected start point?">Go to White City</button>
-              <button type="button" data-question="Which Imperial library is nearby from my selected starting point?">Nearby library</button>
+              <button type="button" data-question="Which library is nearby from my selected starting point?">Nearby library</button>
             </div>
             <div class="agent-answer" id="agentAnswer">
               Travel or study recommendations will appear here; if the query involves route planning, live route plans will also be shown here.
@@ -105,10 +113,23 @@
                 <strong id="routePreviewMeta"></strong>
               </div>
               <div class="route-controls">
-                <label for="routeModeSelect">Transport mode</label>
-                <div class="route-control-row">
-                  <select id="routeModeSelect"></select>
-                  <button id="routeUpdateButton" type="button">Update</button>
+                <div class="route-endpoints" aria-label="Route endpoints">
+                  <div>
+                    <span>Start</span>
+                    <strong id="routeOriginLabel">Origin</strong>
+                  </div>
+                  <div>
+                    <span>Destination</span>
+                    <strong id="routeDestinationLabel">Destination</strong>
+                  </div>
+                </div>
+                <div class="route-control-divider" aria-hidden="true"></div>
+                <div class="route-mode-controls">
+                  <label for="routeModeSelect">Transport mode</label>
+                  <div class="route-control-row">
+                    <select id="routeModeSelect"></select>
+                    <button id="routeUpdateButton" type="button">Update</button>
+                  </div>
                 </div>
               </div>
               <div class="route-map" id="routeMap" aria-label="Recommended route map"></div>
@@ -190,6 +211,13 @@
       </div>
     </div>
 
-    <script src="./app.js?v=github-pages-local-api-1"></script>
+    <footer class="page-signature" role="contentinfo" aria-label="Page author">
+      <div class="page-signature-inner">
+        <span class="sig-name">Created by Yiqi Zhu</span>
+        <span class="sig-degree">MSc Environmental Data Science and Machine Learning at Imperial College London</span>
+      </div>
+    </footer>
+
+    <script src="./app.js?v=geolocation-start-1"></script>
   </body>
 </html>
