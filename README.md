@@ -13,7 +13,7 @@ The app supports English and Chinese. It answers in the same language as the use
 - Interactive route preview map with selectable transport modes.
 - LLM intent classification, so general chat, study planning, and navigation use different behavior.
 - Context-aware navigation, for example asking “Where is Oxford?” and then “navigate there”.
-- Local Ollama support by default, with optional OpenAI provider support.
+- Groq API support by default, with optional Ollama or OpenAI provider support.
 - Useful Imperial links and a chat modal for continuing the conversation.
 
 ## Project Structure
@@ -34,23 +34,26 @@ The app supports English and Chinese. It answers in the same language as the use
 ## Requirements
 
 - Python 3
-- Ollama, if using the default local LLM mode
-- A local model installed in Ollama, default: `qwen3`
+- A Groq API key, if using the default hosted LLM mode
+- Ollama and a local model, only if using optional local LLM mode
 - Google Maps API key with the Routes API enabled
 
 The app is dependency-light and uses Python's built-in HTTP server stack. There is no npm install step.
 
 ## GitHub Pages Mode
 
-GitHub Pages can host only the static files in this repository. It cannot run `server.py`, Ollama, or private environment variables. The Pages version therefore keeps the frontend static and connects back to your local machine for the API.
+GitHub Pages can host only the static files in this repository. It cannot safely store private API keys or run `server.py`. The Pages version therefore keeps the frontend static and connects to a backend API that you run locally or deploy publicly.
 
-1. On your laptop, keep Ollama running:
+1. Configure the backend with Groq and Google Maps keys in local `.env` or your hosting provider's secret settings:
 
 ```bash
-ollama run qwen3
+LLM_PROVIDER=groq
+GROQ_API_KEY="your_groq_api_key"
+GROQ_MODEL="llama-3.3-70b-versatile"
+GOOGLE_MAPS_API_KEY="your_google_maps_api_key"
 ```
 
-2. Start the local API backend from this repository:
+2. Start the API backend from this repository:
 
 ```bash
 PORT=8001 python3 server.py
@@ -60,6 +63,12 @@ PORT=8001 python3 server.py
 
 ```text
 http://localhost:8001
+```
+
+If you deploy `server.py` to a public backend, point Pages at that backend:
+
+```text
+https://ada-yz1825.github.io/Imperial_travel_agent/?api=https://your-backend.example.com
 ```
 
 If you use a different local port, add an API override to the Pages URL:
@@ -80,17 +89,12 @@ Your Google Maps key still lives in local `.env`; the backend exposes it to the 
 
 ## Setup
 
-1. Install Ollama from <https://ollama.com/>.
-
-2. Pull or run the default model:
+1. Create a `.env` file in the project root:
 
 ```bash
-ollama run qwen3
-```
-
-3. Create a `.env` file in the project root:
-
-```bash
+LLM_PROVIDER="groq"
+GROQ_API_KEY="your_groq_api_key"
+GROQ_MODEL="llama-3.3-70b-versatile"
 GOOGLE_MAPS_API_KEY="your_google_maps_api_key"
 ```
 
@@ -124,14 +128,23 @@ If port `8001` is already in use, either stop the old process or choose another 
 PORT=8002 python3 server.py
 ```
 
-## Optional OpenAI Mode
+## Optional Provider Modes
 
-The default provider is Ollama. To use OpenAI instead:
+The default provider is Groq. To use OpenAI instead:
 
 ```bash
 export LLM_PROVIDER=openai
 export OPENAI_API_KEY="your_openai_api_key"
 export OPENAI_MODEL="gpt-5.2"
+PORT=8001 python3 server.py
+```
+
+To use local Ollama instead:
+
+```bash
+ollama run qwen3
+export LLM_PROVIDER=ollama
+export OLLAMA_MODEL=qwen3
 PORT=8001 python3 server.py
 ```
 
@@ -177,7 +190,8 @@ Important deployment considerations:
 
 - Do not commit real API keys.
 - Restrict Google Maps keys by domain/IP and API scope.
-- Ollama must be running wherever `server.py` runs if using local model mode.
+- Groq/OpenAI keys must be set as backend environment variables, never committed to GitHub.
+- Ollama must be running wherever `server.py` runs if using optional local model mode.
 - For a permanently available public app, deploy to a cloud VM or app platform rather than relying on a personal laptop.
 
 See `DEPLOYMENT.md` for more deployment notes.
@@ -197,8 +211,8 @@ If navigation says Google Maps is unavailable:
 
 If LLM answers are missing:
 
-- Make sure Ollama is running.
-- Run `ollama run qwen3`.
+- Confirm `.env` or your hosting provider has `LLM_PROVIDER=groq` and `GROQ_API_KEY`.
+- If using Ollama mode, make sure Ollama is running and run `ollama run qwen3`.
 - Check `/api/health` for `llmConnected`.
 
 If route or intent behavior feels wrong:

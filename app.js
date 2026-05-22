@@ -685,7 +685,7 @@ async function answerQuestion(question, options = {}) {
     $("agentAnswer").innerHTML = `
       <strong>The local language model is not connected yet</strong>
       <br />${escapeHtml(error.message)}
-      <br />This app uses Ollama by default. Run <code>ollama run qwen3</code>, then keep <code>PORT=8001 python3 server.py</code> running.
+      <br />This app now uses the backend LLM provider configured in <code>.env</code>. For Groq, set <code>LLM_PROVIDER=groq</code> and <code>GROQ_API_KEY</code>, then keep <code>PORT=8001 python3 server.py</code> running.
       <br />Current API endpoint: <code>${escapeHtml(apiBaseLabel())}</code>
     `;
   } finally {

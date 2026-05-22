@@ -15,11 +15,13 @@ except ImportError:
 
 APP_NAME = "Imperial Study Navigator"
 OPENAI_API_URL = "https://api.openai.com/v1/responses"
+GROQ_API_URL = os.environ.get("GROQ_API_URL", "https://api.groq.com/openai/v1/chat/completions")
 GOOGLE_ROUTES_API_URL = "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix"
 GOOGLE_COMPUTE_ROUTES_API_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
 OLLAMA_API_URL = os.environ.get("OLLAMA_API_URL", "http://localhost:11434/api/chat")
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama").lower()
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5.2")
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3")
 OLLAMA_NUM_PREDICT = int(os.environ.get("OLLAMA_NUM_PREDICT", "180"))
 CHAT_HISTORY_LIMIT = int(os.environ.get("CHAT_HISTORY_LIMIT", "6"))
@@ -81,19 +83,60 @@ def get_google_maps_browser_key():
     return get_env_value("GOOGLE_MAPS_BROWSER_KEY") or get_google_maps_api_key()
 
 
+def get_llm_provider():
+    return (get_env_value("LLM_PROVIDER") or LLM_PROVIDER or "ollama").lower()
+
+
+def get_openai_api_key():
+    return get_env_value("OPENAI_API_KEY")
+
+
+def get_groq_api_key():
+    return get_env_value("GROQ_API_KEY")
+
+
+def get_openai_model():
+    return get_env_value("OPENAI_MODEL") or OPENAI_MODEL
+
+
+def get_groq_model():
+    return get_env_value("GROQ_MODEL") or GROQ_MODEL
+
+
+def get_ollama_model():
+    return get_env_value("OLLAMA_MODEL") or OLLAMA_MODEL
+
+
+def current_llm_model():
+    provider = get_llm_provider()
+    if provider == "openai":
+        return get_openai_model()
+    if provider == "groq":
+        return get_groq_model()
+    return get_ollama_model()
+
+
 def check_llm_health():
-    if LLM_PROVIDER == "openai":
-        configured = bool(os.environ.get("OPENAI_API_KEY"))
+    provider = get_llm_provider()
+    if provider == "openai":
+        configured = bool(get_openai_api_key())
         return {
             "connected": configured,
-            "label": f"OpenAI {OPENAI_MODEL}" if configured else "OpenAI key missing",
+            "label": f"OpenAI {get_openai_model()}" if configured else "OpenAI key missing",
+        }
+
+    if provider == "groq":
+        configured = bool(get_groq_api_key())
+        return {
+            "connected": configured,
+            "label": f"Groq {get_groq_model()}" if configured else "Groq key missing",
         }
 
     try:
         request = urllib.request.Request(OLLAMA_API_URL.replace("/api/chat", "/api/tags"), method="GET")
         with urllib.request.urlopen(request, timeout=1.5):
             pass
-        return {"connected": True, "label": f"Ollama {OLLAMA_MODEL}"}
+        return {"connected": True, "label": f"Ollama {get_ollama_model()}"}
     except Exception:
         return {"connected": False, "label": "Ollama offline"}
 
@@ -254,9 +297,9 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
                 {
                     "ok": True,
                     "app": APP_NAME,
-                    "provider": LLM_PROVIDER,
-                    "model": OPENAI_MODEL if LLM_PROVIDER == "openai" else OLLAMA_MODEL,
-                    "streaming": LLM_PROVIDER == "ollama",
+                    "provider": get_llm_provider(),
+                    "model": current_llm_model(),
+                    "streaming": get_llm_provider() == "ollama",
                     "llmConnected": llm_status["connected"],
                     "llmStatus": llm_status["label"],
                     "googleMapsConfigured": bool(get_google_maps_api_key()),
@@ -291,8 +334,9 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
                 self.write_json({"error": "请先输入一个问题。"}, status=400)
                 return
 
-            if LLM_PROVIDER == "openai":
-                api_key = os.environ.get("OPENAI_API_KEY")
+            provider = get_llm_provider()
+            if provider == "openai":
+                api_key = get_openai_api_key()
                 if not api_key:
                     self.write_json(
                         {
@@ -304,7 +348,23 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
                     return
 
                 answer = call_openai(api_key, payload)
-                self.write_json({"answer": answer, "model": OPENAI_MODEL, "provider": "openai"})
+                self.write_json({"answer": answer, "model": get_openai_model(), "provider": "openai"})
+                return
+
+            if provider == "groq":
+                api_key = get_groq_api_key()
+                if not api_key:
+                    self.write_json(
+                        {
+                            "error": "未配置 GROQ_API_KEY。请在启动服务前设置环境变量，然后重新提问。",
+                            "setup": "LLM_PROVIDER=groq GROQ_API_KEY=你的密钥 python3 server.py",
+                        },
+                        status=500,
+                    )
+                    return
+
+                answer = call_groq(api_key, payload)
+                self.write_json({"answer": answer, "model": get_groq_model(), "provider": "groq"})
                 return
 
             self.stream_ollama(payload)
@@ -315,7 +375,7 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
             self.write_json(
                 {
                     "error": "无法连接本地 Ollama 服务。请确认 Ollama 已安装并正在运行。",
-                    "setup": f"ollama run {OLLAMA_MODEL}",
+                    "setup": f"ollama run {get_ollama_model()}",
                 },
                 status=503,
             )
@@ -722,8 +782,9 @@ def parse_navigation_query(query, history=None):
 def extract_navigation_request_with_llm(query, history=None):
     prompt = build_navigation_extraction_prompt(query, history or [])
     try:
-        if LLM_PROVIDER == "openai":
-            api_key = os.environ.get("OPENAI_API_KEY")
+        provider = get_llm_provider()
+        if provider == "openai":
+            api_key = get_openai_api_key()
             if not api_key:
                 return None
             raw = call_openai_json(
@@ -731,6 +792,16 @@ def extract_navigation_request_with_llm(query, history=None):
                 "Extract navigation intent and route endpoints. Return JSON only.",
                 prompt,
                 max_output_tokens=220,
+            )
+        elif provider == "groq":
+            api_key = get_groq_api_key()
+            if not api_key:
+                return None
+            raw = call_groq_json(
+                api_key,
+                "Extract navigation intent and route endpoints. Return JSON only.",
+                prompt,
+                max_completion_tokens=220,
             )
         else:
             raw = call_ollama_once(
@@ -904,11 +975,25 @@ def classify_agent_intent_with_llm(question, route_request):
         ensure_ascii=False,
     )
     try:
-        if LLM_PROVIDER == "openai":
-            api_key = os.environ.get("OPENAI_API_KEY")
+        provider = get_llm_provider()
+        if provider == "openai":
+            api_key = get_openai_api_key()
             if not api_key:
                 return None
             raw = call_openai_navigation(api_key, prompt)
+        elif provider == "groq":
+            api_key = get_groq_api_key()
+            if not api_key:
+                return None
+            raw = call_groq_messages(
+                api_key,
+                [
+                    {"role": "system", "content": "You are an intent classifier. Return compact JSON only, with no markdown."},
+                    {"role": "user", "content": prompt},
+                ],
+                max_completion_tokens=180,
+                temperature=0,
+            )
         else:
             raw = call_ollama_once(
                 [
@@ -1318,11 +1403,32 @@ def build_navigation_answer(query, route_request, routes, errors=None):
 
 def call_navigation_llm(query, route_request, routes, errors, study_options):
     prompt = navigation_prompt(query, route_request, routes, errors, study_options)
-    if LLM_PROVIDER == "openai":
-        api_key = os.environ.get("OPENAI_API_KEY")
+    provider = get_llm_provider()
+    if provider == "openai":
+        api_key = get_openai_api_key()
         if not api_key:
             return ""
         return call_openai_navigation(api_key, prompt)
+    if provider == "groq":
+        api_key = get_groq_api_key()
+        if not api_key:
+            return ""
+        return call_groq_messages(
+            api_key,
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are Imperial Study Navigator. You receive route tool results from Google Routes API. "
+                        "Use the tool data as facts, compare available transport modes naturally, and give a practical recommendation. "
+                        "Match the user's language exactly. Do not invent route data, line names, prices or step-by-step directions."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            max_completion_tokens=420,
+            temperature=0.15,
+        )
     return call_ollama_once(
         [
             {
@@ -1832,6 +1938,8 @@ def call_openai_navigation(api_key, prompt):
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": f"{APP_NAME}/1.0",
         },
         method="POST",
     )
@@ -1863,6 +1971,8 @@ def call_openai_json(api_key, developer_text, prompt, max_output_tokens=220):
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": f"{APP_NAME}/1.0",
         },
         method="POST",
     )
@@ -1870,6 +1980,71 @@ def call_openai_json(api_key, developer_text, prompt, max_output_tokens=220):
     with urllib.request.urlopen(request, timeout=45) as response:
         data = json.loads(response.read().decode("utf-8"))
     return extract_openai_text(data)
+
+
+def call_groq_json(api_key, developer_text, prompt, max_completion_tokens=220):
+    return call_groq_messages(
+        api_key,
+        [
+            {"role": "system", "content": developer_text},
+            {"role": "user", "content": prompt},
+        ],
+        max_completion_tokens=max_completion_tokens,
+        temperature=0,
+    )
+
+
+def call_groq(api_key, payload):
+    prompt = build_agent_prompt(payload)
+    history = payload.get("history", [])[-CHAT_HISTORY_LIMIT:]
+    messages = [{"role": "system", "content": system_prompt(payload)}]
+
+    for item in history:
+        role = "assistant" if item.get("role") == "assistant" else "user"
+        content = str(item.get("content", ""))[:700]
+        if content:
+            messages.append({"role": role, "content": content})
+
+    messages.append({"role": "user", "content": prompt})
+    return call_groq_messages(api_key, messages, max_completion_tokens=650, temperature=0.2)
+
+
+def call_groq_messages(api_key, messages, max_completion_tokens=650, temperature=0.2):
+    request_body = json.dumps(
+        {
+            "model": get_groq_model(),
+            "messages": messages,
+            "temperature": temperature,
+            "max_completion_tokens": max_completion_tokens,
+        },
+        ensure_ascii=False,
+    ).encode("utf-8")
+
+    request = urllib.request.Request(
+        GROQ_API_URL,
+        data=request_body,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": f"{APP_NAME}/1.0",
+        },
+        method="POST",
+    )
+
+    with urllib.request.urlopen(request, timeout=45) as response:
+        data = json.loads(response.read().decode("utf-8"))
+    return extract_groq_text(data)
+
+
+def extract_groq_text(data):
+    choices = data.get("choices", [])
+    if choices:
+        message = choices[0].get("message", {})
+        content = message.get("content")
+        if isinstance(content, str) and content.strip():
+            return content.strip()
+    return "模型没有返回文本结果。"
 
 
 def format_navigation_failure(route_request, errors):
@@ -2200,10 +2375,13 @@ def extract_openai_text(data):
 def main():
     port = int(os.environ.get("PORT", "8000"))
     server = ThreadingHTTPServer(("", port), ImperialNavigatorHandler)
-    if LLM_PROVIDER == "openai":
-        print(f"{APP_NAME} server running at http://localhost:{port} with OpenAI model {OPENAI_MODEL}")
+    provider = get_llm_provider()
+    if provider == "openai":
+        print(f"{APP_NAME} server running at http://localhost:{port} with OpenAI model {get_openai_model()}")
+    elif provider == "groq":
+        print(f"{APP_NAME} server running at http://localhost:{port} with Groq model {get_groq_model()}")
     else:
-        print(f"{APP_NAME} server running at http://localhost:{port} with Ollama model {OLLAMA_MODEL}")
+        print(f"{APP_NAME} server running at http://localhost:{port} with Ollama model {get_ollama_model()}")
     server.serve_forever()
 
 
