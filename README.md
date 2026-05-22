@@ -56,7 +56,7 @@ GOOGLE_MAPS_BROWSER_KEY="your_google_maps_browser_key"
 2. Deploy `server.py` to a public backend, then point Pages at that backend:
 
 ```text
-https://ada-yz1825.github.io/Imperial_travel_agent/?api=https://your-backend.example.com
+https://ada-yz1825.github.io/Imperial_travel_agent/?api=https://imperial-travel-agent-api.onrender.com
 ```
 
 The override is saved in browser local storage for hosted Pages visits, so future hosted visits will keep using that API base until you open the page with another `?api=...` value or clear site data.
@@ -85,7 +85,7 @@ Make sure the Google Cloud project has the Routes API enabled for `GOOGLE_MAPS_A
 
 `GOOGLE_MAPS_API_KEY` is used only by the backend for Routes API calls. `GOOGLE_MAPS_BROWSER_KEY` is used only by the browser for Google Maps JavaScript.
 
-If you are developing locally, you can start the backend with:
+If you are developing locally, you can still start the backend with:
 
 ```bash
 PORT=8001 python3 server.py

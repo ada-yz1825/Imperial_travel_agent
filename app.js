@@ -337,6 +337,7 @@ const places = [
 ];
 
 const API_BASE_STORAGE_KEY = "imperialNavigatorApiBase";
+const DEFAULT_REMOTE_API_BASE = "https://imperial-travel-agent-api.onrender.com";
 
 const $ = (id) => document.getElementById(id);
 
@@ -361,7 +362,7 @@ function getConfiguredApiBase() {
   const storedApiBase = normalizeApiBase(window.localStorage.getItem(API_BASE_STORAGE_KEY));
   if (storedApiBase) return storedApiBase;
 
-  return "http://localhost:8001";
+  return DEFAULT_REMOTE_API_BASE;
 }
 
 const apiBase = getConfiguredApiBase();
