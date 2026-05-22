@@ -1,6 +1,6 @@
 # Imperial Study Navigator
 
-Imperial Study Navigator is a local web app that helps Imperial College London students choose study spaces and plan routes. It combines a conversational LLM assistant, Imperial library/study-space recommendations, Google Maps route estimates, and an interactive map-based starting point picker.
+Imperial Study Navigator is a web app that helps Imperial College London students choose study spaces and plan routes. It combines a conversational LLM assistant, Imperial library/study-space recommendations, Google Maps route estimates, and an interactive map-based starting point picker.
 
 The app supports English and Chinese. It answers in the same language as the user.
 
@@ -13,7 +13,7 @@ The app supports English and Chinese. It answers in the same language as the use
 - Interactive route preview map with selectable transport modes.
 - LLM intent classification, so general chat, study planning, and navigation use different behavior.
 - Context-aware navigation, for example asking “Where is Oxford?” and then “navigate there”.
-- Groq API support by default, with optional Ollama or OpenAI provider support.
+- Groq API support by default, with optional Ollama provider support.
 - Useful Imperial links and a chat modal for continuing the conversation.
 
 ## Project Structure
@@ -34,112 +34,66 @@ The app supports English and Chinese. It answers in the same language as the use
 ## Requirements
 
 - Python 3
-- A Groq API key, if using the default hosted LLM mode
-- Ollama and a local model, only if using optional local LLM mode
-- Google Maps API key with the Routes API enabled
+- A Groq API key for the default hosted LLM mode
+- Google Maps backend Routes key, plus a separate browser Maps key for the map display
 
 The app is dependency-light and uses Python's built-in HTTP server stack. There is no npm install step.
 
 ## GitHub Pages Mode
 
-GitHub Pages can host only the static files in this repository. It cannot safely store private API keys or run `server.py`. The Pages version therefore keeps the frontend static and connects to a backend API that you run locally or deploy publicly.
+GitHub Pages can host only the static files in this repository. It cannot safely store private API keys or run `server.py`. The Pages version keeps the frontend static and connects to a backend API that you deploy publicly.
 
-1. Configure the backend with Groq and Google Maps keys in local `.env` or your hosting provider's secret settings:
+1. Configure the backend with Groq and Google Maps keys in your hosting provider's secret settings:
 
 ```bash
 LLM_PROVIDER=groq
 GROQ_API_KEY="your_groq_api_key"
 GROQ_MODEL="llama-3.3-70b-versatile"
 GOOGLE_MAPS_API_KEY="your_google_maps_api_key"
+GOOGLE_MAPS_BROWSER_KEY="your_google_maps_browser_key"
 ```
 
-2. Start the API backend from this repository:
-
-```bash
-PORT=8001 python3 server.py
-```
-
-3. Open the GitHub Pages URL for this repository. When the page is not running on localhost, the frontend automatically calls:
-
-```text
-http://localhost:8001
-```
-
-If you deploy `server.py` to a public backend, point Pages at that backend:
+2. Deploy `server.py` to a public backend, then point Pages at that backend:
 
 ```text
 https://ada-yz1825.github.io/Imperial_travel_agent/?api=https://your-backend.example.com
 ```
 
-If you use a different local port, add an API override to the Pages URL:
+The override is saved in browser local storage for hosted Pages visits, so future hosted visits will keep using that API base until you open the page with another `?api=...` value or clear site data.
 
-```text
-https://ada-yz1825.github.io/Imperial_travel_agent/?api=http://localhost:8002
-```
-
-The override is saved in browser local storage for hosted Pages visits, so future hosted visits will keep using that API base until you open the page with another `?api=...` value or clear site data. Localhost development still uses same-origin `/api` calls.
-
-`server.py` enables CORS for `/api/*` endpoints so the GitHub Pages origin can call your local backend. To restrict allowed origins, add this to `.env`:
+`server.py` enables CORS for `/api/*` endpoints so the GitHub Pages origin can call your backend. To restrict allowed origins, add this to your backend environment:
 
 ```bash
 CORS_ALLOWED_ORIGINS="https://ada-yz1825.github.io"
 ```
 
-Your Google Maps key still lives in local `.env`; the backend exposes it to the browser only so Google Maps JavaScript can load. For a public Pages demo, restrict that key in Google Cloud by HTTP referrer and API scope.
+Keep the backend Routes key and browser Maps key separate. The backend uses `GOOGLE_MAPS_API_KEY` for Google Routes API calls, and the frontend uses `GOOGLE_MAPS_BROWSER_KEY` for Google Maps JavaScript.
 
 ## Setup
 
-1. Create a `.env` file in the project root:
+1. Create a `.env` file in the project root for deployment or local development:
 
 ```bash
 LLM_PROVIDER="groq"
 GROQ_API_KEY="your_groq_api_key"
 GROQ_MODEL="llama-3.3-70b-versatile"
 GOOGLE_MAPS_API_KEY="your_google_maps_api_key"
+GOOGLE_MAPS_BROWSER_KEY="your_google_maps_browser_key"
 ```
 
-Make sure the Google Cloud project has the Routes API enabled. The same key is also exposed to the browser so the frontend can load Google Maps; restrict the key appropriately before public deployment.
+Make sure the Google Cloud project has the Routes API enabled for `GOOGLE_MAPS_API_KEY`. Use `GOOGLE_MAPS_BROWSER_KEY` for the browser map script and restrict it by HTTP referrer.
 
-For better separation, you can optionally use a second browser-only key:
+`GOOGLE_MAPS_API_KEY` is used only by the backend for Routes API calls. `GOOGLE_MAPS_BROWSER_KEY` is used only by the browser for Google Maps JavaScript.
 
-```bash
-GOOGLE_MAPS_BROWSER_KEY="your_maps_javascript_api_browser_key"
-```
-
-`GOOGLE_MAPS_API_KEY` is used by the local backend for Routes API calls. `GOOGLE_MAPS_BROWSER_KEY`, when present, is sent to the browser for Google Maps JavaScript. If `GOOGLE_MAPS_BROWSER_KEY` is empty, the app falls back to `GOOGLE_MAPS_API_KEY`.
-
-## Run Locally
-
-From the project folder:
+If you are developing locally, you can start the backend with:
 
 ```bash
 PORT=8001 python3 server.py
 ```
 
-Then open:
+## Optional Local Mode
 
-```text
-http://localhost:8001/
-```
-
-If port `8001` is already in use, either stop the old process or choose another port:
-
-```bash
-PORT=8002 python3 server.py
-```
-
-## Optional Provider Modes
-
-The default provider is Groq. To use OpenAI instead:
-
-```bash
-export LLM_PROVIDER=openai
-export OPENAI_API_KEY="your_openai_api_key"
-export OPENAI_MODEL="gpt-5.2"
-PORT=8001 python3 server.py
-```
-
-To use local Ollama instead:
+If you want to experiment with a local model, you can run Ollama instead of Groq:
 
 ```bash
 ollama run qwen3
@@ -184,14 +138,14 @@ For navigation, the backend extracts origin and destination from free text. If t
 
 ## Notes on Deployment
 
-This project can run locally, on GitHub Pages plus a local backend, or behind a temporary tunnel such as ngrok/Cloudflare Tunnel for demos. For a fully public deployment that does not require your laptop, use a hosted server or cloud platform and set environment variables securely.
+For development or demos, you can connect GitHub Pages to a backend or use a temporary tunnel such as ngrok/Cloudflare Tunnel. For a fully public deployment that does not require your laptop, use a hosted server or cloud platform and set environment variables securely.
 
 Important deployment considerations:
 
 - Do not commit real API keys.
 - Restrict Google Maps keys by domain/IP and API scope.
-- Groq/OpenAI keys must be set as backend environment variables, never committed to GitHub.
-- Ollama must be running wherever `server.py` runs if using optional local model mode.
+- Groq keys must be set as backend environment variables, never committed to GitHub.
+- Ollama must be running wherever `server.py` runs if using the optional local model mode.
 - For a permanently available public app, deploy to a cloud VM or app platform rather than relying on a personal laptop.
 
 See `DEPLOYMENT.md` for more deployment notes.
@@ -200,19 +154,19 @@ See `DEPLOYMENT.md` for more deployment notes.
 
 If the page cannot connect:
 
-- Check that the server is running on the expected port.
-- Open `http://localhost:8001/api/health` to confirm backend status.
+- Check that your deployed backend is reachable.
+- Open the backend `/api/health` endpoint to confirm status.
 
 If navigation says Google Maps is unavailable:
 
-- Confirm `.env` contains `GOOGLE_MAPS_API_KEY`.
+- Confirm `.env` contains both `GOOGLE_MAPS_API_KEY` and `GOOGLE_MAPS_BROWSER_KEY`.
 - Confirm Routes API is enabled in Google Cloud.
 - Restart `server.py` after changing `.env`.
 
 If LLM answers are missing:
 
 - Confirm `.env` or your hosting provider has `LLM_PROVIDER=groq` and `GROQ_API_KEY`.
-- If using Ollama mode, make sure Ollama is running and run `ollama run qwen3`.
+- If using Ollama mode, make sure Ollama is running.
 - Check `/api/health` for `llmConnected`.
 
 If route or intent behavior feels wrong:

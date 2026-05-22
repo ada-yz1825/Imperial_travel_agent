@@ -9,7 +9,6 @@ const cityState = {
   },
   noon: {
     weather: "Cloudy 18°C",
-    traffic: "Smooth travel",
     air: "Excellent",
     rainPenalty: 0,
     trafficPenalty: 6,
@@ -409,6 +408,7 @@ let routeMarkers = [];
 let pendingRoutePreview = null;
 let activeRoutePreview = null;
 let googleMapsLoading = false;
+let routesKeyConfigured = false;
 let latestNavigationData = null;
 const chatHistory = [];
 
@@ -542,6 +542,18 @@ function render() {
     .slice(0, 4);
 
   $("recommendations").innerHTML = latestRanked.map(renderCard).join("");
+}
+
+function setGoogleMapsStatus(browserReady, routesReady) {
+  routesKeyConfigured = routesReady;
+  if (browserReady && routesReady) {
+    integrationStatus.google = "Keys ready";
+  } else {
+    const browserStatus = browserReady ? "Browser key ready" : "Browser key missing";
+    const routesStatus = routesReady ? "Routes key ready" : "Routes key missing";
+    integrationStatus.google = `${browserStatus} · ${routesStatus}`;
+  }
+  $("trafficSignal").textContent = integrationStatus.google;
 }
 
 function getContext() {
@@ -762,7 +774,7 @@ async function answerNavigationQuestion(question, options = {}) {
     $("agentAnswer").innerHTML = `
       <strong>Navigation is not available yet</strong>
       <br />${escapeHtml(error.message)}
-      <br />Check that <code>GOOGLE_MAPS_API_KEY</code> is set and that Routes API is enabled in Google Cloud.
+      <br />Check that <code>GOOGLE_MAPS_BROWSER_KEY</code> is set for the map display and <code>GOOGLE_MAPS_API_KEY</code> is set for Routes API.
       <br />Current API endpoint: <code>${escapeHtml(apiBaseLabel())}</code>
     `;
   } finally {
@@ -1001,11 +1013,18 @@ function loadGoogleStartMap(apiKey) {
   window.initStartPickerMap = initStartPickerMap;
 
   const script = document.createElement("script");
-  script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&callback=initStartPickerMap`;
+  const params = new URLSearchParams({
+    key: apiKey,
+    callback: "initStartPickerMap",
+    loading: "async",
+    auth_referrer_policy: "origin",
+  });
+  script.src = `https://maps.googleapis.com/maps/api/js?${params.toString()}`;
   script.async = true;
   script.defer = true;
   script.onerror = () => {
-    $("startMapStatus").textContent = "Google Maps did not load; use the campus selector below.";
+    googleMapsLoading = false;
+    $("startMapStatus").textContent = "Google Maps did not load; check the browser key referrer restrictions, Maps JavaScript API activation, and billing settings.";
   };
   document.head.appendChild(script);
 }
@@ -1039,6 +1058,7 @@ function initStartPickerMap() {
   });
 
   updateStartMapStatus();
+  setGoogleMapsStatus(true, routesKeyConfigured);
   if (pendingRoutePreview) renderRoutePreview(pendingRoutePreview);
 }
 
@@ -1446,13 +1466,14 @@ async function refreshIntegrationStatus() {
     if (!response.ok) throw new Error(data.error || "Health check failed");
     integrationStatus = {
       llm: data.llmConnected ? data.llmStatus || "Connected" : data.llmStatus || "Offline",
-      google: data.googleMapsConfigured ? "Key ready" : "Key missing",
+      google: integrationStatus.google,
       tools: integrationStatus.tools || "Conversation",
     };
+    setGoogleMapsStatus(Boolean(data.googleMapsBrowserConfigured), Boolean(data.googleMapsConfigured));
     if (data.googleMapsBrowserKey) {
       loadGoogleStartMap(data.googleMapsBrowserKey);
     } else {
-      $("startMapStatus").textContent = "Google Maps key missing; use the campus selector below.";
+      $("startMapStatus").textContent = "Google Maps browser key missing; use the campus selector below.";
     }
   } catch (error) {
     integrationStatus = {

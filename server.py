@@ -80,7 +80,7 @@ def get_google_maps_api_key():
 
 
 def get_google_maps_browser_key():
-    return get_env_value("GOOGLE_MAPS_BROWSER_KEY") or get_google_maps_api_key()
+    return get_env_value("GOOGLE_MAPS_BROWSER_KEY")
 
 
 def get_llm_provider():
@@ -303,6 +303,7 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
                     "llmConnected": llm_status["connected"],
                     "llmStatus": llm_status["label"],
                     "googleMapsConfigured": bool(get_google_maps_api_key()),
+                    "googleMapsBrowserConfigured": bool(get_google_maps_browser_key()),
                     "googleMapsBrowserKey": get_google_maps_browser_key(),
                 }
             )
@@ -801,7 +802,7 @@ def extract_navigation_request_with_llm(query, history=None):
                 api_key,
                 "Extract navigation intent and route endpoints. Return JSON only.",
                 prompt,
-                max_completion_tokens=220,
+                max_completion_tokens=1200,
             )
         else:
             raw = call_ollama_once(
@@ -991,7 +992,7 @@ def classify_agent_intent_with_llm(question, route_request):
                     {"role": "system", "content": "You are an intent classifier. Return compact JSON only, with no markdown."},
                     {"role": "user", "content": prompt},
                 ],
-                max_completion_tokens=180,
+                max_completion_tokens=1200,
                 temperature=0,
             )
         else:
@@ -1426,7 +1427,7 @@ def call_navigation_llm(query, route_request, routes, errors, study_options):
                 },
                 {"role": "user", "content": prompt},
             ],
-            max_completion_tokens=420,
+            max_completion_tokens=1200,
             temperature=0.15,
         )
     return call_ollama_once(
@@ -1982,7 +1983,7 @@ def call_openai_json(api_key, developer_text, prompt, max_output_tokens=220):
     return extract_openai_text(data)
 
 
-def call_groq_json(api_key, developer_text, prompt, max_completion_tokens=220):
+def call_groq_json(api_key, developer_text, prompt, max_completion_tokens=1200):
     return call_groq_messages(
         api_key,
         [
@@ -2006,10 +2007,10 @@ def call_groq(api_key, payload):
             messages.append({"role": role, "content": content})
 
     messages.append({"role": "user", "content": prompt})
-    return call_groq_messages(api_key, messages, max_completion_tokens=650, temperature=0.2)
+    return call_groq_messages(api_key, messages, max_completion_tokens=1200, temperature=0.2)
 
 
-def call_groq_messages(api_key, messages, max_completion_tokens=650, temperature=0.2):
+def call_groq_messages(api_key, messages, max_completion_tokens=1200, temperature=0.2):
     request_body = json.dumps(
         {
             "model": get_groq_model(),
