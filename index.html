@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Imperial Study Navigator</title>
+    <link rel="stylesheet" href="./styles.css?v=motion-polish-1" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="hero-panel" aria-label="Imperial study space planner">
+        <div class="hero-copy">
+          <p class="eyebrow">Imperial Study Navigator</p>
+          <h1>Start Planning your journey across Imperial</h1>
+          <p class="hero-text">
+            Compare Imperial libraries and study spaces with live Google route times, crowding estimates, comfort and your own study preferences.
+          </p>
+        </div>
+        <div class="city-signal" aria-label="live campus signals">
+          <div>
+            <span>LLM</span>
+            <strong id="weatherSignal">Checking</strong>
+          </div>
+          <div>
+            <span>Google Routes</span>
+            <strong id="trafficSignal">Checking</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <aside class="control-panel" aria-label="planning settings">
+          <div class="field-group">
+            <h3 class="left-section-title compact">Choose where to start</h3>
+            <label for="startPoint">Starting location</label>
+            <div class="campus-map" id="startMap" aria-label="Pick any starting point on Google Map"></div>
+            <div class="map-status" id="startMapStatus">Loading Google Map...</div>
+            <span class="select-note">or select campus</span>
+            <select id="startPoint">
+              <option value="mapSelection">Map selection</option>
+              <option value="southKensington">South Kensington</option>
+              <option value="whiteCity">White City</option>
+              <option value="hammersmith">Hammersmith</option>
+              <option value="stMarys">St Mary's</option>
+            </select>
+            <h3 class="left-section-title">Study space recommendations</h3>
+            <div class="field-group">
+              <label for="scenario">Study goal</label>
+              <select id="scenario">
+                <option value="focus">Quiet study</option>
+                <option value="group">Group study</option>
+                <option value="medicine">Medical resources</option>
+                <option value="late">Late study</option>
+                <option value="nearest">Nearest seat</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <span>Walking comfort limit</span>
+            <output id="walkOutput">15 min</output>
+          </div>
+          <input id="walkTolerance" type="range" min="5" max="35" value="15" step="5" />
+          <button id="updateRecommendations" class="secondary-action" type="button">Update recommendations</button>
+
+          <div class="recommendation-grid" id="recommendations"></div>
+        </aside>
+
+        <section class="decision-area" aria-live="polite">
+          <div class="agent-brief">
+            <div>
+              <p class="eyebrow">Travel agent</p>
+              <h2 id="summaryTitle">Start with asking where to study or how to get there</h2>
+            </div>
+            <div class="agent-brand" aria-label="Agent tools status">
+              <div class="agent-tools">
+                <span>Agent mode or tools</span>
+                <strong id="airSignal">Conversation</strong>
+              </div>
+            </div>
+          </div>
+
+          <form class="question-box" id="questionForm">
+            <label for="userQuestion">Ask the Agent</label>
+            <div class="question-input-row">
+              <input
+                id="userQuestion"
+                type="text"
+                autocomplete="off"
+                placeholder="Where are you going? How would you like to study?"
+              />
+              <button id="askButton" type="submit">Ask</button>
+            </div>
+            <div class="quick-prompts" aria-label="quick questions">
+              <button type="button" data-question="I want a quiet Imperial library for focused study. Where should I go?">Quiet study</button>
+              <button type="button" data-question="How do I get to White City Campus from my current selected start point?">Go to White City</button>
+              <button type="button" data-question="Which Imperial library is nearby from my selected starting point?">Nearby library</button>
+            </div>
+            <div class="agent-answer" id="agentAnswer">
+              Travel or study recommendations will appear here; if the query involves route planning, live route plans will also be shown here.
+            </div>
+            <div class="route-preview" id="routePreview" hidden>
+              <div class="route-preview-header">
+                <span id="routePreviewTitle">Route map</span>
+                <strong id="routePreviewMeta"></strong>
+              </div>
+              <div class="route-controls">
+                <label for="routeModeSelect">Transport mode</label>
+                <div class="route-control-row">
+                  <select id="routeModeSelect"></select>
+                  <button id="routeUpdateButton" type="button">Update</button>
+                </div>
+              </div>
+              <div class="route-map" id="routeMap" aria-label="Recommended route map"></div>
+            </div>
+            <div class="agent-actions" id="agentActions" hidden>
+              <a id="googleMapsLink" class="cta" href="https://www.google.com/maps/search/?api=1&query=Imperial%20College%20London" target="_blank" rel="noreferrer">Open Google maps for Route</a>
+              <button id="openChatButton" class="cta chat-cta" type="button">Go to chat mode</button>
+            </div>
+          </form>
+
+          <section class="how-it-works" aria-label="How it works">
+            <p class="eyebrow">How it works?</p>
+            <div class="how-grid">
+              <div>
+                <strong>1. Understand intent</strong>
+                <span>The agent first classifies whether your message is a navigation request, a study-space planning question, or general chat, and chooses the appropriate tools and tone.</span>
+              </div>
+              <div>
+                <strong>2. Use tools only when needed</strong>
+                <span>Navigation queries trigger Google Routes calls for live travel times and route geometry; study planning uses the local candidate dataset and the LLM for natural recommendations.</span>
+              </div>
+              <div>
+                <strong>3. Route parsing and start-point fallback</strong>
+                <span>The agent will automatically parse origin and destination from free text (e.g. "from South Kensington to White City"). If no explicit origin is found, it uses the start point selected on the left (map selection or campus preset).</span>
+              </div>
+              <div>
+                <strong>4. Live data and verification</strong>
+                <span>When available, Google provides live duration and distance estimates and encoded polylines for map preview. The assistant reports exact numbers from the tool and links to Google Maps for full directions.</span>
+              </div>
+<!-- Removed privacy/offline and user controls items per request -->
+            </div>
+          </section>
+
+          <section class="useful-links" aria-label="Useful links">
+            <p class="eyebrow">Useful links</p>
+            <div class="useful-list">
+              <ul>
+                <li><a class="link-cta" href="https://www.imperial.ac.uk" target="_blank" rel="noreferrer">Imperial College London</a></li>
+                <li><a class="link-cta" href="https://www.imperial.ac.uk/library" target="_blank" rel="noreferrer">Imperial Libraries</a></li>
+                <li><a class="link-cta" href="https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/abdus-salam-library/" target="_blank" rel="noreferrer">Abdus Salam Library</a></li>
+                <li><a class="link-cta" href="https://www.imperial.ac.uk/white-city-campus/" target="_blank" rel="noreferrer">White City Campus</a></li>
+                <li><a class="link-cta" href="https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/hammersmith-campus-library/" target="_blank" rel="noreferrer">Hammersmith Library</a></li>
+                <li><a class="link-cta" href="https://www.imperial.ac.uk/admin-services/property/travel/shuttle-bus/" target="_blank" rel="noreferrer">Imperial shuttle</a></li>
+              </ul>
+            </div>
+          </section>
+
+        </section>
+      </section>
+    </main>
+
+    <div class="chat-modal" id="chatModal" hidden>
+      <div class="chat-modal-panel" role="dialog" aria-modal="true" aria-labelledby="chatModalTitle">
+        <div class="chat-modal-header">
+          <div>
+            <p class="eyebrow">Conversation</p>
+            <h2 id="chatModalTitle">Agent chat</h2>
+          </div>
+          <button id="closeChatButton" type="button" aria-label="Close chat">Close</button>
+        </div>
+        <div class="chat-modal-history" id="chatModalHistory"></div>
+        <form class="chat-modal-form" id="modalChatForm">
+          <input id="modalUserQuestion" type="text" autocomplete="off" placeholder="Continue the conversation..." />
+          <button id="modalAskButton" type="submit">Send</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- External link confirmation modal -->
+    <div class="confirm-modal" id="externalConfirmModal" hidden>
+      <div class="confirm-modal-panel">
+        <div class="confirm-modal-body">
+            <p id="externalConfirmText">You are about to leave this page and open a new tab. Are you sure you want to continue?</p>
+          </div>
+          <div class="confirm-modal-actions">
+            <button id="confirmOpenLink" class="cta">Open in new tab</button>
+            <button id="cancelOpenLink" type="button" class="secondary-action">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="./app.js?v=chat-route-context-1"></script>
+  </body>
+</html>

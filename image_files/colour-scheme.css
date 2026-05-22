@@ -1,0 +1,467 @@
+/* ======================================================================================== */
+/* C U S T O M I S A T I O N   S T Y L E S H E E T                                          */
+/* ---------------------------------------------------------------------------------------- */
+/*
+    Customisations of the look and feel of Asset Bank should go in here.
+*/
+/* ======================================================================================== */
+
+.header__help-link__wrapper {
+    display: none;
+}
+
+.nev .nev__link:hover i {
+    color: #fff;
+}
+
+.header {
+    background: #fff;
+}
+
+/* Stew updated 14/2/18 - from default background: rgba(0,0,0,0.3) requested by Thomas Angus */
+
+/*.folder-panels__title {
+background: rgba(0,0,0,0.6)!important;
+}
+ */
+
+/* =================================================================================
+    General typography
+==================================================================================== */
+
+
+/* Colour of links throughout */
+a,
+span.required,
+span.requiredForCompleteness,
+div.copy code  {
+    color: #00457c;
+}
+
+/* Overide color of icons within links */
+a > [class^="icon-"] {
+    color: #00457c;
+}
+
+.caret-down {
+    border-top: 5px solid #00457c;
+}
+
+
+a:hover,
+a:hover [class^="icon-"] {
+    color: #1467a9;
+}
+
+
+/*Icon attributes - No min-height set by default so does not take up space for other clients */
+/*div.iconAttrWrapper {
+    min-height: 1.2em;
+}*/
+
+
+ul.lightbox p.action{
+    font-size: 11px;
+}
+
+/* =================================================================================
+    Login and registration pages
+==================================================================================== */
+#loginPage div.logo, #registrationPage div.logo {
+    /*background: #fff;*/
+        padding-top: 40px;
+    padding-bottom: 40px;
+}
+
+
+/* =================================================================================
+    Borders of panels, images and horizontal rules throughout the application
+==================================================================================== */
+div.browsePanel,
+div.newsPanel,
+div.noFeatured,
+.underline,
+div.hr,
+div.head,
+ul.results li,
+#footer,
+div.dialogPanel,
+#loginPanel,
+#tabContent,
+.tabContent,
+fieldset,
+#homePage a.imgWrapper,
+.tabs,
+.tabs a,
+.tabs label,
+div.sortStrip,
+ul.lightbox li,
+.lbStrip,
+.bordered,
+.form-actions,
+.homepage-search-wrapper > .commonSaved,
+.navpanel  {
+    border-color: #ccc;
+}
+
+.home-classic div.browsePanel,
+div.newsPanel,
+div.noFeatured,
+ul.lightbox>li,
+div.adminTabs h2,
+div.sortStrip,
+
+table.stripey tr.even th,
+table.stripey tr.even td,
+ul.lightbox li,
+.home-classic .tabs .is-active a,
+.lbStrip,
+.lbPanel-bottom,
+div.commonSaved {
+    background: #F3F2ED;
+}
+
+/* Hover effect on image thumbnails */
+.home-classic a.imgWrapper:hover, a.videoFrameLink:hover img,
+div.commonSaved a:hover img,
+table.lightboxList td.thumb a.thumb:hover img,
+div.imgStrip a:hover {
+    border-color: #00457c;
+    background: #FFF;
+}
+
+/* =================================================================================
+    Top strip, language selector
+==================================================================================== */
+#topStrip {
+    display:none;
+}
+
+div#topStrip.langSelect {                           /* multi-language switched on */
+    background: #444;
+    border-bottom:0;
+    color: #eee;
+    display: block;
+}
+
+/* =================================================================================
+    Header styles
+==================================================================================== */
+#hLinks {
+    margin-top: 20px;                           /* tweak to adjust hLinks position */
+    margin-bottom: 13px;                            /* tweak to adjust search bar position */
+}
+
+#hLinks li {
+    border-color: #ccc!important;   /* Override pipes in header */
+}
+
+a#helpLozenge {
+    background-color: #00457c;
+    box-shadow: none;
+    transition: background 0.2s;
+    color: #fff;
+    /*background-image: url(../../images/standard/icon/help_icon_dark.png);*/
+}
+
+div.headShadow {
+    background: #fff;
+    padding: 0;
+    margin-bottom: 0;
+}
+
+#header {
+    background: #fff;                           /* Main banner colour */
+    border: none;
+    height: 125px;
+}
+
+/* tweak position of logo in header */
+#header img.logo {
+    padding: 23px 0 0 0;
+    margin: 0;
+}
+
+/* Styling of search keywords inputs */
+#header input.keywords,
+#header input.inline  {
+    border: 1px solid #bbb;
+    padding: 3px;
+}
+#header .headerContent select {
+    border: 1px solid #bbb;
+}
+
+
+/* header responsive buttons */
+.button--large {
+    -webkit-box-shadow: none;
+    -moz-box-shadow: none;
+    box-shadow: none;
+}
+
+/* responsive header quick search panel */
+.header-search-bar input[type="text"] {
+    border-color: #00457c;
+}
+
+/* =================================================================================
+   Home page
+==================================================================================== */
+.hero-text {
+    height: auto;
+    padding: 30px 25px;
+    max-height: 370px;
+}
+
+
+/* =================================================================================
+    Quick search panel on homepage
+==================================================================================== */
+#qsPanel,
+#qsPanel.middle {
+    border-color: #00457c;
+    background: #00457c;
+}
+
+/* Text colour in search panel */
+#qsPanel a.advanced,
+#qsPanel a.advanced:hover,
+#qsPanel label,
+#qsPanel .hoverHelp,
+#qsPanel span.inline {
+    color: white;
+}
+
+/* Styling of search panel inputs */
+#qsPanel input.text,
+#qsPanel select,
+#qsPanel input[type="text"] {
+    border: 1px solid #bfbfbf;
+}
+
+/* Text colour in search panel */
+#qsPanel a.advanced,
+#qsPanel a.advanced:hover,
+#qsPanel label,
+#qsPanel .hoverHelp,
+#qsPanel span.inline {
+    color: #444;
+}
+
+/*qs input */
+#qsPanel .search-box__input{
+    border-color: #ccd1dc;
+}
+
+#qsPanel select {
+    height: 26px;
+}
+
+/* Quick Search Panel -- light*/
+#qsPanel, #qsPanel.middle {
+    border-color: #ccd1dc;
+    background: #e6e9f0;
+}
+
+
+/* =================================================================================
+    Navigation
+==================================================================================== */
+
+/* Current page highlighting in the main navigation */
+ul.nav li a.current,
+ul.nav li a.current:hover {
+    color: #00457c;
+}
+
+/* =================================================================================
+    Revert to previous navigation styles
+==================================================================================== */
+/*
+ul.nav {
+    border-top: 1px solid #ddd;
+}
+
+ul.nav a    {
+    color: #676767;
+    background: #FFF;
+    border-bottom: 1px solid #ddd;
+    padding-left: 10px;
+}
+
+ul.nav ul li a {
+    padding-left: 20px;
+}
+
+ul.nav li a.current,
+ul.nav li a.current:hover,
+ul.nav li.subholder a.current:hover {
+    background: #e9eaeb url(../../images/standard/arrow/nav_arrow.gif) right center no-repeat !important;
+}
+*/
+
+/* =================================================================================
+    Button styles
+==================================================================================== */
+
+.button {
+    background: #00457c;
+}
+
+.button:hover,
+.button:focus {
+    background: #1467a9;
+}
+
+.button--large {
+    background: #fff;
+}
+
+.button--large [class^="icon-"] {
+    color: #00457c;
+}
+
+.home-classic .asset-strip__action .button {
+    color: #00457c; /* revert button styling on classic homepage*/
+}
+
+.button:hover [class^="icon-"] {
+    color: #fff
+}
+
+/* =================================================================================
+    Misc styles
+==================================================================================== */
+
+.popup div.copy h2,
+#popup div.copy h2,
+#masks h1 {
+    background: #00457c;                    /* Pop-up help headers */
+    color: #fff;
+}
+
+/* Panels are the same colour*/
+.home-classic div.browsePanel,
+div.newsPanel,
+div.noFeatured,
+ul.lightbox>li,
+div.adminTabs h2,
+.homepage-search-wrapper,
+div.sortStrip,
+ul.lightbox li,
+.home-classic .tabs .is-active a,
+.lbStrip,
+.lbPanel-bottom,
+div.commonSaved {
+    background: #F9F9F9;
+}
+
+table.stripey tr.even th,
+table.stripey tr.even td{
+    background: #E8E8E8;
+}
+
+/* Browse & search panels*/
+ul.lightbox>li,
+ul.lightbox li{
+    background: #f7f7f7;
+    border-color: #E6E6E6;
+}
+
+/*Squares it all off*/
+.button,
+.hero-text,
+.catThumb-portrait,
+ul.lightbox>li,
+ul.lightbox li,
+.quick-search-form-toolbar .search-field,
+.picker__filter,
+a#helpLozenge,
+.tabs a,
+.box__header,
+.asset-strip-images,
+.box__footer,
+div.newsPanel,
+.button-bar>.button:first-child,
+.button-bar>.dropdown:first-child>.button,
+.button-bar>.button:last-child,
+.button-bar>.dropdown:last-child>.button,
+.search-box__input, .search-box__input[type="text"], .search-box__input[type="search"],
+#qsPanel input.text, #qsPanel select, #qsPanel input.button{
+    border-radius: 0;
+
+}
+
+
+/* Category Panels */
+.catThumb-text {
+    color: #444;
+    background: #e6e9f0;
+    border-top: 1px solid #e6e9f0;
+    padding-left: 10px;
+}
+
+.catThumb-count {
+    color: #444;
+}
+
+.catThumb-link:hover .catThumb-text {
+    background: #999;
+    border-color: #999;
+}
+
+#browsePage .catThumb-text {
+    padding: 10px 0 30px 10px;
+    box-sizing: border-box;
+    max-width: 240px;
+}
+
+.catThumb-portrait,
+ul.catThumbs-portrait li img {
+    box-shadow: none;
+}
+
+/* Nice lightbox */
+.navpanel--lightbox .noBottomMargin a {
+    margin-top: 16px;
+    display: block;
+}
+
+.navpanel--lightbox .empty.on {
+    display: block;
+    margin-top: 13px;
+}
+
+.tiled-background {
+    background: #e6e9f0;
+    border: 1px solid #e6e9f0;
+}
+
+
+/* =================================================================================
+   Deactivate drop shadows
+==================================================================================== */
+
+div.lbShadow {
+    background: none;
+    padding:0;
+}
+
+
+div.rightShadow, div.leftShadow {
+    background: #FFF;
+    padding-bottom: 0;
+}
+
+/* CSS3 shadows */
+/*.lbShadow,
+.browsePanel,
+.newsPanel,
+#qsPanel,
+.lightbox > li,
+.featuredImage  {
+    -webkit-box-shadow:0 7px 7px -5px rgba(0, 0, 0, 0.1);
+    box-shadow:0 7px 7px -5px rgba(0, 0, 0, 0.1);
+}*/
+

@@ -1,0 +1,1346 @@
+const cityState = {
+  morning: {
+    weather: "Light rain 13°C",
+    traffic: "Peak delays",
+    air: "Good",
+    rainPenalty: 18,
+    trafficPenalty: 22,
+    crowdBias: 8,
+  },
+  noon: {
+    weather: "Cloudy 18°C",
+    traffic: "Smooth travel",
+    air: "Excellent",
+    rainPenalty: 0,
+    trafficPenalty: 6,
+    crowdBias: 0,
+  },
+  evening: {
+    weather: "Showers 15°C",
+    traffic: "Moderate delays",
+    air: "Good",
+    rainPenalty: 14,
+    trafficPenalty: 17,
+    crowdBias: 12,
+  },
+  night: {
+    weather: "Clear 11°C",
+    traffic: "Low delays",
+    air: "Moderate",
+    rainPenalty: 0,
+    trafficPenalty: 4,
+    crowdBias: -5,
+  },
+};
+
+const scenarioProfiles = {
+  focus: {
+    label: "Quiet study",
+    wanted: ["quiet", "wifi", "indoor"],
+    baseWeights: { speed: 0.24, calm: 0.3, comfort: 0.32, budget: 0.14 },
+  },
+  group: {
+    label: "Group study",
+    wanted: ["group", "study-space", "wifi"],
+    baseWeights: { speed: 0.25, calm: 0.16, comfort: 0.36, budget: 0.23 },
+  },
+  medicine: {
+    label: "Medical resources",
+    wanted: ["medicine", "quiet", "indoor"],
+    baseWeights: { speed: 0.22, calm: 0.22, comfort: 0.34, budget: 0.22 },
+  },
+  late: {
+    label: "Late study",
+    wanted: ["24h", "quiet", "indoor"],
+    baseWeights: { speed: 0.2, calm: 0.3, comfort: 0.36, budget: 0.14 },
+  },
+  nearest: {
+    label: "Nearest seat",
+    wanted: ["wifi", "indoor", "campus"],
+    baseWeights: { speed: 0.48, calm: 0.16, comfort: 0.2, budget: 0.16 },
+  },
+};
+
+const startOffsets = {
+  mapSelection: {
+    label: "Map selection",
+    lat: 51.498356,
+    lng: -0.176894,
+    modifier: 0,
+  },
+  southKensington: {
+    label: "South Kensington",
+    lat: 51.498356,
+    lng: -0.176894,
+    modifier: 0,
+    southKensington: -4,
+    charingCross: 16,
+    chelseaWestminster: 9,
+    hammersmith: 18,
+    whiteCity: 22,
+    royalBrompton: 8,
+    stMarys: 17,
+    silwoodPark: 62,
+  },
+  whiteCity: {
+    label: "White City",
+    lat: 51.515768,
+    lng: -0.224009,
+    modifier: 0,
+    southKensington: 20,
+    charingCross: 24,
+    chelseaWestminster: 19,
+    hammersmith: 12,
+    whiteCity: -4,
+    royalBrompton: 21,
+    stMarys: 18,
+    silwoodPark: 58,
+  },
+  hammersmith: {
+    label: "Hammersmith",
+    lat: 51.51742,
+    lng: -0.234721,
+    modifier: 0,
+    southKensington: 18,
+    charingCross: 15,
+    chelseaWestminster: 16,
+    hammersmith: -4,
+    whiteCity: 12,
+    royalBrompton: 17,
+    stMarys: 20,
+    silwoodPark: 61,
+  },
+  stMarys: {
+    label: "St Mary's",
+    lat: 51.517403,
+    lng: -0.174169,
+    modifier: 0,
+    southKensington: 18,
+    charingCross: 26,
+    chelseaWestminster: 20,
+    hammersmith: 22,
+    whiteCity: 18,
+    royalBrompton: 18,
+    stMarys: -4,
+    silwoodPark: 58,
+  },
+};
+
+const places = [
+  {
+    name: "Abdus Salam Library",
+    zone: "southKensington",
+    type: "Main campus library",
+    lat: 51.498356,
+    lng: -0.176894,
+    image: "./assets/library-images/abdus-salam-library.jpg",
+    distance: 0.2,
+    transitMinutes: 4,
+    walkMinutes: 3,
+    crowd: 72,
+    comfort: 88,
+    budget: 100,
+    tags: ["quiet", "wifi", "indoor", "24h", "science", "central"],
+  },
+  {
+    name: "GoStudy and Student Space",
+    zone: "southKensington",
+    type: "Study space",
+    lat: 51.4984,
+    lng: -0.1752,
+    image: "./assets/library-images/gostudy-student-space.jpg",
+    distance: 0.4,
+    transitMinutes: 6,
+    walkMinutes: 5,
+    crowd: 54,
+    comfort: 80,
+    budget: 100,
+    tags: ["wifi", "indoor", "study-space", "group", "low-cost"],
+  },
+  {
+    name: "Charing Cross Campus Library",
+    zone: "charingCross",
+    type: "Medical library",
+    lat: 51.4872,
+    lng: -0.2197,
+    image: "./assets/library-images/charing-cross-library.jpg",
+    distance: 6.2,
+    transitMinutes: 28,
+    walkMinutes: 8,
+    crowd: 42,
+    comfort: 78,
+    budget: 100,
+    tags: ["quiet", "wifi", "indoor", "medicine", "campus"],
+  },
+  {
+    name: "Chelsea and Westminster Campus Library",
+    zone: "chelseaWestminster",
+    type: "Medical library",
+    lat: 51.4846,
+    lng: -0.1819,
+    image: "./assets/library-images/chelsea-westminster-library.jpg",
+    distance: 3.0,
+    transitMinutes: 18,
+    walkMinutes: 9,
+    crowd: 36,
+    comfort: 76,
+    budget: 100,
+    tags: ["quiet", "wifi", "indoor", "medicine", "calm"],
+  },
+  {
+    name: "Hammersmith Campus Library",
+    zone: "hammersmith",
+    type: "Medical library",
+    lat: 51.51742,
+    lng: -0.234721,
+    image: "./assets/library-images/hammersmith-library.jpg",
+    distance: 6.6,
+    transitMinutes: 31,
+    walkMinutes: 7,
+    crowd: 40,
+    comfort: 79,
+    budget: 100,
+    tags: ["quiet", "wifi", "indoor", "medicine", "campus"],
+  },
+  {
+    name: "White City Campus Library Services",
+    zone: "whiteCity",
+    type: "Campus library services",
+    lat: 51.515768,
+    lng: -0.224009,
+    image: "./assets/library-images/white-city-collabor-88.jpg",
+    distance: 7.4,
+    transitMinutes: 34,
+    walkMinutes: 6,
+    crowd: 45,
+    comfort: 77,
+    budget: 100,
+    tags: ["wifi", "indoor", "services", "campus", "transit"],
+  },
+  {
+    name: "Royal Brompton Campus Library",
+    zone: "royalBrompton",
+    type: "Medical library",
+    lat: 51.4892,
+    lng: -0.1708,
+    image: "./assets/library-images/royal-brompton-library.jpg",
+    distance: 1.7,
+    transitMinutes: 15,
+    walkMinutes: 14,
+    crowd: 34,
+    comfort: 75,
+    budget: 100,
+    tags: ["quiet", "wifi", "indoor", "medicine", "calm"],
+  },
+  {
+    name: "St Mary's Campus Library",
+    zone: "stMarys",
+    type: "Medical library",
+    lat: 51.517403,
+    lng: -0.174169,
+    image: "./assets/library-images/st-marys-library.jpg",
+    distance: 5.2,
+    transitMinutes: 27,
+    walkMinutes: 6,
+    crowd: 44,
+    comfort: 78,
+    budget: 100,
+    tags: ["quiet", "wifi", "indoor", "medicine", "campus"],
+  },
+  {
+    name: "Silwood Park Campus Library",
+    zone: "silwoodPark",
+    type: "Campus library",
+    lat: 51.4113,
+    lng: -0.6415,
+    image: "./assets/library-images/silwood-park-library.jpg",
+    distance: 42.0,
+    transitMinutes: 78,
+    walkMinutes: 5,
+    crowd: 18,
+    comfort: 82,
+    budget: 100,
+    tags: ["quiet", "wifi", "indoor", "green", "calm"],
+  },
+];
+
+const $ = (id) => document.getElementById(id);
+
+const controls = {
+  scenario: $("scenario"),
+  startPoint: $("startPoint"),
+  walkTolerance: $("walkTolerance"),
+};
+
+const preferenceWeights = {
+  speed: 70,
+  calm: 65,
+  comfort: 75,
+  budget: 45,
+};
+
+let latestRanked = [];
+let routeRequestId = 0;
+let routeStatus = "Routes on demand";
+let routeUpdatedAt = "Estimate";
+let integrationStatus = {
+  llm: "Checking",
+  google: "Checking",
+  tools: "Conversation",
+};
+let startMap = null;
+let startMarker = null;
+let routeMap = null;
+let routePolyline = null;
+let routeMarkers = [];
+let pendingRoutePreview = null;
+let activeRoutePreview = null;
+let googleMapsLoading = false;
+let latestNavigationData = null;
+const chatHistory = [];
+
+function normalise(value, min, max) {
+  return Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
+}
+
+function distanceBetweenKm(origin, destination) {
+  if (!origin?.lat || !origin?.lng || !destination?.lat || !destination?.lng) return destination.distance;
+  const earthRadiusKm = 6371;
+  const toRadians = (degrees) => (degrees * Math.PI) / 180;
+  const deltaLat = toRadians(destination.lat - origin.lat);
+  const deltaLng = toRadians(destination.lng - origin.lng);
+  const startLat = toRadians(origin.lat);
+  const endLat = toRadians(destination.lat);
+  const haversine =
+    Math.sin(deltaLat / 2) ** 2 +
+    Math.cos(startLat) * Math.cos(endLat) * Math.sin(deltaLng / 2) ** 2;
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+}
+
+function getRouteForStart(place, startKey) {
+  return place.liveRoutes?.[startKey] || null;
+}
+
+function getStartPoint() {
+  return startOffsets[controls.startPoint.value] || startOffsets.southKensington;
+}
+
+function getStartCacheKey() {
+  const start = getStartPoint();
+  if (controls.startPoint.value !== "mapSelection") return controls.startPoint.value;
+  return `map:${start.lat.toFixed(5)},${start.lng.toFixed(5)}`;
+}
+
+function getPreferenceWeights(profile) {
+  const raw = {
+    speed: preferenceWeights.speed * profile.baseWeights.speed,
+    calm: preferenceWeights.calm * profile.baseWeights.calm,
+    comfort: preferenceWeights.comfort * profile.baseWeights.comfort,
+    budget: preferenceWeights.budget * profile.baseWeights.budget,
+  };
+  const total = Object.values(raw).reduce((sum, value) => sum + value, 0);
+  return Object.fromEntries(Object.entries(raw).map(([key, value]) => [key, value / total]));
+}
+
+function scorePlace(place, context) {
+  const profile = scenarioProfiles[context.scenario];
+  const start = context.start;
+  const zoneOffset = start[place.zone] ?? start.modifier;
+  const fallbackDistance = distanceBetweenKm(start, place);
+  const liveRoute = getRouteForStart(place, context.startCacheKey);
+  const hasLiveRoute = Number.isFinite(liveRoute?.transitMinutes);
+  const estimatedTransit = controls.startPoint.value === "mapSelection"
+    ? Math.round(fallbackDistance * 8 + 5)
+    : place.transitMinutes + zoneOffset;
+  const baseTransit = hasLiveRoute ? liveRoute.transitMinutes : Math.max(3, estimatedTransit);
+  const trafficImpact = 0;
+  const adjustedTransit = Math.round(baseTransit + trafficImpact);
+  const adjustedDistance = Number((Number.isFinite(liveRoute?.distanceKm) ? liveRoute.distanceKm : fallbackDistance).toFixed(2));
+  const estimatedWalkMinutes = Math.max(1, Math.round((adjustedDistance / 5) * 60));
+  const adjustedCrowd = place.crowd;
+  const walkingPenalty = estimatedWalkMinutes > context.walkTolerance ? (estimatedWalkMinutes - context.walkTolerance) * 1.8 : 0;
+  const rainPenalty = 0;
+  const matchedTags = profile.wanted.filter((tag) => place.tags.includes(tag));
+  const missingTags = profile.wanted.length - matchedTags.length;
+  const matchScore = matchedTags.length * 12 - missingTags * 10;
+  const weights = getPreferenceWeights(profile);
+
+  const speedScore = 100 - normalise(adjustedTransit, 10, 62);
+  const calmScore = 100 - adjustedCrowd;
+  const comfortScore = place.comfort - rainPenalty - walkingPenalty + matchScore;
+  const budgetScore = place.budget;
+
+  const total =
+    speedScore * weights.speed +
+    calmScore * weights.calm +
+    comfortScore * weights.comfort +
+    budgetScore * weights.budget;
+
+  return {
+    ...place,
+    adjustedTransit,
+    adjustedDistance,
+    estimatedWalkMinutes,
+    hasLiveRoute,
+    adjustedCrowd,
+    total: Math.round(Math.max(0, Math.min(100, total))),
+    risk: getRisk(place, adjustedCrowd, adjustedTransit, rainPenalty, walkingPenalty),
+    decision: getDecision(place, context, adjustedTransit, adjustedCrowd, rainPenalty),
+  };
+}
+
+function getRisk(place, crowd, transit, rainPenalty, walkingPenalty) {
+  if (rainPenalty > 10) return { label: "Weather risk", className: "warning" };
+  if (crowd > 70) return { label: "Likely busy", className: "caution" };
+  if (transit > 48) return { label: "Long journey", className: "caution" };
+  if (walkingPenalty > 0) return { label: "Walk limit exceeded", className: "caution" };
+  if (place.budget < 62) return { label: "Cost trade-off", className: "caution" };
+  return { label: "Good fit", className: "ok" };
+}
+
+function getDecision(place, context, transit, crowd, rainPenalty) {
+  if (rainPenalty > 10 && place.tags.includes("outdoor")) {
+    return "Less ideal in wet weather.";
+  }
+  if (crowd > 70) {
+    return "Strong match, likely busy.";
+  }
+  if (transit < 26 && place.comfort > 80) {
+    return "Short trip, high comfort.";
+  }
+  if (transit < 20) {
+    return "A solid match with short travel.";
+  }
+  return "A solid match nearby.";
+}
+
+function render() {
+  updateOutputs();
+
+  const context = getContext();
+
+  $("weatherSignal").textContent = integrationStatus.llm;
+  $("trafficSignal").textContent = integrationStatus.google;
+  $("airSignal").textContent = integrationStatus.tools;
+
+  latestRanked = places
+    .map((place) => scorePlace(place, context))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 4);
+
+  $("recommendations").innerHTML = latestRanked.map(renderCard).join("");
+}
+
+function getContext() {
+  const start = getStartPoint();
+  return {
+    scenario: controls.scenario.value,
+    startPoint: controls.startPoint.value,
+    start,
+    startCacheKey: getStartCacheKey(),
+    walkTolerance: Number(controls.walkTolerance.value),
+  };
+}
+
+function renderCard(place, index) {
+  const hiddenTags = new Set(["medicine", "wifi", "indoor", "study-space", "group"]);
+  const lowPriorityTags = new Set(["quiet", "science", "services"]);
+  const visibleTags = place.tags
+    .filter((tag) => !hiddenTags.has(tag))
+    .sort((first, second) => Number(lowPriorityTags.has(first)) - Number(lowPriorityTags.has(second)))
+    .slice(0, 3);
+  const tagLabels = visibleTags
+    .map((tag) => `<span class="tag">${tagLabel(tag)}</span>`)
+    .join("");
+  return `
+    <article class="place-card">
+      <div class="place-image" style="background-image: url('${place.image}')"></div>
+      <div class="place-body">
+        <div class="place-heading">
+          <span class="rank">${index + 1}</span>
+          <h3>${place.name}</h3>
+        </div>
+        <p class="decision"><span class="score-badge">${place.total}</span>${place.decision}</p>
+        <div class="tags">${tagLabels}<span class="tag ${place.risk.className}">${place.risk.label}</span></div>
+        <div class="metrics">
+          <div class="metric"><span>Distance</span><strong>${place.adjustedDistance} km</strong></div>
+          <div class="metric"><span>Walk est.</span><strong>${place.estimatedWalkMinutes} min</strong></div>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function tagLabel(tag) {
+  const labels = {
+    quiet: "Quiet",
+    wifi: "Wi-Fi",
+    indoor: "Indoor",
+    view: "View",
+    "low-cost": "Free access",
+    "24h": "24 hours",
+    science: "STEM resources",
+    central: "Main library",
+    medicine: "Medical resources",
+    campus: "Campus library",
+    "study-space": "Study space",
+    group: "Group study",
+    services: "Services",
+    food: "Food nearby",
+    transit: "Transit access",
+    outdoor: "Outdoor",
+    green: "Green setting",
+    calm: "Calm",
+  };
+  return labels[tag] ?? tag;
+}
+
+function updateOutputs() {
+  $("walkOutput").textContent = `${controls.walkTolerance.value} min`;
+}
+
+async function answerQuestion(question, options = {}) {
+  const cleaned = question.trim();
+  if (!cleaned) {
+    $("agentAnswer").textContent = "Ask something like: from South Kensington to Hammersmith Campus by transit.";
+    return;
+  }
+
+  renderLoadingAnswer("Understanding your request");
+  const intent = await classifyIntent(cleaned);
+  if (intent.mode === "navigation") {
+    setAgentMode("Navigation");
+    await answerNavigationQuestion(cleaned, options);
+    return;
+  }
+
+  const isStudyPlanning = isStudyPlanningQuestion(cleaned);
+  setAgentMode(isStudyPlanning ? "Study planning" : "Conversation");
+  clearRoutePreview();
+  applyQuestionIntent(cleaned);
+  if (shouldUseRoutesForStudyQuestion(cleaned) || controls.scenario.value === "nearest") {
+    await refreshRoutes();
+  }
+  render();
+
+  const context = getContext();
+  setAsking(true);
+  renderLoadingAnswer("Generating results");
+
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: cleaned,
+        context: buildAgentContext(context),
+        ranked: latestRanked.slice(0, 2).map(toModelPlace),
+        history: chatHistory.slice(-6),
+      }),
+    });
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || "Model request failed");
+    }
+
+    if (!options.skipUserPush) {
+      chatHistory.push({ role: "user", content: cleaned });
+      renderChatModalHistory();
+    }
+    const contentType = response.headers.get("Content-Type") || "";
+    const answer = contentType.includes("application/x-ndjson")
+      ? await readStreamingAnswer(response)
+      : await readJsonAnswer(response);
+
+    chatHistory.push({ role: "assistant", content: answer });
+    trimChatHistory();
+    latestNavigationData = null;
+    renderAgentActions();
+    renderChatModalHistory();
+  } catch (error) {
+    hideAgentActions();
+    $("agentAnswer").innerHTML = `
+      <strong>The local language model is not connected yet</strong>
+      <br />${escapeHtml(error.message)}
+      <br />This app uses Ollama by default. Run <code>ollama run qwen3</code>, then keep <code>python3 server.py</code> running.
+    `;
+  } finally {
+    setAsking(false);
+  }
+}
+
+async function classifyIntent(question) {
+  try {
+    const response = await fetch("/api/intent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, contextStart: currentStartContext(), history: chatHistory.slice(-6) }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Intent request failed");
+    return {
+      mode: data.mode === "navigation" ? "navigation" : "study",
+      confidence: data.confidence || 0,
+      reason: data.reason || "",
+    };
+  } catch (error) {
+    if (isNavigationQuery(question)) {
+      return { mode: "navigation", confidence: 0.65, reason: "local route fallback" };
+    }
+    return { mode: "study", confidence: 0, reason: error.message };
+  }
+}
+
+async function answerNavigationQuestion(question, options = {}) {
+  setAsking(true);
+  renderLoadingAnswer("Checking Google Routes for accurate navigation");
+  const routeSummaryTimer = window.setTimeout(() => {
+    renderLoadingAnswer("Generating routes to your destination");
+  }, 6000);
+  const routeMapTimer = window.setTimeout(() => {
+    renderLoadingAnswer("Generating summary and map, this may take a while");
+  }, 8000);
+
+  try {
+    const response = await fetch("/api/navigate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: question, contextStart: currentStartContext(), history: chatHistory.slice(-6) }),
+    });
+    const data = await response.json();
+    window.clearTimeout(routeSummaryTimer);
+    window.clearTimeout(routeMapTimer);
+    if (!response.ok) {
+      const details = Array.isArray(data.details) && data.details.length
+        ? `\n${data.details.join("\n")}`
+        : "";
+      throw new Error(`${data.error || "Navigation request failed"}${details}`);
+    }
+
+    if (!options.skipUserPush) {
+      chatHistory.push({ role: "user", content: question });
+      renderChatModalHistory();
+    }
+    chatHistory.push({ role: "assistant", content: data.answer });
+    trimChatHistory();
+    latestNavigationData = data;
+    renderStreamingAnswer(data.answer);
+    renderRoutePreview(data);
+    renderAgentActions(data, data.recommended);
+    renderChatModalHistory();
+  } catch (error) {
+    hideAgentActions();
+    clearRoutePreview();
+    $("agentAnswer").innerHTML = `
+      <strong>Navigation is not available yet</strong>
+      <br />${escapeHtml(error.message)}
+      <br />Check that <code>GOOGLE_MAPS_API_KEY</code> is set and that Routes API is enabled in Google Cloud.
+    `;
+  } finally {
+    window.clearTimeout(routeSummaryTimer);
+    window.clearTimeout(routeMapTimer);
+    setAsking(false);
+  }
+}
+
+function currentStartContext() {
+  const start = getStartPoint();
+  return {
+    name: start.label,
+    lat: start.lat,
+    lng: start.lng,
+    source: controls.startPoint.value === "mapSelection" ? "map" : "campus",
+  };
+}
+
+function isNavigationQuery(question) {
+  const text = question.toLowerCase();
+  return (
+    /\bfrom\s+.+\s+to\s+.+/.test(text) ||
+    /从.+到.+/.test(question) ||
+    /从.+去.+/.test(question) ||
+    /.+到.+怎么走/.test(question) ||
+    text.includes("directions") ||
+    text.includes("navigate") ||
+    text.includes("route to") ||
+    question.includes("怎么去") ||
+    question.includes("怎么走") ||
+    question.includes("路线") ||
+    question.includes("导航")
+  );
+}
+
+function shouldUseRoutesForStudyQuestion(question) {
+  const text = question.toLowerCase();
+  return (
+    text.includes("nearest") ||
+    text.includes("closest") ||
+    text.includes("fastest") ||
+    text.includes("travel time") ||
+    text.includes("how long") ||
+    text.includes("commute") ||
+    text.includes("nearby") ||
+    question.includes("最近") ||
+    question.includes("最快") ||
+    question.includes("多远") ||
+    question.includes("多久") ||
+    question.includes("通勤")
+  );
+}
+
+function isStudyPlanningQuestion(question) {
+  const text = question.toLowerCase();
+  return (
+    text.includes("study") ||
+    text.includes("library") ||
+    text.includes("campus") ||
+    text.includes("quiet") ||
+    text.includes("group") ||
+    text.includes("revise") ||
+    text.includes("revision") ||
+    text.includes("focus") ||
+    text.includes("seat") ||
+    text.includes("nearest") ||
+    text.includes("nearby") ||
+    text.includes("study space") ||
+    question.includes("图书馆") ||
+    question.includes("学习") ||
+    question.includes("自习") ||
+    question.includes("安静") ||
+    question.includes("附近")
+  );
+}
+
+async function readJsonAnswer(response) {
+  const data = await response.json();
+  const answer = data.answer || "";
+  renderStreamingAnswer(answer);
+  return answer;
+}
+
+async function readStreamingAnswer(response) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let answer = "";
+  renderStreamingAnswer("");
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const event = JSON.parse(line);
+      if (event.error) throw new Error(event.error);
+      if (event.delta) {
+        answer += event.delta;
+        renderStreamingAnswer(answer);
+      }
+    }
+  }
+
+  return answer.trim();
+}
+
+function renderStreamingAnswer(answer) {
+  if (!answer) {
+    renderLoadingAnswer("Generating answer");
+    return;
+  }
+  const text = answer;
+  $("agentAnswer").innerHTML = renderMarkdown(text);
+}
+
+function renderLoadingAnswer(message) {
+  clearRoutePreview();
+  hideAgentActions();
+  $("agentAnswer").innerHTML = `
+    <div class="thinking-panel" role="status" aria-live="polite">
+      <div class="thinking-header">
+        <span class="thinking-orbit" aria-hidden="true"></span>
+        <strong>${escapeHtml(message)}</strong>
+        <span class="thinking-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+      </div>
+      <div class="thinking-bar" aria-hidden="true"><span></span></div>
+    </div>
+  `;
+}
+
+function renderMarkdown(value) {
+  return escapeHtml(value)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/^\s*[-*]\s+(.+)$/gm, "• $1")
+    .replace(/\n/g, "<br />");
+}
+
+function trimChatHistory() {
+  if (chatHistory.length > 6) {
+    chatHistory.splice(0, chatHistory.length - 6);
+  }
+}
+
+function applyQuestionIntent(question) {
+  const text = question.toLowerCase();
+  const intentRules = [
+    { value: "late", words: ["tonight", "night", "late", "24h", "24 hours", "evening"] },
+    { value: "medicine", words: ["medical", "medicine", "hospital", "clinical", "nhs"] },
+    { value: "group", words: ["group", "discussion", "collaborate", "team"] },
+    { value: "focus", words: ["nearest", "nearby", "closest", "quick", "seat"] },
+    { value: "focus", words: ["study", "quiet", "focus", "revise", "revision", "write"] },
+  ];
+  const matched = intentRules.find((rule) => rule.words.some((word) => text.includes(word)));
+  if (matched) controls.scenario.value = matched.value;
+}
+
+function buildAgentContext(context) {
+  return {
+    scenario: scenarioProfiles[context.scenario].label,
+    startPoint: context.start.label,
+    startCoordinates: {
+      lat: Number(context.start.lat.toFixed(6)),
+      lng: Number(context.start.lng.toFixed(6)),
+    },
+    walkTolerance: `${context.walkTolerance} min`,
+    preferences: {
+      speed: preferenceWeights.speed,
+      calm: preferenceWeights.calm,
+      comfort: preferenceWeights.comfort,
+      budget: preferenceWeights.budget,
+    },
+    routeStatus,
+    routeUpdatedAt,
+    dataNote: "Library names come from Imperial College London Library Services' Our libraries page. Travel time and distance use Google Routes API when available; crowding and comfort are prototype estimates.",
+  };
+}
+
+function toModelPlace(place) {
+  return {
+    name: place.name,
+    type: place.type,
+    score: place.total,
+    decision: place.decision,
+    risk: place.risk.label,
+    transitMinutes: place.adjustedTransit,
+    distanceKm: place.adjustedDistance,
+    routeSource: place.hasLiveRoute ? "Google Routes API" : "prototype estimate",
+    walkMinutes: place.estimatedWalkMinutes,
+    crowd: place.adjustedCrowd,
+    comfort: place.comfort,
+    budget: place.budget,
+    tags: place.tags.map(tagLabel),
+  };
+}
+
+function setAsking(isAsking) {
+  $("askButton").disabled = isAsking;
+  $("askButton").textContent = isAsking ? "Thinking" : "Ask";
+}
+
+function setAgentMode(mode) {
+  integrationStatus.tools = mode;
+  render();
+}
+
+function escapeHtml(value) {
+  return value.replace(/[&<>"']/g, (char) => {
+    const entities = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" };
+    return entities[char];
+  });
+}
+
+function loadGoogleStartMap(apiKey) {
+  if (startMap || googleMapsLoading) return;
+  googleMapsLoading = true;
+  window.initStartPickerMap = initStartPickerMap;
+
+  const script = document.createElement("script");
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&callback=initStartPickerMap`;
+  script.async = true;
+  script.defer = true;
+  script.onerror = () => {
+    $("startMapStatus").textContent = "Google Maps did not load; use the campus selector below.";
+  };
+  document.head.appendChild(script);
+}
+
+function initStartPickerMap() {
+  const mapElement = $("startMap");
+  const initial = getStartPoint();
+  const position = { lat: initial.lat, lng: initial.lng };
+
+  startMap = new google.maps.Map(mapElement, {
+    center: position,
+    zoom: 13,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false,
+  });
+
+  startMarker = new google.maps.Marker({
+    map: startMap,
+    position,
+    draggable: true,
+    title: "Starting point",
+  });
+
+  startMap.addListener("click", (event) => {
+    setMapStartPoint(event.latLng);
+  });
+
+  startMarker.addListener("dragend", (event) => {
+    setMapStartPoint(event.latLng);
+  });
+
+  updateStartMapStatus();
+  if (pendingRoutePreview) renderRoutePreview(pendingRoutePreview);
+}
+
+function renderRoutePreview(data) {
+  const routes = routeOptionsForPreview(data);
+  const recommended = routes.find((route) => route.mode === data?.recommended?.mode) || routes[0];
+  activeRoutePreview = data;
+  renderRouteModeOptions(routes, recommended?.mode);
+  drawRoutePreview(data, recommended);
+}
+
+function routeOptionsForPreview(data) {
+  return [data?.recommended, ...(data?.alternatives || [])].filter((route) => route?.polyline);
+}
+
+function renderRouteModeOptions(routes, selectedMode) {
+  const select = $("routeModeSelect");
+  select.innerHTML = routes
+    .map((route) => {
+      const distance = Number.isFinite(route.distanceKm) ? `, ${route.distanceKm} km` : "";
+      const label = `${route.modeLabel || route.mode} · ${route.durationMinutes} min${distance}`;
+      return `<option value="${route.mode}" ${route.mode === selectedMode ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    })
+    .join("");
+  $("routeUpdateButton").disabled = routes.length < 2;
+}
+
+function drawSelectedRoutePreview() {
+  if (!activeRoutePreview) return;
+  const routes = routeOptionsForPreview(activeRoutePreview);
+  const selectedMode = $("routeModeSelect").value;
+  const route = routes.find((item) => item.mode === selectedMode) || routes[0];
+  drawRoutePreview(activeRoutePreview, route);
+  updateGoogleMapsLink(activeRoutePreview, route);
+}
+
+function drawRoutePreview(data, recommended) {
+  const encodedPolyline = recommended?.polyline;
+  if (!encodedPolyline) {
+    clearRoutePreview();
+    return;
+  }
+
+  const path = decodePolyline(encodedPolyline);
+  if (!path.length) {
+    clearRoutePreview();
+    return;
+  }
+
+  pendingRoutePreview = data;
+  const preview = $("routePreview");
+  preview.hidden = false;
+  $("routePreviewTitle").textContent = `Route map: ${recommended.modeLabel || recommended.mode || "route"}`;
+  const distance = Number.isFinite(recommended.distanceKm) ? `, ${recommended.distanceKm} km` : "";
+  $("routePreviewMeta").textContent = `${recommended.durationMinutes} min${distance}`;
+  updateGoogleMapsLink(data, recommended);
+
+  if (!window.google?.maps) return;
+
+  const mapElement = $("routeMap");
+  mapElement.style.minHeight = "360px";
+  mapElement.style.height = "360px";
+  if (!routeMap) {
+    routeMap = new google.maps.Map(mapElement, {
+      center: path[0],
+      zoom: 13,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+    });
+  }
+
+  if (routePolyline) routePolyline.setMap(null);
+  routeMarkers.forEach((marker) => marker.setMap(null));
+  routeMarkers = [];
+
+  routePolyline = new google.maps.Polyline({
+    path,
+    geodesic: true,
+    strokeColor: "#2767a8",
+    strokeOpacity: 0.95,
+    strokeWeight: 5,
+    map: routeMap,
+  });
+
+  routeMarkers = [
+    new google.maps.Marker({ map: routeMap, position: path[0], label: "A", title: data.origin || "Origin" }),
+    new google.maps.Marker({ map: routeMap, position: path[path.length - 1], label: "B", title: data.destination || "Destination" }),
+  ];
+
+  const bounds = new google.maps.LatLngBounds();
+  path.forEach((point) => bounds.extend(point));
+  routeMap.fitBounds(bounds, 32);
+}
+
+function clearRoutePreview() {
+  pendingRoutePreview = null;
+  activeRoutePreview = null;
+  const preview = $("routePreview");
+  if (preview) preview.hidden = true;
+  if (routePolyline) {
+    routePolyline.setMap(null);
+    routePolyline = null;
+  }
+  routeMarkers.forEach((marker) => marker.setMap(null));
+  routeMarkers = [];
+}
+
+function renderAgentActions(data = null, route = data?.recommended) {
+  const actions = $("agentActions");
+  const googleLink = $("googleMapsLink");
+  actions.hidden = false;
+  const hasRoute = Boolean(data?.origin && data?.destination);
+  googleLink.hidden = !hasRoute;
+  if (hasRoute) updateGoogleMapsLink(data, route);
+}
+
+function hideAgentActions() {
+  $("agentActions").hidden = true;
+}
+
+function updateGoogleMapsLink(data = latestNavigationData, route = data?.recommended) {
+  const link = $("googleMapsLink");
+  if (!data?.origin || !data?.destination) {
+    link.hidden = true;
+    return;
+  }
+
+  link.hidden = false;
+  const params = new URLSearchParams({
+    api: "1",
+    origin: data.origin,
+    destination: data.destination,
+    travelmode: googleMapsTravelMode(route?.mode),
+  });
+  link.href = `https://www.google.com/maps/dir/?${params.toString()}`;
+}
+
+function googleMapsTravelMode(mode) {
+  const modes = {
+    TRANSIT: "transit",
+    WALK: "walking",
+    BICYCLE: "bicycling",
+    DRIVE: "driving",
+  };
+  return modes[mode] || "transit";
+}
+
+function openChatModal() {
+  const modal = $("chatModal");
+  modal.hidden = false;
+  // trigger animation
+  void modal.offsetWidth;
+  modal.classList.remove("closing");
+  modal.classList.add("visible");
+  renderChatModalHistory();
+  $("modalUserQuestion").focus();
+}
+
+function closeChatModal() {
+  const modal = $("chatModal");
+  if (modal.hidden) return;
+  modal.classList.remove("visible");
+  modal.classList.add("closing");
+  modal.addEventListener("animationend", function handler() {
+    modal.hidden = true;
+    modal.classList.remove("closing");
+    modal.removeEventListener("animationend", handler);
+  });
+}
+
+function renderChatModalHistory(isLoading = false) {
+  const history = $("chatModalHistory");
+  if (!history) return;
+  if (!chatHistory.length) {
+    history.innerHTML = `<div class="chat-message assistant">No conversation yet. Ask the agent something to start.</div>`;
+    return;
+  }
+
+  const messages = chatHistory
+    .map((item) => {
+      const role = item.role === "user" ? "user" : "assistant";
+      return `<div class="chat-message ${role}">${renderMarkdown(item.content)}</div>`;
+    })
+    .join("");
+  const loading = isLoading
+    ? `<div class="chat-message assistant typing"><span></span><span></span><span></span></div>`
+    : "";
+  history.innerHTML = messages + loading;
+  history.scrollTop = history.scrollHeight;
+}
+
+function decodePolyline(encoded) {
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+  const coordinates = [];
+
+  while (index < encoded.length) {
+    const latResult = decodePolylineValue(encoded, index);
+    lat += latResult.delta;
+    index = latResult.nextIndex;
+
+    const lngResult = decodePolylineValue(encoded, index);
+    lng += lngResult.delta;
+    index = lngResult.nextIndex;
+
+    coordinates.push({ lat: lat / 1e5, lng: lng / 1e5 });
+  }
+
+  return coordinates;
+}
+
+function decodePolylineValue(encoded, startIndex) {
+  let result = 0;
+  let shift = 0;
+  let index = startIndex;
+  let byte;
+
+  do {
+    byte = encoded.charCodeAt(index) - 63;
+    index += 1;
+    result |= (byte & 0x1f) << shift;
+    shift += 5;
+  } while (byte >= 0x20 && index < encoded.length);
+
+  const delta = result & 1 ? ~(result >> 1) : result >> 1;
+  return { delta, nextIndex: index };
+}
+
+function setMapStartPoint(latLng) {
+  const lat = latLng.lat();
+  const lng = latLng.lng();
+  startOffsets.mapSelection = {
+    label: "Map selection",
+    lat,
+    lng,
+    modifier: 0,
+  };
+  controls.startPoint.value = "mapSelection";
+  if (startMarker) startMarker.setPosition({ lat, lng });
+  if (startMap) startMap.panTo({ lat, lng });
+  updateStartMapStatus();
+}
+
+function selectCampusStart(key) {
+  const campus = startOffsets[key];
+  if (!campus) return;
+  if (startMarker) startMarker.setPosition({ lat: campus.lat, lng: campus.lng });
+  if (startMap) {
+    startMap.panTo({ lat: campus.lat, lng: campus.lng });
+    startMap.setZoom(13);
+  }
+  updateStartMapStatus();
+}
+
+function updateStartMapStatus() {
+  const start = getStartPoint();
+  const label = controls.startPoint.value === "mapSelection"
+    ? `Map point ${start.lat.toFixed(5)}, ${start.lng.toFixed(5)}`
+    : `${start.label} selected`;
+  $("startMapStatus").textContent = `${label}. Click the map or drag the marker to choose any start.`;
+}
+
+async function refreshIntegrationStatus() {
+  try {
+    const response = await fetch("/api/health");
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Health check failed");
+    integrationStatus = {
+      llm: data.llmConnected ? data.llmStatus || "Connected" : data.llmStatus || "Offline",
+      google: data.googleMapsConfigured ? "Key ready" : "Key missing",
+      tools: integrationStatus.tools || "Conversation",
+    };
+    if (data.googleMapsBrowserKey) {
+      loadGoogleStartMap(data.googleMapsBrowserKey);
+    } else {
+      $("startMapStatus").textContent = "Google Maps key missing; use the campus selector below.";
+    }
+  } catch (error) {
+    integrationStatus = {
+      llm: "Unknown",
+      google: "Unknown",
+      tools: integrationStatus.tools || "Conversation",
+    };
+  }
+  render();
+}
+
+async function refreshRoutes() {
+  const requestId = ++routeRequestId;
+  const start = getStartPoint();
+  const startCacheKey = getStartCacheKey();
+  if (!start?.lat || !start?.lng) return;
+
+  routeStatus = "Loading live routes...";
+  render();
+
+  try {
+    const response = await fetch("/api/routes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        start: { name: start.label, lat: start.lat, lng: start.lng },
+        destinations: places.map((place) => ({
+          name: place.name,
+          lat: place.lat,
+          lng: place.lng,
+        })),
+      }),
+    });
+    const data = await response.json();
+    if (requestId !== routeRequestId) return;
+    if (!response.ok) throw new Error(data.error || "Google route request failed");
+
+    places.forEach((place) => {
+      const route = data.routes?.[place.name];
+      if (!route?.transitMinutes) return;
+      place.liveRoutes = place.liveRoutes || {};
+      place.liveRoutes[startCacheKey] = {
+        transitMinutes: route.transitMinutes,
+        distanceKm: route.distanceKm,
+      };
+    });
+    routeStatus = "Google Routes live";
+    routeUpdatedAt = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch (error) {
+    console.warn(error);
+    routeStatus = "Routes on demand";
+    routeUpdatedAt = "Estimate";
+  }
+
+  render();
+}
+
+Object.values(controls).forEach((control) => {
+  control.addEventListener("input", () => {
+    if (control === controls.walkTolerance) {
+      updateOutputs();
+      return;
+    }
+    if (control === controls.startPoint && controls.startPoint.value !== "mapSelection") {
+      selectCampusStart(controls.startPoint.value);
+      return;
+    }
+    render();
+    if (controls.scenario.value === "nearest") refreshRoutes();
+  });
+});
+$("updateRecommendations").addEventListener("click", () => {
+  render();
+  if (controls.scenario.value === "nearest") refreshRoutes();
+});
+$("questionForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  answerQuestion($("userQuestion").value);
+});
+document.querySelectorAll("[data-question]").forEach((button) => {
+  button.addEventListener("click", () => {
+    $("userQuestion").value = button.dataset.question;
+    answerQuestion(button.dataset.question);
+  });
+});
+$("routeUpdateButton").addEventListener("click", drawSelectedRoutePreview);
+$("openChatButton").addEventListener("click", openChatModal);
+$("closeChatButton").addEventListener("click", closeChatModal);
+$("chatModal").addEventListener("click", (event) => {
+  if (event.target === $("chatModal")) closeChatModal();
+});
+// External Google Maps link: show confirm modal before leaving
+const externalConfirmModalEl = $("externalConfirmModal");
+const confirmOpenLinkBtn = $("confirmOpenLink");
+const cancelOpenLinkBtn = $("cancelOpenLink");
+let pendingExternalHref = null;
+
+const googleLinkEl = $("googleMapsLink");
+if (googleLinkEl) {
+  googleLinkEl.addEventListener("click", (e) => {
+    const href = e.currentTarget && e.currentTarget.href;
+    if (!href) return;
+    e.preventDefault();
+    showExternalConfirm(href);
+  });
+}
+
+// Intercept clicks on Useful links so we show the same external-confirm modal
+document.querySelectorAll('.useful-links a.link-cta').forEach((el) => {
+  el.addEventListener('click', (e) => {
+    const href = e.currentTarget && e.currentTarget.href;
+    if (!href) return;
+    e.preventDefault();
+    showExternalConfirm(href);
+  });
+});
+
+function showExternalConfirm(href) {
+  pendingExternalHref = href;
+  if (!externalConfirmModalEl) return;
+  externalConfirmModalEl.hidden = false;
+  void externalConfirmModalEl.offsetWidth;
+  externalConfirmModalEl.classList.remove("closing");
+  externalConfirmModalEl.classList.add("visible");
+  const txt = $("externalConfirmText");
+  if (txt) txt.textContent = "You are about to leave this page and open a new tab. Continue?";
+}
+
+function hideExternalConfirm() {
+  if (!externalConfirmModalEl || externalConfirmModalEl.hidden) return;
+  externalConfirmModalEl.classList.remove("visible");
+  externalConfirmModalEl.classList.add("closing");
+  externalConfirmModalEl.addEventListener("animationend", function handler() {
+    externalConfirmModalEl.hidden = true;
+    externalConfirmModalEl.classList.remove("closing");
+    externalConfirmModalEl.removeEventListener("animationend", handler);
+  });
+  pendingExternalHref = null;
+}
+
+if (confirmOpenLinkBtn) {
+  confirmOpenLinkBtn.addEventListener("click", () => {
+    if (pendingExternalHref) window.open(pendingExternalHref, "_blank");
+    hideExternalConfirm();
+  });
+}
+if (cancelOpenLinkBtn) {
+  cancelOpenLinkBtn.addEventListener("click", hideExternalConfirm);
+}
+$("modalChatForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const input = $("modalUserQuestion");
+  const question = input.value.trim();
+  if (!question) return;
+  $("userQuestion").value = question;
+  input.value = "";
+  chatHistory.push({ role: "user", content: question });
+  renderChatModalHistory(true);
+  $("modalAskButton").disabled = true;
+  try {
+    await answerQuestion(question, { skipUserPush: true });
+    renderChatModalHistory();
+  } finally {
+    $("modalAskButton").disabled = false;
+    input.focus();
+  }
+});
+
+render();
+refreshIntegrationStatus();
