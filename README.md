@@ -9,6 +9,10 @@ Click The Link to visit the demo:
 
 [View the live website](https://ada-yz1825.github.io/Imperial_travel_agent/)
 
+If there is a problem, than try this site:
+
+[View the alternative website](https://imperial-travel-agent-api.onrender.com/)
+
 
 ## Features
 
