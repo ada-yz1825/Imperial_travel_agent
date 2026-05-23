@@ -415,7 +415,7 @@ let latestNavigationData = null;
 const chatHistory = [];
 const STREAM_RENDER_BASE_DELAY_MS = 30;
 const STREAM_RENDER_CHUNK_SIZE = 4;
-const MIN_LOADING_MS = 1800;
+const MIN_LOADING_MS = 1900;
 let answerRenderSessionId = 0;
 
 function normalise(value, min, max) {
