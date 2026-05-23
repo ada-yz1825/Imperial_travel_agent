@@ -413,6 +413,10 @@ let googleMapsLoading = false;
 let routesKeyConfigured = false;
 let latestNavigationData = null;
 const chatHistory = [];
+const STREAM_RENDER_BASE_DELAY_MS = 30;
+const STREAM_RENDER_CHUNK_SIZE = 4;
+const MIN_LOADING_MS = 2500;
+let answerRenderSessionId = 0;
 
 function normalise(value, min, max) {
   return Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
@@ -644,10 +648,11 @@ async function answerQuestion(question, options = {}) {
 
   setAgentMode("Pending");
   renderLoadingAnswer("Understanding your request");
+  const minLoadingReadyAt = Date.now() + MIN_LOADING_MS;
   const intent = await classifyIntent(cleaned);
   if (intent.mode === "navigation") {
     setAgentMode("Navigation");
-    await answerNavigationQuestion(cleaned, options);
+    await answerNavigationQuestion(cleaned, { ...options, minLoadingReadyAt });
     return;
   }
 
@@ -669,6 +674,7 @@ async function answerQuestion(question, options = {}) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        stream: true,
         question: cleaned,
         context: buildAgentContext(context),
         ranked: latestRanked.slice(0, 2).map(toModelPlace),
@@ -684,6 +690,7 @@ async function answerQuestion(question, options = {}) {
       chatHistory.push({ role: "user", content: cleaned });
       renderChatModalHistory();
     }
+    await waitForMinimumLoading(minLoadingReadyAt);
     const contentType = response.headers.get("Content-Type") || "";
     const answer = sanitizeModelOutput(contentType.includes("application/x-ndjson")
       ? await readStreamingAnswer(response)
@@ -695,6 +702,8 @@ async function answerQuestion(question, options = {}) {
     renderAgentActions();
     renderChatModalHistory();
   } catch (error) {
+    await waitForMinimumLoading(minLoadingReadyAt);
+    cancelAnswerRender();
     hideAgentActions();
     const errorMessage = "Looks like the AI quota hit rush hour. Please try again in a minute, or send a shorter question.";
     const errorHtml = `
@@ -735,6 +744,9 @@ async function classifyIntent(question) {
 }
 
 async function answerNavigationQuestion(question, options = {}) {
+  const minLoadingReadyAt = Number.isFinite(options.minLoadingReadyAt)
+    ? options.minLoadingReadyAt
+    : Date.now() + MIN_LOADING_MS;
   setAsking(true);
   renderLoadingAnswer("Checking Google Routes for accurate navigation");
   const ROUTE_SUMMARY_DELAY_MS = 4000;
@@ -768,15 +780,18 @@ async function answerNavigationQuestion(question, options = {}) {
       chatHistory.push({ role: "user", content: question });
       renderChatModalHistory();
     }
+    await waitForMinimumLoading(minLoadingReadyAt);
     const answer = sanitizeModelOutput(data.answer);
     chatHistory.push({ role: "assistant", content: answer });
     trimChatHistory();
     latestNavigationData = { ...data, answer };
-    renderStreamingAnswer(answer);
+    await renderAnswerWithPacing(answer);
     showRoutePreviewAfterDelay(data, 500);
     renderAgentActions(data, data.recommended);
     renderChatModalHistory();
   } catch (error) {
+    await waitForMinimumLoading(minLoadingReadyAt);
+    cancelAnswerRender();
     hideAgentActions();
     clearRoutePreview();
     $("agentAnswer").innerHTML = `
@@ -870,7 +885,7 @@ function isStudyPlanningQuestion(question) {
 async function readJsonAnswer(response) {
   const data = await response.json();
   const answer = data.answer || "";
-  renderStreamingAnswer(answer);
+  await renderAnswerWithPacing(answer);
   return answer;
 }
 
@@ -879,7 +894,7 @@ async function readStreamingAnswer(response) {
   const decoder = new TextDecoder();
   let buffer = "";
   let answer = "";
-  renderStreamingAnswer("");
+  const streamState = beginAnswerRender();
 
   while (true) {
     const { done, value } = await reader.read();
@@ -894,24 +909,108 @@ async function readStreamingAnswer(response) {
       if (event.error) throw new Error(event.error);
       if (event.delta) {
         answer += event.delta;
-        renderStreamingAnswer(answer);
+        enqueueAnswerRender(streamState, event.delta);
       }
     }
   }
 
+  closeAnswerRender(streamState);
+  await waitForAnswerRender(streamState);
+
   return answer.trim();
 }
 
-function renderStreamingAnswer(answer) {
-  if (!answer) {
+function beginAnswerRender() {
+  cancelAnswerRender();
+  const state = {
+    sessionId: ++answerRenderSessionId,
+    queue: "",
+    rendered: "",
+    completed: false,
+    timer: null,
+    resolve: null,
+  };
+  state.finished = new Promise((resolve) => {
+    state.resolve = resolve;
+  });
+  return state;
+}
+
+function enqueueAnswerRender(state, delta) {
+  if (!state || state.sessionId !== answerRenderSessionId || !delta) return;
+  state.queue += delta;
+  if (!state.timer) {
+    scheduleAnswerRenderStep(state, STREAM_RENDER_BASE_DELAY_MS);
+  }
+}
+
+function closeAnswerRender(state) {
+  if (!state || state.sessionId !== answerRenderSessionId) return;
+  state.completed = true;
+  if (!state.timer && !state.queue) {
+    state.resolve();
+  }
+}
+
+function waitForAnswerRender(state) {
+  if (!state || state.sessionId !== answerRenderSessionId) return Promise.resolve();
+  return state.finished;
+}
+
+function scheduleAnswerRenderStep(state, delayMs) {
+  state.timer = window.setTimeout(() => {
+    state.timer = null;
+    stepAnswerRender(state);
+  }, delayMs);
+}
+
+function stepAnswerRender(state) {
+  if (!state || state.sessionId !== answerRenderSessionId) return;
+
+  if (!state.queue) {
+    if (state.completed) {
+      state.resolve();
+      return;
+    }
+    scheduleAnswerRenderStep(state, STREAM_RENDER_BASE_DELAY_MS);
+    return;
+  }
+
+  const chunk = state.queue.slice(0, STREAM_RENDER_CHUNK_SIZE);
+  state.queue = state.queue.slice(chunk.length);
+  state.rendered += chunk;
+  const text = sanitizeModelOutput(state.rendered);
+  $("agentAnswer").innerHTML = text ? renderMarkdown(text) : "";
+
+  const punctuationDelay = /[。！？!?\n]$/.test(chunk) ? 72 : 0;
+  scheduleAnswerRenderStep(state, STREAM_RENDER_BASE_DELAY_MS + punctuationDelay);
+}
+
+function cancelAnswerRender() {
+  answerRenderSessionId += 1;
+}
+
+async function waitForMinimumLoading(minLoadingReadyAt) {
+  const waitMs = Number(minLoadingReadyAt) - Date.now();
+  if (waitMs > 0) {
+    await new Promise((resolve) => window.setTimeout(resolve, waitMs));
+  }
+}
+
+async function renderAnswerWithPacing(answer) {
+  const clean = sanitizeModelOutput(answer);
+  if (!clean) {
     renderLoadingAnswer("Generating answer");
     return;
   }
-  const text = sanitizeModelOutput(answer);
-  $("agentAnswer").innerHTML = renderMarkdown(text);
+  const state = beginAnswerRender();
+  enqueueAnswerRender(state, clean);
+  closeAnswerRender(state);
+  await waitForAnswerRender(state);
 }
 
 function renderLoadingAnswer(message) {
+  cancelAnswerRender();
   clearRoutePreview();
   hideAgentActions();
   $("agentAnswer").innerHTML = `

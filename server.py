@@ -2,6 +2,7 @@ import json
 import math
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -28,6 +29,8 @@ CHAT_HISTORY_LIMIT = int(os.environ.get("CHAT_HISTORY_LIMIT", "6"))
 GROQ_MAX_COMPLETION_TOKENS = int(os.environ.get("GROQ_MAX_COMPLETION_TOKENS", "750"))
 GROQ_JSON_MAX_COMPLETION_TOKENS = int(os.environ.get("GROQ_JSON_MAX_COMPLETION_TOKENS", "1500"))
 GROQ_NAVIGATION_MAX_COMPLETION_TOKENS = int(os.environ.get("GROQ_NAVIGATION_MAX_COMPLETION_TOKENS", "1500"))
+CHAT_STREAM_CHUNK_CHARS = int(os.environ.get("CHAT_STREAM_CHUNK_CHARS", "16"))
+CHAT_STREAM_CHUNK_DELAY_SECONDS = float(os.environ.get("CHAT_STREAM_CHUNK_DELAY_SECONDS", "0.03"))
 GOOGLE_TRAVEL_MODE = os.environ.get("GOOGLE_TRAVEL_MODE", "TRANSIT")
 IMPERIAL_SHUTTLE_URL = "https://www.imperial.ac.uk/admin-services/property/travel/shuttle-bus/"
 IMPERIAL_SHUTTLE_CAMPUSES = {
@@ -302,7 +305,7 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
                     "app": APP_NAME,
                     "provider": get_llm_provider(),
                     "model": current_llm_model(),
-                    "streaming": get_llm_provider() == "ollama",
+                    "streaming": True,
                     "llmConnected": llm_status["connected"],
                     "llmStatus": llm_status["label"],
                     "googleMapsConfigured": bool(get_google_maps_api_key()),
@@ -339,6 +342,7 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
                 return
 
             provider = get_llm_provider()
+            wants_stream = should_stream_chat(payload)
             if provider == "openai":
                 api_key = get_openai_api_key()
                 if not api_key:
@@ -349,6 +353,10 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
                         },
                         status=500,
                     )
+                    return
+
+                if wants_stream:
+                    self.stream_chat_from_text(lambda: call_openai(api_key, payload), get_openai_model(), "openai")
                     return
 
                 answer = call_openai(api_key, payload)
@@ -365,6 +373,10 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
                         },
                         status=500,
                     )
+                    return
+
+                if wants_stream:
+                    self.stream_chat_from_text(lambda: call_groq(api_key, payload), get_groq_model(), "groq")
                     return
 
                 answer = call_groq(api_key, payload)
@@ -548,6 +560,34 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
         except Exception as error:
             self.stream_json({"error": f"服务端错误：{error}"})
 
+    def stream_chat_from_text(self, answer_provider, model_name, provider_name):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_cors_headers()
+        self.end_headers()
+
+        try:
+            answer = strip_reasoning_text(str(answer_provider() or "")).strip()
+            if not answer:
+                answer = "模型没有返回文本结果。"
+
+            for chunk in iter_stream_chunks(answer):
+                self.stream_json({"delta": chunk})
+                if CHAT_STREAM_CHUNK_DELAY_SECONDS > 0:
+                    time.sleep(CHAT_STREAM_CHUNK_DELAY_SECONDS)
+
+            self.stream_json({"done": True, "model": model_name, "provider": provider_name})
+        except BrokenPipeError:
+            return
+        except urllib.error.HTTPError as error:
+            message = error.read().decode("utf-8", errors="replace")
+            self.stream_json({"error": format_model_http_error(message)})
+        except urllib.error.URLError:
+            self.stream_json({"error": "模型服务连接失败，请稍后重试。"})
+        except Exception as error:
+            self.stream_json({"error": f"服务端错误：{error}"})
+
 
 def get_cors_origin(request_origin):
     if not request_origin:
@@ -574,6 +614,32 @@ def default_cors_origins():
         "http://127.0.0.1:8001",
         "http://127.0.0.1:8002",
     }
+
+
+def should_stream_chat(payload):
+    raw = payload.get("stream", True)
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, str):
+        return raw.strip().lower() not in {"0", "false", "no", "off"}
+    return bool(raw)
+
+
+def iter_stream_chunks(text, chunk_chars=CHAT_STREAM_CHUNK_CHARS):
+    value = str(text or "")
+    size = max(4, int(chunk_chars or 18))
+    cursor = 0
+    length = len(value)
+    while cursor < length:
+        end = min(length, cursor + size)
+        while end < length and value[end] not in {" ", "\n", "\t", "，", "。", "!", "?", ",", ";", ":", "；", "："}:
+            if end - cursor >= size + 10:
+                break
+            end += 1
+        chunk = value[cursor:end]
+        if chunk:
+            yield chunk
+        cursor = end
 
 
 def call_google_route_matrix(api_key, start, destinations):
