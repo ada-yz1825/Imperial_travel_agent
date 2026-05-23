@@ -149,6 +149,18 @@ h1 {
   background: rgba(255, 255, 255, 0.16);
 }
 
+.city-signal .signal-tile {
+  cursor: pointer;
+  transition: background 180ms ease, transform 180ms ease;
+}
+
+.city-signal .signal-tile:hover,
+.city-signal .signal-tile:focus-visible {
+  background: rgba(255, 255, 255, 0.26);
+  transform: translateY(-1px);
+  outline: none;
+}
+
 .city-signal span,
 .metric span {
   display: block;
@@ -400,6 +412,18 @@ button:hover {
   padding: 10px 12px;
   background: #fff;
   text-align: right;
+}
+
+.agent-tools.info-tile {
+  cursor: pointer;
+  transition: background 180ms ease, transform 180ms ease;
+}
+
+.agent-tools.info-tile:hover,
+.agent-tools.info-tile:focus-visible {
+  background: #f2f8ff;
+  transform: translateY(-1px);
+  outline: none;
 }
 
 .agent-tools span {
@@ -748,6 +772,10 @@ button:hover {
   color: #263544;
   font-weight: 700;
   font-size: 1.08rem;
+}
+
+.tool-info-text {
+  white-space: pre-line;
 }
 .confirm-modal-actions {
   display: flex;

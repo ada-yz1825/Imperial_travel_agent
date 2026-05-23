@@ -17,11 +17,11 @@
           </p>
         </div>
         <div class="city-signal" aria-label="live campus signals">
-          <div>
+          <div id="llmSignalTile" class="signal-tile" role="button" tabindex="0" aria-label="About LLM status">
             <span>LLM</span>
             <strong id="weatherSignal">Checking</strong>
           </div>
-          <div>
+          <div id="routesSignalTile" class="signal-tile" role="button" tabindex="0" aria-label="About Google Routes status">
             <span>Google Routes</span>
             <strong id="trafficSignal">Checking</strong>
           </div>
@@ -82,7 +82,7 @@
                 <h2 id="summaryTitle">Ask the agent to plan, explore, or navigate for your next trip</h2>
               </div>
               <div class="agent-brand" aria-label="Agent tools status">
-                <div class="agent-tools">
+                <div id="agentToolsTile" class="agent-tools info-tile" role="button" tabindex="0" aria-label="About agent mode or tools">
                   <span>Agent mode or tools</span>
                   <strong id="airSignal">Conversation</strong>
                 </div>
@@ -213,6 +213,17 @@
       </div>
     </div>
 
+    <div class="confirm-modal" id="toolInfoModal" hidden>
+      <div class="confirm-modal-panel">
+        <div class="confirm-modal-body">
+          <p id="toolInfoText" class="tool-info-text"></p>
+        </div>
+        <div class="confirm-modal-actions">
+          <button id="closeToolInfo" class="cta" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+
     <footer class="page-signature" role="contentinfo" aria-label="Page author">
       <div class="page-signature-inner">
         <span class="sig-name">Created by Yiqi Zhu</span>
@@ -220,6 +231,6 @@
       </div>
     </footer>
 
-    <script src="./app.js?v=quota-message-2"></script>
+    <script src="./app.js?v=agent-tools-info-1"></script>
   </body>
 </html>

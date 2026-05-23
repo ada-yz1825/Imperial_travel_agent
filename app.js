@@ -415,7 +415,7 @@ let latestNavigationData = null;
 const chatHistory = [];
 const STREAM_RENDER_BASE_DELAY_MS = 30;
 const STREAM_RENDER_CHUNK_SIZE = 4;
-const MIN_LOADING_MS = 2500;
+const MIN_LOADING_MS = 1800;
 let answerRenderSessionId = 0;
 
 function normalise(value, min, max) {
@@ -1716,7 +1716,19 @@ $("chatModal").addEventListener("click", (event) => {
 const externalConfirmModalEl = $("externalConfirmModal");
 const confirmOpenLinkBtn = $("confirmOpenLink");
 const cancelOpenLinkBtn = $("cancelOpenLink");
+const toolInfoModalEl = $("toolInfoModal");
+const toolInfoTextEl = $("toolInfoText");
+const closeToolInfoBtn = $("closeToolInfo");
+const llmSignalTile = $("llmSignalTile");
+const routesSignalTile = $("routesSignalTile");
+const agentToolsTile = $("agentToolsTile");
 let pendingExternalHref = null;
+
+const TOOL_INFO_COPY = {
+  routes: "Google Routes provides live travel time, distance, and route geometry when the agent enters navigation mode.\n\nIt supports route comparison across public transport, walking, cycling, and driving, and powers the route preview map.",
+  llm: "The LLM handles conversation, intent understanding, and study-space recommendations. When route planning is needed, it uses Google Routes data rather than guessing travel time.",
+  agent: "When your question involves studying, libraries, campus facilities, or travel directions, the agent can switch mode automatically:\n\n• Study Planning — recommends Imperial study spaces based on your goal and selected starting point.\n• Navigation — calls Google Routes to calculate travel time, distance, and route geometry.\n• Conversation — answers general questions without using external route tools.\n\nThe mode updates automatically after each question.",
+};
 
 const googleLinkEl = $("googleMapsLink");
 if (googleLinkEl) {
@@ -1761,6 +1773,37 @@ function hideExternalConfirm() {
   pendingExternalHref = null;
 }
 
+function showToolInfo(kind) {
+  if (!toolInfoModalEl || !toolInfoTextEl) return;
+  const content = String(TOOL_INFO_COPY[kind] || TOOL_INFO_COPY.llm);
+  toolInfoTextEl.innerHTML = escapeHtml(content).replace(/\n/g, "<br />");
+  toolInfoModalEl.hidden = false;
+  void toolInfoModalEl.offsetWidth;
+  toolInfoModalEl.classList.remove("closing");
+  toolInfoModalEl.classList.add("visible");
+}
+
+function hideToolInfo() {
+  if (!toolInfoModalEl || toolInfoModalEl.hidden) return;
+  toolInfoModalEl.classList.remove("visible");
+  toolInfoModalEl.classList.add("closing");
+  toolInfoModalEl.addEventListener("animationend", function handler() {
+    toolInfoModalEl.hidden = true;
+    toolInfoModalEl.classList.remove("closing");
+    toolInfoModalEl.removeEventListener("animationend", handler);
+  });
+}
+
+function bindSignalTileInfo(tile, kind) {
+  if (!tile) return;
+  tile.addEventListener("click", () => showToolInfo(kind));
+  tile.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    showToolInfo(kind);
+  });
+}
+
 if (confirmOpenLinkBtn) {
   confirmOpenLinkBtn.addEventListener("click", () => {
     if (pendingExternalHref) window.open(pendingExternalHref, "_blank");
@@ -1770,6 +1813,45 @@ if (confirmOpenLinkBtn) {
 if (cancelOpenLinkBtn) {
   cancelOpenLinkBtn.addEventListener("click", hideExternalConfirm);
 }
+
+bindSignalTileInfo(llmSignalTile, "llm");
+bindSignalTileInfo(routesSignalTile, "routes");
+bindSignalTileInfo(agentToolsTile, "agent");
+
+// Fallback delegated handlers in case tiles are re-rendered or late-mounted.
+document.addEventListener("click", (event) => {
+  const tile = event.target.closest("#llmSignalTile, #routesSignalTile, #agentToolsTile");
+  if (!tile) return;
+  const kind = tile.id === "routesSignalTile"
+    ? "routes"
+    : tile.id === "agentToolsTile"
+      ? "agent"
+      : "llm";
+  showToolInfo(kind);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const tile = event.target.closest("#llmSignalTile, #routesSignalTile, #agentToolsTile");
+  if (!tile) return;
+  event.preventDefault();
+  const kind = tile.id === "routesSignalTile"
+    ? "routes"
+    : tile.id === "agentToolsTile"
+      ? "agent"
+      : "llm";
+  showToolInfo(kind);
+});
+
+if (closeToolInfoBtn) {
+  closeToolInfoBtn.addEventListener("click", hideToolInfo);
+}
+if (toolInfoModalEl) {
+  toolInfoModalEl.addEventListener("click", (event) => {
+    if (event.target === toolInfoModalEl) hideToolInfo();
+  });
+}
+
 $("modalChatForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const input = $("modalUserQuestion");
