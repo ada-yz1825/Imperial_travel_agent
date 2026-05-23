@@ -28,8 +28,11 @@
   font-size: 0.92rem;
 }
 .page-signature-inner {
-  display: inline-block;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   max-width: 920px;
+  margin: 0 auto;
   padding: 4px 10px;
   background: rgba(0,0,0,0.36);
   border-radius: 8px;
@@ -49,10 +52,27 @@
   color: rgba(255,255,255,0.88);
   font-weight: 600;
 }
+.page-signature .sig-note {
+  display: block;
+  margin-top: 0;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: rgba(255,255,255,0.72);
+  font-weight: 500;
+}
+.page-signature .sig-blankline {
+  display: block;
+  font-size: 1px;
+  line-height: 1px;
+  height: 6px;
+  flex: 0 0 6px;
+}
 
 @media (max-width: 720px) {
   .page-signature { font-size: 0.88rem; }
   .page-signature .sig-degree { font-size: 0.82rem; }
+  .page-signature .sig-note { font-size: 0.62rem; }
+  .page-signature .sig-blankline { height: 4px; flex-basis: 4px; }
 }
 
 * {
@@ -767,7 +787,8 @@ button:hover {
   display: grid;
   gap: 20px;
 }
-.confirm-modal-body p {
+.confirm-modal-body p,
+.tool-info-text {
   margin: 0;
   color: #263544;
   font-weight: 700;
@@ -775,7 +796,27 @@ button:hover {
 }
 
 .tool-info-text {
-  white-space: pre-line;
+  display: grid;
+  gap: 16px;
+  white-space: normal;
+}
+.tool-info-text p {
+  margin: 0;
+}
+.tool-info-list {
+  display: grid;
+  gap: 12px;
+}
+.tool-info-item {
+  display: block;
+  border: 1px solid rgba(39, 103, 168, 0.12);
+  border-radius: 8px;
+  background: rgba(39, 103, 168, 0.07);
+  padding: 10px 12px;
+  line-height: 1.35;
+}
+.tool-info-item strong {
+  color: var(--blue);
 }
 .confirm-modal-actions {
   display: flex;

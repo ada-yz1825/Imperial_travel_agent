@@ -1776,11 +1776,25 @@ function hideExternalConfirm() {
 function showToolInfo(kind) {
   if (!toolInfoModalEl || !toolInfoTextEl) return;
   const content = String(TOOL_INFO_COPY[kind] || TOOL_INFO_COPY.llm);
-  toolInfoTextEl.innerHTML = escapeHtml(content).replace(/\n/g, "<br />");
+  toolInfoTextEl.innerHTML = kind === "agent"
+    ? renderAgentToolInfo()
+    : escapeHtml(content).replace(/\n/g, "<br />");
   toolInfoModalEl.hidden = false;
   void toolInfoModalEl.offsetWidth;
   toolInfoModalEl.classList.remove("closing");
   toolInfoModalEl.classList.add("visible");
+}
+
+function renderAgentToolInfo() {
+  return `
+    <p>When your question involves studying, libraries, campus facilities, or travel directions, the agent can switch mode automatically:</p>
+    <div class="tool-info-list">
+      <div class="tool-info-item"><strong>Study Planning</strong> recommends Imperial study spaces based on your goal and selected starting point.</div>
+      <div class="tool-info-item"><strong>Navigation</strong> calls Google Routes to calculate travel time, distance, and route geometry.</div>
+      <div class="tool-info-item"><strong>Conversation</strong> answers general questions without using external route tools.</div>
+    </div>
+    <p>The mode updates automatically after each question.</p>
+  `;
 }
 
 function hideToolInfo() {
