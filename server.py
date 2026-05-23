@@ -743,6 +743,17 @@ def attach_route_geometry(api_key, route_request, route):
 
 def parse_navigation_query(query, history=None):
     language = detect_response_language(query)
+    if is_destination_information_query(query):
+        return {
+            "language": language,
+            "origin": None,
+            "destination": None,
+            "origin_source": None,
+            "mode": None,
+            "departureTime": parse_departure_time(query),
+            "_llm_is_navigation": False,
+            "_llm_reason": "destination information / attractions question",
+        }
     llm_request = extract_navigation_request_with_llm(query, history or [])
     llm_says_not_navigation = llm_request and not llm_request.get("is_navigation")
     origin_text = None if llm_says_not_navigation else (llm_request.get("origin") if llm_request else None)
@@ -873,6 +884,8 @@ def build_navigation_extraction_prompt(query, history):
         "rules": [
             "Never invent locations. Do not use example places unless the user mentioned them.",
             "Do not treat command words as places: 导航, 路线, 怎么去, navigate, route, directions, go, get, travel.",
+            "If the user is asking for an introduction, attractions, sightseeing, what to see, what to do, or interesting places in a city, set is_navigation false.",
+            "Examples that are not navigation: 介绍牛津, 牛津有哪些好玩的景点, tell me about Oxford, what to see in Paris, what to do in Cambridge.",
             "For '导航去牛津' or 'go to Oxford', origin is null and destination is 牛津/Oxford.",
             "For '那帮我导航去这里', '然后帮我导航去那里', or similar, words before the route command are conversational filler, not an origin.",
             "For '从南肯到白城' or 'from South Kensington to White City', extract both places.",
@@ -908,6 +921,9 @@ def extract_destination_only(query):
 
 
 def classify_agent_intent(question, context_start=None, history=None):
+    if is_destination_information_query(question):
+        empty_route_request = {"origin": None, "destination": None, "mode": None}
+        return intent_payload("study", 0.94, "destination information / attractions question", empty_route_request)
     route_request = parse_navigation_query(question, history or [])
     apply_context_start(route_request, context_start)
     has_route_points = bool(route_request.get("origin") and route_request.get("destination"))
@@ -1127,6 +1143,58 @@ def has_study_language(question):
         "适合",
     ]
     return any(term in text for term in terms)
+
+
+def is_destination_information_query(question):
+    text = str(question or "").strip().lower()
+    if not text:
+        return False
+
+    route_markers = [
+        "怎么去",
+        "怎么走",
+        "导航",
+        "路线",
+        "route",
+        "directions",
+        "go to",
+        "get to",
+        "travel to",
+        "how do i get",
+        "how can i get",
+        "from ",
+        " to ",
+    ]
+    if any(marker in text for marker in route_markers):
+        return False
+
+    attraction_markers = [
+        "有什么好玩",
+        "好玩的景点",
+        "好玩",
+        "景点",
+        "旅游",
+        "游玩",
+        "玩什么",
+        "值得去",
+        "值得看",
+        "介绍",
+        "有哪些",
+        "what to see",
+        "things to do",
+        "attractions",
+        "sights",
+        "tourist",
+        "visit",
+        "explore",
+        "tell me about",
+        "what to do",
+    ]
+    if not any(marker in text for marker in attraction_markers):
+        return False
+
+    has_place_name = bool(re.search(r"[\u4e00-\u9fff]{2,}|[A-Za-z][A-Za-z\s.'-]{1,40}", text))
+    return has_place_name
 
 
 def navigation_mode_candidates(requested_mode):

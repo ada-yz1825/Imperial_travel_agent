@@ -19,8 +19,9 @@
 
 /* Page signature (subtle, centred, non-intrusive) */
 .page-signature {
-  margin: 28px 0 8px;
-  padding-top: 12px;
+  /* move slightly closer to content above and increase bottom breathing room */
+  margin: 6px 0 40px;
+  padding-top: 4px;
   border-top: 1px solid rgba(16,24,32,0.06);
   text-align: center;
   color: #fff;
@@ -29,7 +30,7 @@
 .page-signature-inner {
   display: inline-block;
   max-width: 920px;
-  padding: 6px 12px;
+  padding: 4px 10px;
   background: rgba(0,0,0,0.36);
   border-radius: 8px;
 }
@@ -38,13 +39,13 @@
   font-weight: 800;
   letter-spacing: 0.2px;
   color: #fff;
-  font-size: clamp(1rem, 1.8vw, 1.2rem);
+  font-size: clamp(1.1rem, 2.2vw, 1.5rem);
   text-shadow: 0 1px 2px rgba(0,0,0,0.6);
 }
 .page-signature .sig-degree {
   display: block;
   margin-top: 4px;
-  font-size: clamp(0.88rem, 1.2vw, 0.96rem);
+  font-size: clamp(0.96rem, 1.4vw, 1.06rem);
   color: rgba(255,255,255,0.88);
   font-weight: 600;
 }
@@ -168,17 +169,16 @@ h1 {
 
 .workspace {
   display: grid;
-  grid-template-columns: 430px minmax(0, 820px);
+  /* give more horizontal room to the right column so headings wrap less */
+  grid-template-columns: 430px minmax(0, 900px);
   gap: 22px;
   align-items: start;
   justify-content: center;
 }
 
 .decision-area {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: var(--shadow);
+  display: grid;
+  gap: 18px;
 }
 
 .control-panel {
@@ -214,7 +214,7 @@ label,
 .field-row {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 8px;
   color: #303946;
   font-size: 0.9rem;
@@ -343,6 +343,13 @@ button:hover {
 
 .decision-area {
   min-height: 0;
+}
+
+.decision-module {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--shadow);
   padding: 20px;
 }
 
@@ -361,7 +368,7 @@ button:hover {
 
 .agent-brief h2 {
   margin-bottom: 0;
-  font-size: 1.7rem;
+  font-size: 1.63rem;
 }
 
 .imperial-logo {
@@ -775,9 +782,9 @@ button:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 10px;
   border-bottom: 1px solid var(--line);
-  padding: 16px;
+  padding: 10px;
 }
 
 .chat-modal-header h2 {
@@ -879,10 +886,6 @@ button:hover {
   margin-top: 16px;
   border-top: 1px solid var(--line);
   padding-top: 16px;
-  /* Divider below this section to separate from Useful links */
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 18px;
-  margin-bottom: 18px;
 }
 
 .how-it-works .eyebrow {
@@ -903,18 +906,13 @@ button:hover {
 
 /* Useful links module */
 .useful-links {
-  margin-top: 20px;
-  border: 1px solid var(--line);
-  border-radius: 15px;
-  background: #fff;
-  padding: 20px 25px;
+  padding: 18px 20px;
 }
 .useful-links .eyebrow {
   color: var(--blue);
-  margin: 0 0 13px;
-  font-size: 1.25rem;
-  font-weight: 800;
-  font-width: 750;
+  margin: 0 0 14px;
+  font-size: 1.18rem;
+  font-weight: 900;
   text-transform: none;
 }
 .useful-links ul {
@@ -1312,23 +1310,28 @@ button:hover {
 }
 
 .control-module,
-.decision-area {
+.decision-module {
   animation: panel-in 560ms var(--ease-out) both;
-  transition: background 220ms ease, box-shadow 220ms ease, transform 220ms ease;
+  transition: border-color 180ms ease, box-shadow 220ms ease, transform 220ms ease;
 }
 
 .control-module {
   animation-delay: 220ms;
 }
 
-.decision-area {
+.decision-module {
   animation-delay: 300ms;
 }
 
-.control-module:hover,
-.decision-area:hover {
+.control-module:hover {
   background: rgba(255, 255, 255, 0.965);
   box-shadow: var(--shadow-hover);
+}
+
+.decision-module:hover {
+  border-color: rgba(39, 103, 168, 0.28);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-1px);
 }
 
 button,

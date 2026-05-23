@@ -13,7 +13,7 @@
           <p class="eyebrow">Imperial Study Navigator</p>
           <h1>Start Planning your journey</h1>
           <p class="hero-text">
-            Start by selecting your location on the map, then ask the agent to plan your travel route, recommend study spaces, or just any question.
+            Choose your starting point, ask the agent anything, and get study-space recommendations or live route plans across Imperial and beyond.
           </p>
         </div>
         <div class="city-signal" aria-label="live campus signals">
@@ -75,95 +75,97 @@
         </aside>
 
         <section class="decision-area" aria-live="polite">
-          <div class="agent-brief">
-            <div>
-              <p class="eyebrow">Travel agent</p>
-              <h2 id="summaryTitle">Start with asking where to study or how to get there</h2>
-            </div>
-            <div class="agent-brand" aria-label="Agent tools status">
-              <div class="agent-tools">
-                <span>Agent mode or tools</span>
-                <strong id="airSignal">Conversation</strong>
+          <div class="decision-module agent-module">
+            <div class="agent-brief">
+              <div>
+                <p class="eyebrow">Travel agent</p>
+                <h2 id="summaryTitle">Ask the agent to plan, explore, or navigate for your next trip</h2>
+              </div>
+              <div class="agent-brand" aria-label="Agent tools status">
+                <div class="agent-tools">
+                  <span>Agent mode or tools</span>
+                  <strong id="airSignal">Conversation</strong>
+                </div>
               </div>
             </div>
+
+            <form class="question-box" id="questionForm">
+              <label for="userQuestion">Ask the Agent</label>
+              <div class="question-input-row">
+                <input
+                  id="userQuestion"
+                  type="text"
+                  autocomplete="off"
+                  placeholder="Where are you going? How would you like to study?"
+                />
+                <button id="askButton" type="submit">Ask</button>
+              </div>
+              <div class="quick-prompts" aria-label="quick questions">
+                <button type="button" data-question="I want a quiet Imperial library for focused study. Where should I go?">Quiet study</button>
+                <button type="button" data-question="How do I get to White City Campus from my current selected start point?">Go to White City</button>
+                <button type="button" data-question="Which library is nearby from my selected starting point?">Nearby library</button>
+              </div>
+              <div class="agent-answer" id="agentAnswer">
+                Travel or study recommendations will appear here; if the query involves route planning, live route plans will also be shown here.
+              </div>
+              <div class="route-preview" id="routePreview" hidden>
+                <div class="route-preview-header">
+                  <span id="routePreviewTitle">Route map</span>
+                  <strong id="routePreviewMeta"></strong>
+                </div>
+                <div class="route-controls">
+                  <div class="route-endpoints" aria-label="Route endpoints">
+                    <div>
+                      <span>Start</span>
+                      <strong id="routeOriginLabel">Origin</strong>
+                    </div>
+                    <div>
+                      <span>Destination</span>
+                      <strong id="routeDestinationLabel">Destination</strong>
+                    </div>
+                  </div>
+                  <div class="route-control-divider" aria-hidden="true"></div>
+                  <div class="route-mode-controls">
+                    <label for="routeModeSelect">Transport mode</label>
+                    <div class="route-control-row">
+                      <select id="routeModeSelect"></select>
+                      <button id="routeUpdateButton" type="button">Update</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="route-map" id="routeMap" aria-label="Recommended route map"></div>
+              </div>
+              <div class="agent-actions" id="agentActions" hidden>
+                <a id="googleMapsLink" class="cta" href="https://www.google.com/maps/search/?api=1&query=Imperial%20College%20London" target="_blank" rel="noreferrer">Open Google maps for Route</a>
+                <button id="openChatButton" class="cta chat-cta" type="button">Go to chat mode</button>
+              </div>
+            </form>
+
+            <section class="how-it-works" aria-label="How it works">
+              <p class="eyebrow">How it works?</p>
+              <div class="how-grid">
+                <div>
+                  <strong>1. Understand intent</strong>
+                  <span>The agent first classifies whether your message is a navigation request, a study-space planning question, or general chat, and chooses the appropriate tools and tone.</span>
+                </div>
+                <div>
+                  <strong>2. Use tools only when needed</strong>
+                  <span>Navigation queries trigger Google Routes calls for live travel times and route geometry; study planning uses the local candidate dataset and the LLM for natural recommendations.</span>
+                </div>
+                <div>
+                  <strong>3. Route parsing and start-point fallback</strong>
+                  <span>The agent will automatically parse origin and destination from free text (e.g. "from South Kensington to White City"). If no explicit origin is found, it uses the start point selected on the left (map selection or campus preset).</span>
+                </div>
+                <div>
+                  <strong>4. Live data and verification</strong>
+                  <span>When available, Google provides live duration and distance estimates and encoded polylines for map preview. The assistant reports exact numbers from the tool and links to Google Maps for full directions.</span>
+                </div>
+  <!-- Removed privacy/offline and user controls items per request -->
+              </div>
+            </section>
           </div>
 
-          <form class="question-box" id="questionForm">
-            <label for="userQuestion">Ask the Agent</label>
-            <div class="question-input-row">
-              <input
-                id="userQuestion"
-                type="text"
-                autocomplete="off"
-                placeholder="Where are you going? How would you like to study?"
-              />
-              <button id="askButton" type="submit">Ask</button>
-            </div>
-            <div class="quick-prompts" aria-label="quick questions">
-              <button type="button" data-question="I want a quiet Imperial library for focused study. Where should I go?">Quiet study</button>
-              <button type="button" data-question="How do I get to White City Campus from my current selected start point?">Go to White City</button>
-              <button type="button" data-question="Which library is nearby from my selected starting point?">Nearby library</button>
-            </div>
-            <div class="agent-answer" id="agentAnswer">
-              Travel or study recommendations will appear here; if the query involves route planning, live route plans will also be shown here.
-            </div>
-            <div class="route-preview" id="routePreview" hidden>
-              <div class="route-preview-header">
-                <span id="routePreviewTitle">Route map</span>
-                <strong id="routePreviewMeta"></strong>
-              </div>
-              <div class="route-controls">
-                <div class="route-endpoints" aria-label="Route endpoints">
-                  <div>
-                    <span>Start</span>
-                    <strong id="routeOriginLabel">Origin</strong>
-                  </div>
-                  <div>
-                    <span>Destination</span>
-                    <strong id="routeDestinationLabel">Destination</strong>
-                  </div>
-                </div>
-                <div class="route-control-divider" aria-hidden="true"></div>
-                <div class="route-mode-controls">
-                  <label for="routeModeSelect">Transport mode</label>
-                  <div class="route-control-row">
-                    <select id="routeModeSelect"></select>
-                    <button id="routeUpdateButton" type="button">Update</button>
-                  </div>
-                </div>
-              </div>
-              <div class="route-map" id="routeMap" aria-label="Recommended route map"></div>
-            </div>
-            <div class="agent-actions" id="agentActions" hidden>
-              <a id="googleMapsLink" class="cta" href="https://www.google.com/maps/search/?api=1&query=Imperial%20College%20London" target="_blank" rel="noreferrer">Open Google maps for Route</a>
-              <button id="openChatButton" class="cta chat-cta" type="button">Go to chat mode</button>
-            </div>
-          </form>
-
-          <section class="how-it-works" aria-label="How it works">
-            <p class="eyebrow">How it works?</p>
-            <div class="how-grid">
-              <div>
-                <strong>1. Understand intent</strong>
-                <span>The agent first classifies whether your message is a navigation request, a study-space planning question, or general chat, and chooses the appropriate tools and tone.</span>
-              </div>
-              <div>
-                <strong>2. Use tools only when needed</strong>
-                <span>Navigation queries trigger Google Routes calls for live travel times and route geometry; study planning uses the local candidate dataset and the LLM for natural recommendations.</span>
-              </div>
-              <div>
-                <strong>3. Route parsing and start-point fallback</strong>
-                <span>The agent will automatically parse origin and destination from free text (e.g. "from South Kensington to White City"). If no explicit origin is found, it uses the start point selected on the left (map selection or campus preset).</span>
-              </div>
-              <div>
-                <strong>4. Live data and verification</strong>
-                <span>When available, Google provides live duration and distance estimates and encoded polylines for map preview. The assistant reports exact numbers from the tool and links to Google Maps for full directions.</span>
-              </div>
-<!-- Removed privacy/offline and user controls items per request -->
-            </div>
-          </section>
-
-          <section class="useful-links" aria-label="Useful links">
+          <section class="decision-module useful-links" aria-label="Useful links">
             <p class="eyebrow">Useful links</p>
             <div class="useful-list">
               <ul>
@@ -218,6 +220,6 @@
       </div>
     </footer>
 
-    <script src="./app.js?v=geolocation-start-1"></script>
+    <script src="./app.js?v=quota-message-2"></script>
   </body>
 </html>

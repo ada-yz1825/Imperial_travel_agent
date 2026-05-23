@@ -696,12 +696,17 @@ async function answerQuestion(question, options = {}) {
     renderChatModalHistory();
   } catch (error) {
     hideAgentActions();
-    $("agentAnswer").innerHTML = `
-      <strong>The backend LLM request failed</strong>
-      <br />${escapeHtml(error.message)}
-      <br />This app now uses the backend LLM provider configured in <code>.env</code> or your deployed backend. If Groq returns a rate limit, wait a few seconds and try again, or lower the request size.
+    const errorMessage = "Looks like the AI quota hit rush hour. Please try again in a minute, or send a shorter question.";
+    const errorHtml = `
+      <strong>${escapeHtml(errorMessage)}</strong>
       <br />Current API endpoint: <code>${escapeHtml(apiBaseLabel())}</code>
     `;
+    $("agentAnswer").innerHTML = errorHtml;
+    if (options.skipUserPush) {
+      chatHistory.push({ role: "assistant", content: errorMessage });
+      trimChatHistory();
+      renderChatModalHistory();
+    }
   } finally {
     setAsking(false);
   }
