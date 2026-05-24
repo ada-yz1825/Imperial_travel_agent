@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Imperial Study Navigator</title>
-    <link rel="stylesheet" href="./styles.css?v=how-collapse-3" />
+    <link rel="stylesheet" href="./styles.css?v=agent-spacing-1" />
   </head>
   <body>
     <main class="app-shell">
@@ -79,7 +79,7 @@
           <div class="decision-module agent-module">
             <div class="agent-brief">
               <div>
-                <p class="eyebrow">Travel agent</p>
+                <h3 class="left-section-title">Travel agent</h3>
                 <h2 id="summaryTitle">Ask the agent to plan, explore, or navigate for your next trip</h2>
               </div>
               <div class="agent-brand" aria-label="Agent tools status">
@@ -138,7 +138,7 @@
               </div>
               <div class="agent-actions" id="agentActions" hidden>
                 <a id="googleMapsLink" class="cta" href="https://www.google.com/maps/search/?api=1&query=Imperial%20College%20London" target="_blank" rel="noreferrer">Open Google maps for Route</a>
-                <button id="openChatButton" class="cta chat-cta" type="button">Go to chat mode</button>
+                <button id="openChatButton" class="cta chat-cta" type="button">Continue in chat window</button>
               </div>
             </form>
 
@@ -169,9 +169,15 @@
             <div class="weather-header">
               <div>
                 <p class="eyebrow">Weather</p>
-                <h3>Weather at your <span id="weatherScopeLabel" class="weather-scope-label">start point</span></h3>
+                <h3>At your <span id="weatherScopeLabel" class="weather-scope-label">start point</span></h3>
               </div>
-              <button id="updateWeatherButton" class="secondary-action" type="button">Update Weather data at <span class="weather-button-destination">destination</span></button>
+              <div class="weather-action-group">
+                <span class="weather-action-label">Update Weather data at</span>
+                <div class="weather-actions" aria-label="Weather update options">
+                  <button id="updateWeatherCurrentButton" class="secondary-action weather-choice-button" type="button">Current location</button>
+                  <button id="updateWeatherDestinationButton" class="secondary-action weather-choice-button" type="button">Destination</button>
+                </div>
+              </div>
             </div>
             <div class="weather-card" id="weatherCard">
               <div class="weather-main">
@@ -181,7 +187,7 @@
                     <span class="weather-icon" id="weatherIcon" aria-hidden="true">--</span>
                     <strong id="weatherTemperature">Weather not loaded</strong>
                   </div>
-                  <span id="weatherDescription">Use your selected start point or update from your navigation destination.</span>
+                  <span id="weatherDescription">Use your selected start point, current location, or navigation destination.</span>
                 </div>
                 <div class="weather-summary" aria-live="polite">
                   <span class="weather-summary-label">AI summary</span>
@@ -278,7 +284,7 @@
         <div class="confirm-modal-body">
           <div id="startupWaitText" class="tool-info-text">
             <p>Please allow about 30 seconds for system to start up.</p>
-            <p>The backend may take some time to start up, so the LLM and Google Routes status cards are still checking. Please check for API status later.</p>
+            <p>Please check for API status later. When it is ready, the used LLM model will be displayed, and Google Routes will show "Keys ready".</p>
           </div>
         </div>
         <div class="confirm-modal-actions">
@@ -296,6 +302,6 @@
       </div>
     </footer>
 
-    <script src="./app.js?v=how-collapse-2"></script>
+    <script src="./app.js?v=weather-active-1"></script>
   </body>
 </html>

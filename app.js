@@ -439,6 +439,7 @@ const STREAM_RENDER_BASE_DELAY_MS = 8;
 const STREAM_RENDER_CHUNK_SIZE = 8;
 // Minimum loading duration gating (ms). Lower to reduce perceived wait time.
 const MIN_LOADING_MS = 1500;
+const GEOLOCATION_CACHE_KEY = "imperialNavigatorLastLocation";
 let answerRenderSessionId = 0;
 
 function normalise(value, min, max) {
@@ -703,11 +704,10 @@ function formatWeatherDay(currentTime) {
 }
 
 function setWeatherLoading(message = "Loading weather data...") {
-  const button = $("updateWeatherButton");
-  if (button) {
+  [$("updateWeatherCurrentButton"), $("updateWeatherDestinationButton")].forEach((button) => {
+    if (!button) return;
     button.disabled = true;
-    button.textContent = "Updating weather...";
-  }
+  });
   $("weatherTemperature").textContent = "Loading...";
   $("weatherDescription").textContent = message;
   $("weatherDescription").hidden = false;
@@ -716,21 +716,30 @@ function setWeatherLoading(message = "Loading weather data...") {
 }
 
 function setWeatherButtonReady() {
-  const button = $("updateWeatherButton");
-  if (!button) return;
-  button.disabled = false;
-  button.innerHTML = 'Update Weather data at <span class="weather-button-destination">destination</span>';
+  const currentButton = $("updateWeatherCurrentButton");
+  const destinationButton = $("updateWeatherDestinationButton");
+  if (currentButton) {
+    currentButton.disabled = false;
+    currentButton.textContent = "Current location";
+  }
+  if (destinationButton) {
+    destinationButton.disabled = false;
+    destinationButton.textContent = "Destination";
+  }
 }
 
 function setWeatherScope(scope = "start point", locationName = "") {
   const label = $("weatherScopeLabel");
   if (!label) return;
   const isDestination = scope === "destination";
+  const isCurrentLocation = scope === "current location" || scope === "start point";
   const cleanLocationName = String(locationName || "").trim();
   label.textContent = isDestination && cleanLocationName
     ? `destination: ${cleanLocationName}`
-    : (isDestination ? "destination" : "start point");
+    : (isDestination ? "destination" : (isCurrentLocation ? "current location" : "start point"));
   label.classList.toggle("destination", isDestination);
+  $("updateWeatherCurrentButton")?.classList.toggle("is-active", isCurrentLocation);
+  $("updateWeatherDestinationButton")?.classList.toggle("is-active", isDestination);
 }
 
 function captureWeatherState() {
@@ -1856,7 +1865,7 @@ function geolocationErrorMessage(error) {
   if (error.code === error.PERMISSION_DENIED) return "Location permission was denied.";
   if (error.code === error.POSITION_UNAVAILABLE) return "Current location is unavailable.";
   if (error.code === error.TIMEOUT) return "Location request timed out.";
-  return "Could not read your current location.";
+  return error.message || "Could not read your current location.";
 }
 
 function setLocationButtonLoading(isLoading) {
@@ -1903,6 +1912,93 @@ async function readGeolocationPermissionState() {
   }
 }
 
+function isPermissionDeniedError(error) {
+  return error?.code === error?.PERMISSION_DENIED || error?.code === 1;
+}
+
+function normalizePosition(position, source = "live") {
+  const coords = position?.coords || position || {};
+  const latitude = Number(coords.latitude);
+  const longitude = Number(coords.longitude);
+  const accuracy = Number(coords.accuracy);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return {
+    coords: {
+      latitude,
+      longitude,
+      accuracy: Number.isFinite(accuracy) ? accuracy : null,
+    },
+    timestamp: Number(position?.timestamp) || Date.now(),
+    source,
+  };
+}
+
+function cacheCurrentPosition(position) {
+  const normalized = normalizePosition(position, "cache");
+  if (!normalized) return;
+  try {
+    window.localStorage.setItem(GEOLOCATION_CACHE_KEY, JSON.stringify(normalized));
+  } catch (error) {
+    // Storage can be unavailable in private browsing; location still works without it.
+  }
+}
+
+function readCachedCurrentPosition(maxAgeMs = 24 * 60 * 60 * 1000) {
+  try {
+    const cached = JSON.parse(window.localStorage.getItem(GEOLOCATION_CACHE_KEY) || "null");
+    const normalized = normalizePosition(cached, "last known");
+    if (!normalized) return null;
+    if (Date.now() - normalized.timestamp > maxAgeMs) return null;
+    return normalized;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function resolveCurrentPosition(statusCallback = () => {}) {
+  const attempts = [
+    {
+      message: "Reading your current location...",
+      options: { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 },
+      timeoutMs: 14000,
+    },
+    {
+      message: "High-accuracy location is slow; trying a faster approximate location...",
+      options: { enableHighAccuracy: false, timeout: 12000, maximumAge: 600000 },
+      timeoutMs: 14000,
+    },
+    {
+      message: "Trying the browser's cached location...",
+      options: { enableHighAccuracy: false, timeout: 5000, maximumAge: 24 * 60 * 60 * 1000 },
+      timeoutMs: 6000,
+    },
+  ];
+
+  let lastError = null;
+  for (const attempt of attempts) {
+    statusCallback(attempt.message);
+    try {
+      const position = await getCurrentPositionWithTimeout(attempt.options, attempt.timeoutMs);
+      const normalized = normalizePosition(position);
+      if (normalized) {
+        cacheCurrentPosition(normalized);
+        return normalized;
+      }
+    } catch (error) {
+      lastError = error;
+      if (isPermissionDeniedError(error)) throw error;
+    }
+  }
+
+  const cached = readCachedCurrentPosition();
+  if (cached) {
+    statusCallback("Live location is slow; using your last known location.");
+    return cached;
+  }
+
+  throw lastError || new Error("Could not read your current location.");
+}
+
 async function requestCurrentLocation() {
   if (!navigator.geolocation) {
     $("startMapStatus").textContent = "This browser does not support current location.";
@@ -1922,31 +2018,13 @@ async function requestCurrentLocation() {
     : "Reading your current location...";
 
   try {
-    let position;
-    try {
-      position = await getCurrentPositionWithTimeout(
-        {
-          enableHighAccuracy: true,
-          timeout: 8000,
-          maximumAge: 30000,
-        },
-        10000,
-      );
-    } catch (firstError) {
-      $("startMapStatus").textContent = "High-accuracy location is slow; trying a faster approximate location...";
-      position = await getCurrentPositionWithTimeout(
-        {
-          enableHighAccuracy: false,
-          timeout: 7000,
-          maximumAge: 300000,
-        },
-        9000,
-      );
-    }
-
+    const position = await resolveCurrentPosition((message) => {
+      $("startMapStatus").textContent = message;
+    });
     const { latitude, longitude, accuracy } = position.coords;
     const accuracyText = Number.isFinite(accuracy) ? ` Accuracy about ${Math.round(accuracy)} m.` : "";
-    setMapStartCoordinates(latitude, longitude, `Using your current location.${accuracyText}`);
+    const sourceText = position.source === "last known" ? "Using your last known location." : "Using your current location.";
+    setMapStartCoordinates(latitude, longitude, `${sourceText}${accuracyText}`);
   } catch (error) {
     $("startMapStatus").textContent = geolocationErrorMessage(error);
   } finally {
@@ -1956,6 +2034,10 @@ async function requestCurrentLocation() {
 
 function showWeatherDestinationAlert(message) {
   showToolInfo("weatherDestination", message);
+}
+
+function showWeatherLocationAlert(message) {
+  showToolInfo("weatherLocation", message);
 }
 
 function isLatLngPlace(place) {
@@ -2033,6 +2115,36 @@ async function updateWeatherAtDestination() {
     );
   } catch (error) {
     showWeatherDestinationAlert(error.message || "Weather data at the destination could not be updated.");
+  }
+}
+
+async function updateWeatherAtCurrentLocation() {
+  if (!navigator.geolocation) {
+    showWeatherLocationAlert("This browser does not support current location.");
+    return;
+  }
+
+  const permissionState = await readGeolocationPermissionState();
+  if (permissionState === "denied") {
+    showWeatherLocationAlert("Location permission is blocked. Enable it in your browser site settings.");
+    return;
+  }
+
+  try {
+    const position = await resolveCurrentPosition();
+    const { latitude, longitude } = position.coords;
+    await refreshWeatherForStart(
+      {
+        label: "Current location",
+        lat: latitude,
+        lng: longitude,
+        weatherScope: "current location",
+      },
+      true,
+      { preserveOnError: true, throwOnError: true },
+    );
+  } catch (error) {
+    showWeatherLocationAlert(error.message || geolocationErrorMessage(error));
   }
 }
 
@@ -2149,7 +2261,8 @@ $("recommendations").addEventListener("keydown", (event) => {
   openPlaceWebsiteFromCard(card);
 });
 $("useCurrentLocation").addEventListener("click", requestCurrentLocation);
-$("updateWeatherButton").addEventListener("click", updateWeatherAtDestination);
+$("updateWeatherCurrentButton").addEventListener("click", updateWeatherAtCurrentLocation);
+$("updateWeatherDestinationButton").addEventListener("click", updateWeatherAtDestination);
 $("questionForm").addEventListener("submit", (event) => {
   event.preventDefault();
   answerQuestion($("userQuestion").value);
@@ -2183,6 +2296,7 @@ const TOOL_INFO_COPY = {
   routes: "Google Routes provides live travel time, distance, and route geometry when the agent enters navigation mode.\n\nIt supports route comparison across public transport, walking, cycling, and driving, and powers the route preview map.",
   llm: "The LLM handles conversation, intent understanding, and study-space recommendations. When route planning is needed, it uses Google Routes data rather than guessing travel time.",
   agent: "When your question involves studying, libraries, campus facilities, or travel directions, the agent can switch mode automatically:\n\n• Study Planning — recommends Imperial study spaces based on your goal and selected starting point.\n• Navigation — calls Google Routes to calculate travel time, distance, and route geometry.\n• Conversation — answers general questions without using external route tools.\n\nThe mode updates automatically after each question.",
+  weatherLocation: "Current-location weather requires browser location permission.",
   weatherDestination: "Please ask the agent for a navigation route first, then update weather at the parsed destination.",
 };
 

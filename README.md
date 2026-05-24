@@ -1,58 +1,47 @@
 # Imperial Study Navigator
 
-Imperial Study Navigator is a web app that helps Imperial College London students choose study spaces and plan routes. It combines a conversational LLM assistant, Imperial library/study-space recommendations, Google Maps route estimates, and an interactive map-based starting point picker. It answers in the same language as the user.
+Imperial Study Navigator is a web app for Imperial College London students. It combines a conversational agent, study-space recommendations, route planning, and a map-based starting point picker. The interface supports general chat, study planning, and navigation, and responds in the same language as the user where possible.
 
+## Demo
 
-## GitHub Pages
+- Live website: https://ada-yz1825.github.io/Imperial_travel_agent/
 
-Click The Link to visit the demo:
+- Fallback site: https://imperial-travel-agent-api.onrender.com/
 
-[View the live website](https://ada-yz1825.github.io/Imperial_travel_agent/)
+## What the Page Includes
 
-If there is a problem, than try this site:
-
-[View the alternative website](https://imperial-travel-agent-api.onrender.com/)
-
-
-## Features
-
-- Conversational study assistant for Imperial libraries and study spaces.
-- Study-space recommendations based on selected starting location, walking comfort limit, and study goal.
-- Google Maps start-point picker, with campus presets as fallback.
-- Navigation mode that compares public transport, walking, cycling, and driving when the user clearly asks for a route.
-- Interactive route preview map with selectable transport modes.
-- LLM intent classification, so general chat, study planning, and navigation use different behavior.
-- Context-aware navigation, for example asking “Where is Oxford?” and then “navigate there”.
-- Groq API support by default, with optional Ollama provider support.
-- Useful Imperial links and a chat modal for continuing the conversation.
+- A hero section with the main product name and short description.
+- A starting-point picker using Google Maps plus campus presets.
+- Study-space recommendations based on study goal and walking comfort limit.
+- A conversational agent area for planning, exploration, and navigation.
+- Route preview support with transport mode switching.
+- Useful Imperial links.
+- A footer disclaimer stating this is an independent project.
 
 ## Project Structure
 
 ```text
 .
-├── index.html          # Main UI
-├── styles.css          # Layout, styling, animations
-├── app.js              # Frontend logic, map rendering, chat state
+├── index.html          # Main page structure
+├── styles.css          # Layout, styling, and animations
+├── app.js              # Frontend logic and page behavior
 ├── server.py           # Static server and API backend
-├── assets/             # Library and study-space images
-├── image.jpg           # Page background image
-├── image_files/        # Logo/image assets
-├── DEPLOYMENT.md       # Deployment notes
-└── README.md
+├── assets/             # Study-space and library images
+├── image.jpg           # Background image
+└── image_files/        # Logo and related image assets
 ```
 
 ## Requirements
 
 - Python 3
-- A Groq API key for the default hosted LLM mode
-- Google Maps backend Routes key, plus a separate browser Maps key for the map display
+- A Groq API key for the hosted LLM mode
+- Google Maps keys for the browser map and routing features
 
 The app is dependency-light and uses Python's built-in HTTP server stack. There is no npm install step.
 
-
 ## Optional Local Mode
 
-If you want to experiment with a local model, you can run Ollama instead of Groq:
+To try a local model with Ollama:
 
 ```bash
 ollama run qwen3
@@ -63,13 +52,13 @@ PORT=8001 python3 server.py
 
 ## How It Works
 
-The frontend sends user questions to the backend. The backend first classifies the request:
+The frontend sends user questions to the backend. The backend classifies the request into one of three modes:
 
-- Conversation: normal chat, no study or route tool required.
-- Study planning: use local Imperial study-space data and LLM response generation.
-- Navigation: use Google Routes only when the user clearly asks for travel, directions, distance, commute, or a route to a destination. An introduduction of destination will also be included.
+- Conversation: normal chat.
+- Study planning: Imperial study-space recommendations.
+- Navigation: route planning when the user clearly asks for travel or directions.
 
-For navigation, the backend extracts origin and destination from free text. If the user gives no explicit origin, the app uses the selected starting location from the map or campus dropdown. The backend then calls Google Routes, compares travel modes, and asks the LLM to summarize the result naturally.
+For navigation, the app uses the selected starting location when the user does not provide an explicit origin. It then compares travel modes, shows a route preview, can surface weather context when available, and can open Google Maps for the full route.
 
 ## API Endpoints
 
@@ -80,7 +69,7 @@ For navigation, the backend extracts origin and destination from free text. If t
   Classifies a question as conversation, study planning, or navigation.
 
 - `POST /api/chat`  
-  Streams or returns an LLM answer for general chat and study planning.
+  Returns an LLM answer for general chat and study planning.
 
 - `POST /api/navigate`  
   Parses a navigation request, calls Google Routes, and returns the answer plus route data.
@@ -93,30 +82,29 @@ For navigation, the backend extracts origin and destination from free text. If t
 - Imperial study-space data is maintained locally in `server.py`.
 - Route times, distances, and route geometry come from Google Routes API.
 - The LLM is used for intent recognition, natural-language answers, and route summaries.
-- Crowding/comfort values are currently estimated heuristics, not live occupancy data.
-
+- Crowding and comfort values are heuristic estimates rather than live occupancy data.
 
 ## Troubleshooting
 
 If the page cannot connect:
 
-- Check that your deployed backend is reachable.
-- Open the backend `/api/health` endpoint to confirm status.
+- Check that the deployed backend is reachable.
+- Open `/api/health` to confirm status.
 
 If navigation says Google Maps is unavailable:
 
-- Confirm `.env` contains both `GOOGLE_MAPS_API_KEY` and `GOOGLE_MAPS_BROWSER_KEY`.
+- Confirm your environment variables include the required Google Maps keys.
 - Confirm Routes API is enabled in Google Cloud.
-- Restart `server.py` after changing `.env`.
+- Restart `server.py` after changing environment variables.
 
 If LLM answers are missing:
 
-- Confirm `.env` or your hosting provider has `LLM_PROVIDER=groq` and `GROQ_API_KEY`.
+- Confirm the LLM provider and API key are configured correctly.
 - If using Ollama mode, make sure Ollama is running.
 - Check `/api/health` for `llmConnected`.
 
 If route or intent behavior feels wrong:
 
-- The backend logic is in `server.py`.
-- The frontend request flow is in `app.js`.
-- The quick prompts and page text are in `index.html`.
+- Backend logic is in `server.py`.
+- Frontend request flow is in `app.js`.
+- UI copy and layout are in `index.html` and `styles.css`.
