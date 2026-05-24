@@ -238,6 +238,41 @@ h1 {
   margin-top: 12px;
 }
 
+.expandable-action {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.expandable-action[hidden] {
+  display: none;
+}
+
+.expandable-action::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 180ms ease;
+}
+
+.expandable-action[aria-expanded="true"]::after {
+  transform: rotate(225deg) translateY(-1px);
+}
+
+.how-toggle {
+  width: 100%;
+  margin-bottom: 0px;
+}
+
+.how-toggle[aria-expanded="true"] {
+  margin-bottom: 15px;
+}
+
 .field-group {
   margin-bottom: 16px;
 }
@@ -981,10 +1016,30 @@ button:hover {
   min-height: 46px;
 }
 
-.how-it-works {
-  margin-top: 16px;
+.how-it-works-shell {
+  margin-top: 6px;
   border-top: 1px solid var(--line);
-  padding-top: 16px;
+  padding-top: 6px;
+}
+
+.how-it-works {
+  margin-top: 0;
+}
+
+.how-it-works.how-it-works--pop {
+  animation: card-in 420ms var(--ease-out) both;
+}
+
+.how-it-works.how-it-works--pop .how-grid div {
+  animation: card-in 420ms var(--ease-out) both;
+}
+
+.how-it-works.how-it-works--pop .how-grid div:nth-child(2) {
+  animation-delay: 60ms;
+}
+
+.how-it-works.how-it-works--pop .how-grid div:nth-child(3) {
+  animation-delay: 120ms;
 }
 
 .how-it-works .eyebrow {

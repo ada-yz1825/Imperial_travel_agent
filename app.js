@@ -428,6 +428,7 @@ let weatherUpdatedForKey = "";
 let weatherSummaryRequestId = 0;
 let weatherSummaryUpdatedForKey = "";
 let latestNavigationData = null;
+let hasCollapsedHowItWorksAfterFirstAnswer = false;
 const chatHistory = [];
 let lastAnimatedChatMessageKey = "";
 let startupWaitModalShown = false;
@@ -579,11 +580,50 @@ function updateRecommendationLoadMoreButton() {
   if (!button) return;
   if (recommendationDisplayLimit >= 6) {
     button.textContent = "Collapse study spaces";
+    button.setAttribute("aria-expanded", "true");
     button.disabled = false;
     return;
   }
   button.textContent = "Load more study spaces";
+  button.setAttribute("aria-expanded", "false");
   button.disabled = false;
+}
+
+function collapseHowItWorksAfterFirstAnswer() {
+  if (hasCollapsedHowItWorksAfterFirstAnswer) return;
+  const section = $("howItWorks");
+  const button = $("expandHowItWorks");
+  if (!section || !button) return;
+  hasCollapsedHowItWorksAfterFirstAnswer = true;
+  section.hidden = true;
+  button.hidden = false;
+  updateHowItWorksToggle();
+}
+
+function updateHowItWorksToggle() {
+  const section = $("howItWorks");
+  const button = $("expandHowItWorks");
+  if (!section || !button) return;
+  const isExpanded = !section.hidden;
+  button.textContent = isExpanded ? "Collapse introductions to the agent" : "Expand introductions to the agent";
+  button.setAttribute("aria-expanded", String(isExpanded));
+}
+
+function toggleHowItWorks() {
+  const section = $("howItWorks");
+  const button = $("expandHowItWorks");
+  if (!section || !button) return;
+  const shouldExpand = section.hidden;
+  section.hidden = !shouldExpand;
+  if (shouldExpand) {
+    section.classList.remove("how-it-works--pop");
+    void section.offsetWidth;
+    section.classList.add("how-it-works--pop");
+  } else {
+    section.classList.remove("how-it-works--pop");
+  }
+  button.hidden = false;
+  updateHowItWorksToggle();
 }
 
 function setGoogleMapsStatus(browserReady, routesReady) {
@@ -1028,6 +1068,7 @@ async function answerQuestion(question, options = {}) {
     latestNavigationData = null;
     renderAgentActions();
     renderChatModalHistory();
+    collapseHowItWorksAfterFirstAnswer();
   } catch (error) {
     await waitForMinimumLoading(minLoadingReadyAt);
     cancelAnswerRender();
@@ -1110,6 +1151,7 @@ async function answerNavigationQuestion(question, options = {}) {
     renderRoutePreview(data);
     renderAgentActions(data, data.recommended);
     renderChatModalHistory();
+    collapseHowItWorksAfterFirstAnswer();
   } catch (error) {
     await waitForMinimumLoading(minLoadingReadyAt);
     cancelAnswerRender();
@@ -2093,6 +2135,7 @@ $("loadMoreStudySpaces").addEventListener("click", () => {
   recommendationDisplayLimit = recommendationDisplayLimit >= 6 ? 3 : 6;
   render();
 });
+$("expandHowItWorks").addEventListener("click", toggleHowItWorks);
 $("recommendations").addEventListener("click", (event) => {
   const card = event.target.closest(".place-card[data-website]");
   if (!card) return;

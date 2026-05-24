@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Imperial Study Navigator</title>
-    <link rel="stylesheet" href="./styles.css?v=weather-module-2" />
+    <link rel="stylesheet" href="./styles.css?v=how-collapse-3" />
   </head>
   <body>
     <main class="app-shell">
@@ -71,7 +71,7 @@
             <button id="updateRecommendations" class="secondary-action" type="button">Update recommendations</button>
 
             <div class="recommendation-grid" id="recommendations"></div>
-            <button id="loadMoreStudySpaces" class="secondary-action load-more-study-spaces" type="button">Load more study spaces</button>
+            <button id="loadMoreStudySpaces" class="secondary-action expandable-action load-more-study-spaces" type="button" aria-expanded="false">Load more study spaces</button>
           </div>
         </aside>
 
@@ -142,24 +142,27 @@
               </div>
             </form>
 
-            <section class="how-it-works" aria-label="How it works">
-              <p class="eyebrow">How it works?</p>
-              <div class="how-grid">
-                <div>
-                  <strong>1. Ask with context</strong>
-                  <span>Ask in natural Language. Start by selecting a location on the map, using your current location, or choosing a campus preset, so the agent can understand where your journey begins.</span>
+            <div class="how-it-works-shell">
+              <button id="expandHowItWorks" class="secondary-action expandable-action how-toggle" type="button" aria-expanded="false" hidden>Expand introductions to the agent</button>
+              <section class="how-it-works" id="howItWorks" aria-label="How it works">
+                <p class="eyebrow">How it works?</p>
+                <div class="how-grid">
+                  <div>
+                    <strong>1. Ask with context</strong>
+                    <span>Ask in natural Language. Start by selecting a location on the map, using your current location, or choosing a campus preset, so the agent can understand where your journey begins.</span>
+                  </div>
+                  <div>
+                    <strong>2. Agent decides the right workflow</strong>
+                    <span>The agent detects whether your question is normal chat, study-space planning, or navigation. It uses local study-space data for recommendations and only calls Google Routes when live travel data is needed.</span>
+                  </div>
+                  <div>
+                    <strong>3. Get actionable results</strong>
+                    <span>For study planning, the agent suggests suitable places based on your goal and walking comfort limit. For navigation, it compares travel modes, shows a route preview, and links to Google Maps for full directions.</span>
+                  </div>
+    <!-- Removed privacy/offline and user controls items per request -->
                 </div>
-                <div>
-                  <strong>2. Agent decides the right workflow</strong>
-                  <span>The agent detects whether your question is normal chat, study-space planning, or navigation. It uses local study-space data for recommendations and only calls Google Routes when live travel data is needed.</span>
-                </div>
-                <div>
-                  <strong>3. Get actionable results</strong>
-                  <span>For study planning, the agent suggests suitable places based on your goal and walking comfort limit. For navigation, it compares travel modes, shows a route preview, and links to Google Maps for full directions.</span>
-                </div>
-  <!-- Removed privacy/offline and user controls items per request -->
-              </div>
-            </section>
+              </section>
+            </div>
           </div>
 
           <section class="decision-module weather-module" aria-label="Weather information">
@@ -293,6 +296,6 @@
       </div>
     </footer>
 
-    <script src="./app.js?v=weather-module-2"></script>
+    <script src="./app.js?v=how-collapse-2"></script>
   </body>
 </html>
