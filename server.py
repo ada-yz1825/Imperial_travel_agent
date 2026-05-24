@@ -4,6 +4,7 @@ import os
 import re
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -19,6 +20,7 @@ OPENAI_API_URL = "https://api.openai.com/v1/responses"
 GROQ_API_URL = os.environ.get("GROQ_API_URL", "https://api.groq.com/openai/v1/chat/completions")
 GOOGLE_ROUTES_API_URL = "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix"
 GOOGLE_COMPUTE_ROUTES_API_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
+GOOGLE_GEOCODING_API_URL = "https://maps.googleapis.com/maps/api/geocode/json"
 OLLAMA_API_URL = os.environ.get("OLLAMA_API_URL", "http://localhost:11434/api/chat")
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama").lower()
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5.2")
@@ -483,6 +485,7 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
                         "answer": answer,
                         "origin": route_request["origin"]["name"],
                         "destination": route_request["destination"]["name"],
+                        "destinationPlace": public_place_payload(route_request["destination"]),
                         "recommended": None,
                         "alternatives": [],
                         "provider": "google_routes",
@@ -504,6 +507,7 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
                     "answer": answer,
                     "origin": route_request["origin"]["name"],
                     "destination": route_request["destination"]["name"],
+                    "destinationPlace": public_place_payload(route_request["destination"]),
                     "recommended": route_options[0],
                     "mapRoute": route_options[0],
                     "alternatives": route_options[1:],
@@ -1430,7 +1434,49 @@ def resolve_location(text):
     for alias, location in sorted(KNOWN_LOCATIONS.items(), key=lambda item: len(item[0]), reverse=True):
         if alias in key:
             return location
+    geocoded = geocode_location(raw)
+    if geocoded:
+        return geocoded
     return {"name": raw, "address": raw}
+
+
+def geocode_location(text):
+    text = clean_place_text(text)
+    if not text:
+        return None
+    api_key = get_google_maps_api_key()
+    if not api_key:
+        return None
+    params = urllib.parse.urlencode({"address": text, "key": api_key, "language": "en"})
+    request = urllib.request.Request(
+        f"{GOOGLE_GEOCODING_API_URL}?{params}",
+        headers={"User-Agent": APP_NAME},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            data = json.loads(response.read().decode("utf-8", errors="replace"))
+    except Exception:
+        return None
+
+    if data.get("status") != "OK":
+        return None
+    results = data.get("results") or []
+    if not results:
+        return None
+    result = results[0]
+    location = result.get("geometry", {}).get("location", {})
+    lat = location.get("lat")
+    lng = location.get("lng")
+    if not isinstance(lat, (int, float)) or not isinstance(lng, (int, float)):
+        return None
+    formatted = result.get("formatted_address") or text
+    return {
+        "name": formatted,
+        "address": formatted,
+        "lat": lat,
+        "lng": lng,
+    }
 
 
 def detect_travel_mode(query):
@@ -2391,6 +2437,16 @@ def parse_duration_seconds(value):
 
 def valid_lat_lng(value):
     return isinstance(value, dict) and isinstance(value.get("lat"), (int, float)) and isinstance(value.get("lng"), (int, float))
+
+
+def public_place_payload(place):
+    if not valid_lat_lng(place):
+        return None
+    return {
+        "name": place.get("name") or "Destination",
+        "lat": place["lat"],
+        "lng": place["lng"],
+    }
 
 
 def lat_lng(value):

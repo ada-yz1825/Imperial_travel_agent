@@ -379,6 +379,17 @@ function apiBaseLabel() {
   return apiBase || window.location.origin;
 }
 
+function weatherApiUrl(start, apiKey) {
+  const params = new URLSearchParams({
+    key: apiKey,
+    "location.latitude": String(start.lat),
+    "location.longitude": String(start.lng),
+    unitsSystem: "METRIC",
+    languageCode: "en",
+  });
+  return `https://weather.googleapis.com/v1/currentConditions:lookup?${params.toString()}`;
+}
+
 const controls = {
   scenario: $("scenario"),
   startPoint: $("startPoint"),
@@ -393,6 +404,7 @@ const preferenceWeights = {
 };
 
 let latestRanked = [];
+let recommendationDisplayLimit = 3;
 let routeRequestId = 0;
 let routeStatus = "Routes on demand";
 let routeUpdatedAt = "Estimate";
@@ -410,6 +422,11 @@ let pendingRoutePreview = null;
 let activeRoutePreview = null;
 let googleMapsLoading = false;
 let routesKeyConfigured = false;
+let googleMapsBrowserKey = "";
+let weatherRequestId = 0;
+let weatherUpdatedForKey = "";
+let weatherSummaryRequestId = 0;
+let weatherSummaryUpdatedForKey = "";
 let latestNavigationData = null;
 const chatHistory = [];
 let lastAnimatedChatMessageKey = "";
@@ -517,7 +534,7 @@ function getRisk(place, crowd, transit, rainPenalty, walkingPenalty) {
   if (rainPenalty > 10) return { label: "Weather risk", className: "warning" };
   if (crowd > 70) return { label: "Likely busy", className: "caution" };
   if (transit > 48) return { label: "Long journey", className: "caution" };
-  if (walkingPenalty > 0) return { label: "Walk limit exceeded", className: "caution" };
+  if (walkingPenalty > 0) return { label: "Over walk limit", className: "caution" };
   if (place.budget < 62) return { label: "Cost trade-off", className: "caution" };
   return { label: "Good fit", className: "ok" };
 }
@@ -551,9 +568,22 @@ function render() {
   latestRanked = places
     .map((place) => scorePlace(place, context))
     .sort((a, b) => b.total - a.total)
-    .slice(0, 4);
+    .slice(0, recommendationDisplayLimit);
 
   $("recommendations").innerHTML = latestRanked.map(renderCard).join("");
+  updateRecommendationLoadMoreButton();
+}
+
+function updateRecommendationLoadMoreButton() {
+  const button = $("loadMoreStudySpaces");
+  if (!button) return;
+  if (recommendationDisplayLimit >= 6) {
+    button.textContent = "Collapse study spaces";
+    button.disabled = false;
+    return;
+  }
+  button.textContent = "Load more study spaces";
+  button.disabled = false;
 }
 
 function setGoogleMapsStatus(browserReady, routesReady) {
@@ -566,6 +596,273 @@ function setGoogleMapsStatus(browserReady, routesReady) {
     integrationStatus.google = `${browserStatus} · ${routesStatus}`;
   }
   $("trafficSignal").textContent = integrationStatus.google;
+}
+
+function formatTemperature(value) {
+  const degrees = Number(value?.degrees);
+  if (!Number.isFinite(degrees)) return "--";
+  return `${Math.round(degrees)}°C`;
+}
+
+function formatWind(value) {
+  const speed = Number(value?.speed?.value);
+  if (!Number.isFinite(speed)) return "--";
+  const unit = value?.speed?.unit === "KILOMETERS_PER_HOUR" ? "km/h" : "";
+  return `${Math.round(speed)} ${unit}`.trim();
+}
+
+function formatPrecipitationProbability(data) {
+  const percent = Number(
+    data?.precipitation?.probability?.percent ??
+    data?.precipitationProbability?.percent ??
+    data?.precipitationProbability ??
+    data?.probabilityOfPrecipitation?.percent ??
+    data?.rainProbability?.percent
+  );
+  if (!Number.isFinite(percent)) return "--";
+  return `${Math.round(percent)}%`;
+}
+
+function weatherIconEmoji(conditionType, isDaytime) {
+  const type = String(conditionType || "").toUpperCase();
+  if (type.includes("THUNDER")) return "⛈️";
+  if (type.includes("RAIN") || type.includes("DRIZZLE")) return "🌧️";
+  if (type.includes("SNOW") || type.includes("ICE")) return "🌨️";
+  if (type.includes("FOG") || type.includes("HAZE") || type.includes("MIST")) return "🌫️";
+  if (type.includes("CLOUD")) return "☁️";
+  return isDaytime === false ? "🌙" : "☀️";
+}
+
+function weatherConditionLabel(conditionType, isDaytime) {
+  const type = String(conditionType || "").toUpperCase();
+  if (type.includes("THUNDER")) return "Stormy";
+  if (type.includes("RAIN") || type.includes("DRIZZLE")) return "Rainy";
+  if (type.includes("SNOW") || type.includes("ICE")) return "Snowy";
+  if (type.includes("FOG") || type.includes("HAZE") || type.includes("MIST")) return "Foggy";
+  if (type.includes("CLOUD")) return "Cloudy";
+  return isDaytime === false ? "Night" : "Sunny";
+}
+
+function weatherConditionSummary(conditionType, isDaytime) {
+  const type = String(conditionType || "").toUpperCase();
+  if (type.includes("THUNDER")) return "Stormy conditions";
+  if (type.includes("RAIN") || type.includes("DRIZZLE")) return "Rain expected";
+  if (type.includes("SNOW") || type.includes("ICE")) return "Snowy conditions";
+  if (type.includes("FOG") || type.includes("HAZE") || type.includes("MIST")) return "Low visibility";
+  if (type.includes("CLOUD")) return "Cloud cover";
+  return isDaytime === false ? "Night conditions" : "Sunny weather";
+}
+
+function formatWeatherDay(currentTime) {
+  if (!currentTime) return "Today";
+  try {
+    return new Date(currentTime).toLocaleDateString([], { weekday: "long" });
+  } catch (error) {
+    return "Today";
+  }
+}
+
+function setWeatherLoading(message = "Loading weather data...") {
+  const button = $("updateWeatherButton");
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Updating weather...";
+  }
+  $("weatherTemperature").textContent = "Loading...";
+  $("weatherDescription").textContent = message;
+  $("weatherDescription").hidden = false;
+  $("weatherSummary").textContent = "Waiting for the LLM summary...";
+  $("weatherMeta").textContent = "Fetching current conditions from Google Weather API.";
+}
+
+function setWeatherButtonReady() {
+  const button = $("updateWeatherButton");
+  if (!button) return;
+  button.disabled = false;
+  button.innerHTML = 'Update Weather data at <span class="weather-button-destination">destination</span>';
+}
+
+function setWeatherScope(scope = "start point", locationName = "") {
+  const label = $("weatherScopeLabel");
+  if (!label) return;
+  const isDestination = scope === "destination";
+  const cleanLocationName = String(locationName || "").trim();
+  label.textContent = isDestination && cleanLocationName
+    ? `destination: ${cleanLocationName}`
+    : (isDestination ? "destination" : "start point");
+  label.classList.toggle("destination", isDestination);
+}
+
+function captureWeatherState() {
+  const ids = [
+    "weatherDay",
+    "weatherIcon",
+    "weatherTemperature",
+    "weatherDescription",
+    "weatherFeelsLike",
+    "weatherHumidity",
+    "weatherWind",
+    "weatherUv",
+    "weatherPrecipitation",
+    "weatherSummary",
+    "weatherMeta",
+    "weatherScopeLabel",
+  ];
+  return ids.reduce((state, id) => {
+    const element = $(id);
+    if (!element) return state;
+    state[id] = {
+      textContent: element.textContent,
+      hidden: element.hidden,
+      className: element.className,
+    };
+    return state;
+  }, {});
+}
+
+function restoreWeatherState(state) {
+  Object.entries(state || {}).forEach(([id, value]) => {
+    const element = $(id);
+    if (!element || !value) return;
+    element.textContent = value.textContent;
+    element.hidden = value.hidden;
+    element.className = value.className;
+  });
+}
+
+function renderWeatherData(data, start) {
+  setWeatherScope(start?.weatherScope === "destination" ? "destination" : "start point", start?.label);
+  $("weatherDay").textContent = weatherConditionLabel(data?.weatherCondition?.type, data?.isDaytime);
+  $("weatherIcon").textContent = weatherIconEmoji(data?.weatherCondition?.type, data?.isDaytime);
+  $("weatherIcon").removeAttribute("title");
+  $("weatherTemperature").textContent = formatTemperature(data?.temperature);
+  $("weatherDescription").textContent = "";
+  $("weatherDescription").hidden = true;
+  $("weatherFeelsLike").textContent = formatTemperature(data?.feelsLikeTemperature);
+  $("weatherHumidity").textContent = Number.isFinite(data?.relativeHumidity) ? `${data.relativeHumidity}%` : "--";
+  $("weatherWind").textContent = formatWind(data?.wind);
+  $("weatherUv").textContent = Number.isFinite(data?.uvIndex) ? String(data.uvIndex) : "--";
+  $("weatherPrecipitation").textContent = formatPrecipitationProbability(data);
+  const time = data?.currentTime ? new Date(data.currentTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "just now";
+  $("weatherMeta").textContent = `${start.label || "Selected start point"} · ${start.lat.toFixed(4)}, ${start.lng.toFixed(4)} · Updated ${time}`;
+  $("weatherSummary").textContent = "Generating a short weather summary...";
+  void refreshWeatherSummary(data, start);
+}
+
+function renderWeatherError(message) {
+  const fallbackSummary = buildWeatherFallbackSummary(null, null, message);
+  $("weatherDay").textContent = "Today";
+  $("weatherIcon").textContent = "--";
+  $("weatherTemperature").textContent = "Weather unavailable";
+  $("weatherDescription").textContent = message;
+  $("weatherDescription").hidden = false;
+  $("weatherFeelsLike").textContent = "--";
+  $("weatherHumidity").textContent = "--";
+  $("weatherWind").textContent = "--";
+  $("weatherUv").textContent = "--";
+  $("weatherPrecipitation").textContent = "--";
+  $("weatherSummary").textContent = fallbackSummary;
+  $("weatherMeta").textContent = "Check that Weather API is enabled for your Google Maps browser key.";
+}
+
+function buildWeatherFallbackSummary(data, start, errorMessage = "") {
+  if (errorMessage) return "Weather details are currently unavailable, but the app will try again shortly.";
+  const condition = String(data?.weatherCondition?.description?.text || "weather").toLowerCase();
+  const temp = Number(data?.temperature?.degrees);
+  const feelsLike = Number(data?.feelsLikeTemperature?.degrees);
+  const windSpeed = Number(data?.wind?.speed?.value);
+  const pieces = [];
+
+  if (condition.includes("rain") || condition.includes("drizzle")) pieces.push("Wet conditions");
+  else if (condition.includes("cloud")) pieces.push("Cloudy skies");
+  else if (condition.includes("sun") || condition.includes("clear")) pieces.push("Bright weather");
+  else if (condition.includes("snow")) pieces.push("Cold, wintry weather");
+  else if (condition.includes("fog") || condition.includes("mist") || condition.includes("haze")) pieces.push("Low visibility");
+  else pieces.push("Current conditions");
+
+  if (Number.isFinite(temp)) pieces.push(`around ${Math.round(temp)}°C`);
+  if (Number.isFinite(feelsLike) && Math.abs(feelsLike - temp) >= 2) pieces.push(`feels like ${Math.round(feelsLike)}°C`);
+  if (Number.isFinite(windSpeed)) pieces.push(`with a ${Math.round(windSpeed)} km/h breeze`);
+
+  const location = start?.label ? ` near ${start.label}` : "";
+  return `${pieces.join(", ")}${location}.`;
+}
+
+async function refreshWeatherSummary(data, start) {
+  const summaryKey = `${start?.lat?.toFixed?.(5) || ""},${start?.lng?.toFixed?.(5) || ""}:${data?.currentTime || ""}:${data?.weatherCondition?.description?.text || ""}`;
+  if (summaryKey === weatherSummaryUpdatedForKey) return;
+  weatherSummaryUpdatedForKey = summaryKey;
+
+  const requestId = ++weatherSummaryRequestId;
+  const prompt = [
+    "Write exactly one short English sentence describing the current weather for a student planning their day.",
+    "Keep it natural, friendly, and under 16 words.",
+    "Do not mention routes, Imperial, or any data labels.",
+    `Location: ${start?.label || "selected start point"}.`,
+    `Weekday: ${formatWeatherDay(data?.currentTime)}.`,
+    `Condition: ${data?.weatherCondition?.description?.text || "current conditions"}.`,
+    `Temperature: ${Number.isFinite(data?.temperature?.degrees) ? `${Math.round(data.temperature.degrees)}°C` : "unknown"}.`,
+    `Feels like: ${Number.isFinite(data?.feelsLikeTemperature?.degrees) ? `${Math.round(data.feelsLikeTemperature.degrees)}°C` : "unknown"}.`,
+    `Humidity: ${Number.isFinite(data?.relativeHumidity) ? `${Math.round(data.relativeHumidity)}%` : "unknown"}.`,
+    `Wind: ${formatWind(data?.wind)}.`,
+  ].join("\n");
+
+  try {
+    const response = await apiFetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        stream: false,
+        question: prompt,
+        history: [],
+        context: { task: "weather_summary" },
+      }),
+    });
+    const payload = await response.json();
+    if (requestId !== weatherSummaryRequestId) return;
+    if (!response.ok) throw new Error(payload.error || "Weather summary request failed");
+    const summary = sanitizeModelOutput(payload.answer || "");
+    $("weatherSummary").textContent = summary || buildWeatherFallbackSummary(data, start);
+  } catch (error) {
+    if (requestId !== weatherSummaryRequestId) return;
+    $("weatherSummary").textContent = buildWeatherFallbackSummary(data, start, error.message || "");
+  }
+}
+
+async function refreshWeatherForStart(start = getStartPoint(), force = false, options = {}) {
+  if (!start?.lat || !start?.lng) return;
+  const weatherKey = `${start.lat.toFixed(5)},${start.lng.toFixed(5)}`;
+  if (!force && weatherUpdatedForKey === weatherKey) return;
+  if (!googleMapsBrowserKey) {
+    if (options.throwOnError) throw new Error("Google Maps browser key is not available yet.");
+    renderWeatherError("Google Maps browser key is not available yet.");
+    return;
+  }
+
+  const requestId = ++weatherRequestId;
+  const previousState = options.preserveOnError ? captureWeatherState() : null;
+  weatherUpdatedForKey = weatherKey;
+  setWeatherLoading(`Checking weather near ${start.label || "your selected start point"}...`);
+  try {
+    const response = await fetch(weatherApiUrl(start, googleMapsBrowserKey));
+    const data = await response.json();
+    if (requestId !== weatherRequestId) return;
+    if (!response.ok) {
+      throw new Error(data?.error?.message || "Weather API request failed");
+    }
+    renderWeatherData(data, start);
+  } catch (error) {
+    if (requestId !== weatherRequestId) return;
+    weatherUpdatedForKey = "";
+    if (previousState) {
+      restoreWeatherState(previousState);
+    } else {
+      renderWeatherError(error.message || "Weather API request failed.");
+    }
+    if (options.throwOnError) throw error;
+  } finally {
+    if (requestId === weatherRequestId) setWeatherButtonReady();
+  }
 }
 
 function isStartupCheckingState() {
@@ -608,9 +905,11 @@ function renderCard(place, index) {
   const visibleTags = place.tags
     .filter((tag) => !hiddenTags.has(tag))
     .sort((first, second) => Number(lowPriorityTags.has(first)) - Number(lowPriorityTags.has(second)))
-    .slice(0, 3);
-  const tagLabels = visibleTags
+    .slice(0, 2);
+  const badges = visibleTags
     .map((tag) => `<span class="tag">${tagLabel(tag)}</span>`)
+    .concat(`<span class="tag ${place.risk.className}">${place.risk.label}</span>`)
+    .slice(0, 3)
     .join("");
   const websiteAttributes = place.website
     ? ` data-website="${escapeHtml(place.website)}" role="link" tabindex="0" aria-label="Open ${escapeHtml(place.name)} official website"`
@@ -624,7 +923,7 @@ function renderCard(place, index) {
           <h3>${place.name}</h3>
         </div>
         <p class="decision"><span class="score-badge">${place.total}</span>${place.decision}</p>
-        <div class="tags">${tagLabels}<span class="tag ${place.risk.className}">${place.risk.label}</span></div>
+        <div class="tags">${badges}</div>
         <div class="metrics">
           <div class="metric"><span>Distance</span><strong>${place.adjustedDistance} km</strong></div>
           <div class="metric"><span>Walk est.</span><strong>${place.estimatedWalkMinutes} min</strong></div>
@@ -644,8 +943,7 @@ function tagLabel(tag) {
     "24h": "24 hours",
     science: "STEM resources",
     central: "Main library",
-    medicine: "Medical resources",
-    campus: "Campus library",
+    campus: "Imperial",
     "study-space": "Study space",
     group: "Group study",
     services: "Services",
@@ -1481,6 +1779,7 @@ function setMapStartCoordinates(lat, lng, statusMessage = "") {
   if (startMap) startMap.panTo({ lat, lng });
   updateStartMapStatus(statusMessage);
   render();
+  void refreshWeatherForStart(getStartPoint(), true);
   if (controls.scenario.value === "nearest") refreshRoutes();
 }
 
@@ -1494,6 +1793,7 @@ function selectCampusStart(key) {
   }
   updateStartMapStatus();
   render();
+  void refreshWeatherForStart(getStartPoint(), true);
   if (controls.scenario.value === "nearest") refreshRoutes();
 }
 
@@ -1612,6 +1912,88 @@ async function requestCurrentLocation() {
   }
 }
 
+function showWeatherDestinationAlert(message) {
+  showToolInfo("weatherDestination", message);
+}
+
+function isLatLngPlace(place) {
+  return Boolean(place && Number.isFinite(place.lat) && Number.isFinite(place.lng));
+}
+
+function browserGeocodePlaceText(placeText) {
+  const address = String(placeText || "").trim();
+  if (!address) {
+    return Promise.reject(new Error("The navigation destination is missing."));
+  }
+  if (!window.google?.maps?.Geocoder) {
+    return Promise.reject(new Error("Google Maps is not ready for destination lookup yet."));
+  }
+
+  const geocoder = new google.maps.Geocoder();
+  return new Promise((resolve, reject) => {
+    geocoder.geocode({ address }, (results, status) => {
+      const result = Array.isArray(results) ? results[0] : null;
+      const location = result?.geometry?.location;
+      if (status !== "OK" || !location) {
+        reject(new Error(`Could not find weather coordinates for ${address}.`));
+        return;
+      }
+      resolve({
+        name: result.formatted_address || address,
+        lat: location.lat(),
+        lng: location.lng(),
+      });
+    });
+  });
+}
+
+async function resolveWeatherDestination() {
+  if (!latestNavigationData?.destination) {
+    throw new Error("Please ask the agent for a navigation route first, then update weather at the parsed destination.");
+  }
+
+  if (isLatLngPlace(latestNavigationData.destinationPlace)) {
+    return latestNavigationData.destinationPlace;
+  }
+
+  const encodedRoute = latestNavigationData.mapRoute?.polyline || latestNavigationData.recommended?.polyline || "";
+  if (encodedRoute) {
+    const path = decodePolyline(encodedRoute);
+    const routeEnd = path[path.length - 1];
+    if (isLatLngPlace(routeEnd)) {
+      const destination = {
+        name: latestNavigationData.destination || "Navigation destination",
+        lat: routeEnd.lat,
+        lng: routeEnd.lng,
+      };
+      latestNavigationData.destinationPlace = destination;
+      return destination;
+    }
+  }
+
+  const geocoded = await browserGeocodePlaceText(latestNavigationData.destination);
+  latestNavigationData.destinationPlace = geocoded;
+  return geocoded;
+}
+
+async function updateWeatherAtDestination() {
+  try {
+    const destination = await resolveWeatherDestination();
+    await refreshWeatherForStart(
+      {
+        label: destination.name || latestNavigationData.destination || "Navigation destination",
+        lat: destination.lat,
+        lng: destination.lng,
+        weatherScope: "destination",
+      },
+      true,
+      { preserveOnError: true, throwOnError: true },
+    );
+  } catch (error) {
+    showWeatherDestinationAlert(error.message || "Weather data at the destination could not be updated.");
+  }
+}
+
 async function refreshIntegrationStatus() {
   try {
     const response = await apiFetch("/api/health");
@@ -1624,9 +2006,12 @@ async function refreshIntegrationStatus() {
     };
     setGoogleMapsStatus(Boolean(data.googleMapsBrowserConfigured), Boolean(data.googleMapsConfigured));
     if (data.googleMapsBrowserKey) {
+      googleMapsBrowserKey = data.googleMapsBrowserKey;
       loadGoogleStartMap(data.googleMapsBrowserKey);
+      void refreshWeatherForStart(getStartPoint(), true);
     } else {
       $("startMapStatus").textContent = "Google Maps browser key missing; use the campus selector below.";
+      renderWeatherError("Google Maps browser key missing.");
     }
   } catch (error) {
     integrationStatus = {
@@ -1635,6 +2020,7 @@ async function refreshIntegrationStatus() {
       tools: integrationStatus.tools || "Conversation",
     };
     $("startMapStatus").innerHTML = `Local API not connected. Run <code>PORT=8001 python3 server.py</code>, or open this page with <code>?api=http://localhost:8002</code> if you use another port.`;
+    renderWeatherError("Local API is not connected, so the browser key is not available.");
   }
   render();
 }
@@ -1703,6 +2089,10 @@ $("updateRecommendations").addEventListener("click", () => {
   render();
   if (controls.scenario.value === "nearest") refreshRoutes();
 });
+$("loadMoreStudySpaces").addEventListener("click", () => {
+  recommendationDisplayLimit = recommendationDisplayLimit >= 6 ? 3 : 6;
+  render();
+});
 $("recommendations").addEventListener("click", (event) => {
   const card = event.target.closest(".place-card[data-website]");
   if (!card) return;
@@ -1716,6 +2106,7 @@ $("recommendations").addEventListener("keydown", (event) => {
   openPlaceWebsiteFromCard(card);
 });
 $("useCurrentLocation").addEventListener("click", requestCurrentLocation);
+$("updateWeatherButton").addEventListener("click", updateWeatherAtDestination);
 $("questionForm").addEventListener("submit", (event) => {
   event.preventDefault();
   answerQuestion($("userQuestion").value);
@@ -1749,6 +2140,7 @@ const TOOL_INFO_COPY = {
   routes: "Google Routes provides live travel time, distance, and route geometry when the agent enters navigation mode.\n\nIt supports route comparison across public transport, walking, cycling, and driving, and powers the route preview map.",
   llm: "The LLM handles conversation, intent understanding, and study-space recommendations. When route planning is needed, it uses Google Routes data rather than guessing travel time.",
   agent: "When your question involves studying, libraries, campus facilities, or travel directions, the agent can switch mode automatically:\n\n• Study Planning — recommends Imperial study spaces based on your goal and selected starting point.\n• Navigation — calls Google Routes to calculate travel time, distance, and route geometry.\n• Conversation — answers general questions without using external route tools.\n\nThe mode updates automatically after each question.",
+  weatherDestination: "Please ask the agent for a navigation route first, then update weather at the parsed destination.",
 };
 
 const googleLinkEl = $("googleMapsLink");
@@ -1794,9 +2186,9 @@ function hideExternalConfirm() {
   pendingExternalHref = null;
 }
 
-function showToolInfo(kind) {
+function showToolInfo(kind, overrideContent = "") {
   if (!toolInfoModalEl || !toolInfoTextEl) return;
-  const content = String(TOOL_INFO_COPY[kind] || TOOL_INFO_COPY.llm);
+  const content = String(overrideContent || TOOL_INFO_COPY[kind] || TOOL_INFO_COPY.llm);
   toolInfoTextEl.innerHTML = kind === "agent"
     ? renderAgentToolInfo()
     : escapeHtml(content).replace(/\n/g, "<br />");

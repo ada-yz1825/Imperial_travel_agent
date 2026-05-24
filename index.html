@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Imperial Study Navigator</title>
-    <link rel="stylesheet" href="./styles.css?v=chat-bubbles-2" />
+    <link rel="stylesheet" href="./styles.css?v=weather-module-2" />
   </head>
   <body>
     <main class="app-shell">
@@ -71,6 +71,7 @@
             <button id="updateRecommendations" class="secondary-action" type="button">Update recommendations</button>
 
             <div class="recommendation-grid" id="recommendations"></div>
+            <button id="loadMoreStudySpaces" class="secondary-action load-more-study-spaces" type="button">Load more study spaces</button>
           </div>
         </aside>
 
@@ -145,25 +146,70 @@
               <p class="eyebrow">How it works?</p>
               <div class="how-grid">
                 <div>
-                  <strong>1. Understand intent</strong>
-                  <span>The agent first classifies whether your message is a navigation request, a study-space planning question, or general chat, and chooses the appropriate tools and tone.</span>
+                  <strong>1. Ask with context</strong>
+                  <span>Ask in natural Language. Start by selecting a location on the map, using your current location, or choosing a campus preset, so the agent can understand where your journey begins.</span>
                 </div>
                 <div>
-                  <strong>2. Use tools only when needed</strong>
-                  <span>Navigation queries trigger Google Routes calls for live travel times and route geometry; study planning uses the local candidate dataset and the LLM for natural recommendations.</span>
+                  <strong>2. Agent decides the right workflow</strong>
+                  <span>The agent detects whether your question is normal chat, study-space planning, or navigation. It uses local study-space data for recommendations and only calls Google Routes when live travel data is needed.</span>
                 </div>
                 <div>
-                  <strong>3. Route parsing and start-point fallback</strong>
-                  <span>The agent will automatically parse origin and destination from free text (e.g. "from South Kensington to White City"). If no explicit origin is found, it uses the start point selected on the left (map selection or campus preset).</span>
-                </div>
-                <div>
-                  <strong>4. Live data and verification</strong>
-                  <span>When available, Google provides live duration and distance estimates and encoded polylines for map preview. The assistant reports exact numbers from the tool and links to Google Maps for full directions.</span>
+                  <strong>3. Get actionable results</strong>
+                  <span>For study planning, the agent suggests suitable places based on your goal and walking comfort limit. For navigation, it compares travel modes, shows a route preview, and links to Google Maps for full directions.</span>
                 </div>
   <!-- Removed privacy/offline and user controls items per request -->
               </div>
             </section>
           </div>
+
+          <section class="decision-module weather-module" aria-label="Weather information">
+            <div class="weather-header">
+              <div>
+                <p class="eyebrow">Weather</p>
+                <h3>Weather at your <span id="weatherScopeLabel" class="weather-scope-label">start point</span></h3>
+              </div>
+              <button id="updateWeatherButton" class="secondary-action" type="button">Update Weather data at <span class="weather-button-destination">destination</span></button>
+            </div>
+            <div class="weather-card" id="weatherCard">
+              <div class="weather-main">
+                <div class="weather-current">
+                  <div class="weather-current-row">
+                    <strong class="weather-day" id="weatherDay">Today</strong>
+                    <span class="weather-icon" id="weatherIcon" aria-hidden="true">--</span>
+                    <strong id="weatherTemperature">Weather not loaded</strong>
+                  </div>
+                  <span id="weatherDescription">Use your selected start point or update from your navigation destination.</span>
+                </div>
+                <div class="weather-summary" aria-live="polite">
+                  <span class="weather-summary-label">AI summary</span>
+                  <p id="weatherSummary">Waiting for weather data.</p>
+                </div>
+              </div>
+              <div class="weather-metrics">
+                <div>
+                  <span>Feels like</span>
+                  <strong id="weatherFeelsLike">--</strong>
+                </div>
+                <div>
+                  <span>Humidity</span>
+                  <strong id="weatherHumidity">--</strong>
+                </div>
+                <div>
+                  <span>Wind</span>
+                  <strong id="weatherWind">--</strong>
+                </div>
+                <div>
+                  <span>UV</span>
+                  <strong id="weatherUv">--</strong>
+                </div>
+                <div>
+                  <span>Precipitation %</span>
+                  <strong id="weatherPrecipitation">--</strong>
+                </div>
+              </div>
+              <p class="weather-meta" id="weatherMeta">Waiting for weather data.</p>
+            </div>
+          </section>
 
           <section class="decision-module useful-links" aria-label="Useful links">
             <p class="eyebrow">Useful links</p>
@@ -247,6 +293,6 @@
       </div>
     </footer>
 
-    <script src="./app.js?v=chat-bubbles-2"></script>
+    <script src="./app.js?v=weather-module-2"></script>
   </body>
 </html>
