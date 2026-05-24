@@ -29,8 +29,10 @@ CHAT_HISTORY_LIMIT = int(os.environ.get("CHAT_HISTORY_LIMIT", "6"))
 GROQ_MAX_COMPLETION_TOKENS = int(os.environ.get("GROQ_MAX_COMPLETION_TOKENS", "750"))
 GROQ_JSON_MAX_COMPLETION_TOKENS = int(os.environ.get("GROQ_JSON_MAX_COMPLETION_TOKENS", "1500"))
 GROQ_NAVIGATION_MAX_COMPLETION_TOKENS = int(os.environ.get("GROQ_NAVIGATION_MAX_COMPLETION_TOKENS", "1500"))
-CHAT_STREAM_CHUNK_CHARS = int(os.environ.get("CHAT_STREAM_CHUNK_CHARS", "17"))
-CHAT_STREAM_CHUNK_DELAY_SECONDS = float(os.environ.get("CHAT_STREAM_CHUNK_DELAY_SECONDS", "0.03"))
+# Characters to emit per stream chunk (increase to reduce round-trips)
+CHAT_STREAM_CHUNK_CHARS = int(os.environ.get("CHAT_STREAM_CHUNK_CHARS", "40"))
+# Delay between emitting chunks (seconds). Lower for faster streaming; zero disables throttling.
+CHAT_STREAM_CHUNK_DELAY_SECONDS = float(os.environ.get("CHAT_STREAM_CHUNK_DELAY_SECONDS", "0.005"))
 GOOGLE_TRAVEL_MODE = os.environ.get("GOOGLE_TRAVEL_MODE", "TRANSIT")
 IMPERIAL_SHUTTLE_URL = "https://www.imperial.ac.uk/admin-services/property/travel/shuttle-bus/"
 IMPERIAL_SHUTTLE_CAMPUSES = {
@@ -1745,7 +1747,9 @@ def append_destination_context_note(answer, route_request):
     note = generate_destination_context_note(route_request, destination_name, language)
     if not note:
         note = destination_context_fallback(destination_name, language)
-    note = strip_reasoning_text(note)
+    note = clean_destination_context_note(note, destination_name, language)
+    if not note:
+        note = destination_context_fallback(destination_name, language)
     if not note:
         return answer
 
@@ -1785,19 +1789,19 @@ def generate_destination_context_note(route_request, destination_name, language)
             api_key = get_openai_api_key()
             if not api_key:
                 return ""
-            return call_openai_text(api_key, developer_text, prompt, max_output_tokens=260, temperature=0.7)
+            return call_openai_text(api_key, developer_text, prompt, max_output_tokens=360, temperature=0.7)
         if provider == "groq":
             api_key = get_groq_api_key()
             if not api_key:
                 return ""
-            return call_groq_text(api_key, developer_text, prompt, max_completion_tokens=260, temperature=0.7)
+            return call_groq_text(api_key, developer_text, prompt, max_completion_tokens=360, temperature=0.7)
         return call_ollama_once(
             [
                 {"role": "system", "content": developer_text},
                 {"role": "user", "content": prompt},
             ],
             temperature=0.7,
-            num_predict=260,
+            num_predict=360,
         )
     except Exception:
         return ""
@@ -1806,18 +1810,41 @@ def generate_destination_context_note(route_request, destination_name, language)
 def build_destination_context_prompt(destination_name, language):
     if language == "Chinese":
         return (
-            f"请用中文写一段 2 到 4 句的自由介绍，介绍 {destination_name} 这个地方。"
+            f"请用中文写一段 1 到 2 句的自由介绍，介绍 {destination_name} 这个地方。"
             "你可以提到它的气质、著名地标、历史背景、当地氛围，或者为什么值得去。"
             "不要提路线、交通时间、地图、Imperial，也不要说这是补充说明。"
-            "尽量像真人给朋友介绍目的地一样自然。"
+            "尽量像真人给朋友介绍目的地一样自然，并确保最后一句完整结束。"
         )
 
     return (
-        f"Write a 2 to 4 sentence free-form introduction to {destination_name} as a place to visit. "
+        f"Write a 1 to 2 sentence free-form introduction to {destination_name} as a place to visit. "
         "You can mention its atmosphere, notable landmarks, history, local character, or why people go there. "
         "Do not mention routes, travel time, maps, Imperial, or that this is a follow-up. "
-        "Sound natural, like a human recommending the place to a friend."
+        "Sound natural, like a human recommending the place to a friend, and end with a complete sentence."
     )
+
+
+def clean_destination_context_note(note, destination_name, language):
+    cleaned = strip_reasoning_text(note)
+    cleaned = re.sub(r"[ \t]+", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+    completed = complete_sentences_only(cleaned)
+    if completed:
+        return completed
+    return destination_context_fallback(destination_name, language)
+
+
+def complete_sentences_only(text):
+    cleaned = str(text or "").strip()
+    if not cleaned:
+        return ""
+    if re.search(r"[。！？.!?][\"'”’）)\]]?\s*$", cleaned):
+        return cleaned
+
+    matches = list(re.finditer(r"[。！？.!?][\"'”’）)\]]?", cleaned))
+    if not matches:
+        return ""
+    return cleaned[: matches[-1].end()].strip()
 
 
 def destination_context_fallback(destination_name, language):

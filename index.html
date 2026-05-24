@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Imperial Study Navigator</title>
-    <link rel="stylesheet" href="./styles.css?v=motion-polish-1" />
+    <link rel="stylesheet" href="./styles.css?v=chat-bubbles-2" />
   </head>
   <body>
     <main class="app-shell">
@@ -224,6 +224,20 @@
       </div>
     </div>
 
+    <div class="confirm-modal" id="startupWaitModal" hidden>
+      <div class="confirm-modal-panel">
+        <div class="confirm-modal-body">
+          <div id="startupWaitText" class="tool-info-text">
+            <p>Please allow about 30 seconds for system to start up.</p>
+            <p>The backend may take some time to start up, so the LLM and Google Routes status cards are still checking. Please check for API status later.</p>
+          </div>
+        </div>
+        <div class="confirm-modal-actions">
+          <button id="closeStartupWait" class="cta" type="button">Got it</button>
+        </div>
+      </div>
+    </div>
+
     <footer class="page-signature" role="contentinfo" aria-label="Page author">
       <div class="page-signature-inner">
         <span class="sig-name">Created by Yiqi Zhu</span>
@@ -233,6 +247,6 @@
       </div>
     </footer>
 
-    <script src="./app.js?v=agent-tools-info-1"></script>
+    <script src="./app.js?v=chat-bubbles-2"></script>
   </body>
 </html>

@@ -408,14 +408,19 @@ let routePolyline = null;
 let routeMarkers = [];
 let pendingRoutePreview = null;
 let activeRoutePreview = null;
-let routePreviewRevealTimer = null;
 let googleMapsLoading = false;
 let routesKeyConfigured = false;
 let latestNavigationData = null;
 const chatHistory = [];
-const STREAM_RENDER_BASE_DELAY_MS = 30;
-const STREAM_RENDER_CHUNK_SIZE = 4;
-const MIN_LOADING_MS = 1900;
+let lastAnimatedChatMessageKey = "";
+let startupWaitModalShown = false;
+let startupWaitModalTimer = null;
+// Base ms between render steps — lower for snappier updates
+const STREAM_RENDER_BASE_DELAY_MS = 8;
+// How many characters to render per step — increase to show more text at once
+const STREAM_RENDER_CHUNK_SIZE = 8;
+// Minimum loading duration gating (ms). Lower to reduce perceived wait time.
+const MIN_LOADING_MS = 1500;
 let answerRenderSessionId = 0;
 
 function normalise(value, min, max) {
@@ -541,6 +546,7 @@ function render() {
   $("weatherSignal").textContent = integrationStatus.llm;
   $("trafficSignal").textContent = integrationStatus.google;
   updateAgentModeSignal(integrationStatus.tools, false);
+  maybeShowStartupWaitModal();
 
   latestRanked = places
     .map((place) => scorePlace(place, context))
@@ -560,6 +566,29 @@ function setGoogleMapsStatus(browserReady, routesReady) {
     integrationStatus.google = `${browserStatus} · ${routesStatus}`;
   }
   $("trafficSignal").textContent = integrationStatus.google;
+}
+
+function isStartupCheckingState() {
+  return integrationStatus.llm === "Checking" && integrationStatus.google === "Checking";
+}
+
+function maybeShowStartupWaitModal() {
+  if (!isStartupCheckingState()) {
+    if (startupWaitModalTimer) {
+      window.clearTimeout(startupWaitModalTimer);
+      startupWaitModalTimer = null;
+    }
+    if (startupWaitModalEl && !startupWaitModalEl.hidden) hideStartupWaitModal();
+    return;
+  }
+  if (startupWaitModalShown) return;
+  if (startupWaitModalTimer) return;
+  startupWaitModalTimer = window.setTimeout(() => {
+    startupWaitModalTimer = null;
+    if (!isStartupCheckingState() || startupWaitModalShown) return;
+    startupWaitModalShown = true;
+    showStartupWaitModal();
+  }, 1000);
 }
 
 function getContext() {
@@ -750,15 +779,10 @@ async function answerNavigationQuestion(question, options = {}) {
   setAsking(true);
   renderLoadingAnswer("Checking Google Routes for accurate navigation");
   const ROUTE_SUMMARY_DELAY_MS = 4000;
-  const ROUTE_MAP_DELAY_MS = 8000;
 
   const routeSummaryTimer = window.setTimeout(() => {
     renderLoadingAnswer("Generating routes to your destination");
   }, ROUTE_SUMMARY_DELAY_MS);
-
-  const routeMapTimer = window.setTimeout(() => {
-    renderLoadingAnswer("Generating summary and map, this may take a while");
-  }, ROUTE_MAP_DELAY_MS);
 
   try {
     const response = await apiFetch("/api/navigate", {
@@ -768,7 +792,6 @@ async function answerNavigationQuestion(question, options = {}) {
     });
     const data = await response.json();
     window.clearTimeout(routeSummaryTimer);
-    window.clearTimeout(routeMapTimer);
     if (!response.ok) {
       const details = Array.isArray(data.details) && data.details.length
         ? `\n${data.details.join("\n")}`
@@ -786,7 +809,7 @@ async function answerNavigationQuestion(question, options = {}) {
     trimChatHistory();
     latestNavigationData = { ...data, answer };
     await renderAnswerWithPacing(answer);
-    showRoutePreviewAfterDelay(data, 500);
+    renderRoutePreview(data);
     renderAgentActions(data, data.recommended);
     renderChatModalHistory();
   } catch (error) {
@@ -802,16 +825,8 @@ async function answerNavigationQuestion(question, options = {}) {
     `;
   } finally {
     window.clearTimeout(routeSummaryTimer);
-    window.clearTimeout(routeMapTimer);
     setAsking(false);
   }
-}
-
-function showRoutePreviewAfterDelay(data, delayMs = 500) {
-  window.clearTimeout(routePreviewRevealTimer);
-  routePreviewRevealTimer = window.setTimeout(() => {
-    renderRoutePreview(data);
-  }, delayMs);
 }
 
 function currentStartContext() {
@@ -1284,8 +1299,6 @@ function drawRoutePreview(data, recommended) {
 }
 
 function clearRoutePreview() {
-  window.clearTimeout(routePreviewRevealTimer);
-  routePreviewRevealTimer = null;
   pendingRoutePreview = null;
   activeRoutePreview = null;
   const preview = $("routePreview");
@@ -1381,21 +1394,29 @@ function renderChatModalHistory(isLoading = false) {
   const history = $("chatModalHistory");
   if (!history) return;
   if (!chatHistory.length) {
-    history.innerHTML = `<div class="chat-message assistant">No conversation yet. Ask the agent something to start.</div>`;
+    lastAnimatedChatMessageKey = "";
+    history.innerHTML = `<div class="chat-message assistant">No conversation yet. Ask the agent something to start.<span class="chat-bubble-tail" aria-hidden="true"></span></div>`;
     return;
   }
 
+  const lastIndex = chatHistory.length - 1;
+  let nextAnimatedMessageKey = "";
   const messages = chatHistory
     .map((item, index) => {
       const role = item.role === "user" ? "user" : "assistant";
+      const messageKey = `${index}:${role}:${item.content}`;
+      const shouldPop = index === lastIndex && messageKey !== lastAnimatedChatMessageKey;
+      if (shouldPop) nextAnimatedMessageKey = messageKey;
+      const popClass = shouldPop ? " chat-message--pop" : "";
       const routeMapButton = shouldShowRouteMapButton(item, index) ? routeMapButtonHtml() : "";
-      return `<div class="chat-message ${role}">${renderMarkdown(item.content)}${routeMapButton}</div>`;
+      return `<div class="chat-message ${role}${popClass}">${renderMarkdown(item.content)}${routeMapButton}<span class="chat-bubble-tail" aria-hidden="true"></span></div>`;
     })
     .join("");
   const loading = isLoading
     ? `<div class="chat-message assistant typing"><span></span><span></span><span></span></div>`
     : "";
   history.innerHTML = messages + loading;
+  if (nextAnimatedMessageKey) lastAnimatedChatMessageKey = nextAnimatedMessageKey;
   history.scrollTop = history.scrollHeight;
 }
 
@@ -1808,6 +1829,28 @@ function hideToolInfo() {
   });
 }
 
+const startupWaitModalEl = $("startupWaitModal");
+const closeStartupWaitBtn = $("closeStartupWait");
+
+function showStartupWaitModal() {
+  if (!startupWaitModalEl) return;
+  startupWaitModalEl.hidden = false;
+  void startupWaitModalEl.offsetWidth;
+  startupWaitModalEl.classList.remove("closing");
+  startupWaitModalEl.classList.add("visible");
+}
+
+function hideStartupWaitModal() {
+  if (!startupWaitModalEl || startupWaitModalEl.hidden) return;
+  startupWaitModalEl.classList.remove("visible");
+  startupWaitModalEl.classList.add("closing");
+  startupWaitModalEl.addEventListener("animationend", function handler() {
+    startupWaitModalEl.hidden = true;
+    startupWaitModalEl.classList.remove("closing");
+    startupWaitModalEl.removeEventListener("animationend", handler);
+  });
+}
+
 function bindSignalTileInfo(tile, kind) {
   if (!tile) return;
   tile.addEventListener("click", () => showToolInfo(kind));
@@ -1865,6 +1908,14 @@ if (toolInfoModalEl) {
     if (event.target === toolInfoModalEl) hideToolInfo();
   });
 }
+if (closeStartupWaitBtn) {
+  closeStartupWaitBtn.addEventListener("click", hideStartupWaitModal);
+}
+if (startupWaitModalEl) {
+  startupWaitModalEl.addEventListener("click", (event) => {
+    if (event.target === startupWaitModalEl) hideStartupWaitModal();
+  });
+}
 
 $("modalChatForm").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -1878,7 +1929,6 @@ $("modalChatForm").addEventListener("submit", async (event) => {
   $("modalAskButton").disabled = true;
   try {
     await answerQuestion(question, { skipUserPush: true });
-    renderChatModalHistory();
   } finally {
     $("modalAskButton").disabled = false;
     input.focus();

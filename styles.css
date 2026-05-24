@@ -869,32 +869,62 @@ button:hover {
 
 .chat-modal-history {
   overflow: auto;
-  padding: 16px;
+  padding: 18px 24px 22px;
   background: #f8fafb;
 }
 
 .chat-message {
   max-width: 76%;
   width: fit-content;
-  margin-bottom: 10px;
-  border-radius: 8px;
-  padding: 10px 12px;
+  margin-bottom: 20px;
+  border-radius: 18px;
+  padding: 11px 14px;
   line-height: 1.55;
-  max-height: 320px;
-  overflow: auto;
+  overflow: visible;
   overflow-wrap: anywhere;
+  position: relative;
+  z-index: 1;
 }
 
 .chat-message.user {
   margin-left: auto;
   background: var(--blue);
   color: #fff;
+  border-bottom-right-radius: 8px;
 }
 
 .chat-message.assistant {
   background: #fff;
   color: #303b48;
   border: 1px solid var(--line);
+  border-bottom-left-radius: 8px;
+}
+
+.chat-bubble-tail {
+  display: block;
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.chat-message.user .chat-bubble-tail {
+  right: -10px;
+  bottom: 8px;
+  border-top: 13px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 18px solid var(--blue);
+  transform: rotate(7deg);
+}
+
+.chat-message.assistant .chat-bubble-tail {
+  left: -10px;
+  bottom: 8px;
+  border-top: 13px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-right: 18px solid #fff;
+  filter: drop-shadow(-1px 0 0 var(--line));
+  transform: rotate(-7deg);
 }
 
 .chat-route-map-button {
@@ -1457,8 +1487,16 @@ select:focus {
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
 }
 
-.chat-message {
-  animation: message-in 180ms var(--ease-out) both;
+.chat-message.user.chat-message--pop {
+  animation: chat-bubble-pop-right 680ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  will-change: transform, opacity;
+  transform-origin: right bottom;
+}
+
+.chat-message.assistant.chat-message--pop {
+  animation: chat-bubble-pop-left 680ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  will-change: transform, opacity;
+  transform-origin: left bottom;
 }
 
 .how-grid div:hover {
@@ -1587,14 +1625,35 @@ select:focus {
   }
 }
 
-@keyframes message-in {
-  from {
+@keyframes chat-bubble-pop-left {
+  0% {
     opacity: 0;
-    transform: translateY(4px) scale(0.99);
+    transform: translateX(-18px) translateY(7px) scale(0.96) rotate(-0.3deg);
+    filter: blur(0);
   }
-  to {
+  70% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateX(2px) translateY(-1px) scale(1.006) rotate(0.08deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) translateY(0) scale(1) rotate(0);
+  }
+}
+
+@keyframes chat-bubble-pop-right {
+  0% {
+    opacity: 0;
+    transform: translateX(18px) translateY(7px) scale(0.96) rotate(0.3deg);
+    filter: blur(0);
+  }
+  70% {
+    opacity: 1;
+    transform: translateX(-2px) translateY(-1px) scale(1.006) rotate(-0.08deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) translateY(0) scale(1) rotate(0);
   }
 }
 
