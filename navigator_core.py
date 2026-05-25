@@ -38,6 +38,7 @@ GROQ_NAVIGATION_MAX_COMPLETION_TOKENS = int(os.environ.get("GROQ_NAVIGATION_MAX_
 TOGETHER_MAX_COMPLETION_TOKENS = int(os.environ.get("TOGETHER_MAX_COMPLETION_TOKENS", str(LLM_MAX_COMPLETION_TOKENS)))
 TOGETHER_JSON_MAX_COMPLETION_TOKENS = int(os.environ.get("TOGETHER_JSON_MAX_COMPLETION_TOKENS", str(LLM_JSON_MAX_COMPLETION_TOKENS)))
 TOGETHER_NAVIGATION_MAX_COMPLETION_TOKENS = int(os.environ.get("TOGETHER_NAVIGATION_MAX_COMPLETION_TOKENS", str(LLM_NAVIGATION_MAX_COMPLETION_TOKENS)))
+WEATHER_SUMMARY_MAX_COMPLETION_TOKENS = int(os.environ.get("WEATHER_SUMMARY_MAX_COMPLETION_TOKENS", "700"))
 # Characters to emit per stream chunk (increase to reduce round-trips)
 CHAT_STREAM_CHUNK_CHARS = int(os.environ.get("CHAT_STREAM_CHUNK_CHARS", "40"))
 # Delay between emitting chunks (seconds). Lower for faster streaming; zero disables throttling.
@@ -2048,7 +2049,9 @@ def call_groq(api_key, payload):
             messages.append({"role": role, "content": content})
 
     messages.append({"role": "user", "content": prompt})
-    return call_groq_messages(api_key, messages, max_completion_tokens=GROQ_MAX_COMPLETION_TOKENS, temperature=0.2)
+    temperature = 0.55 if is_weather_summary_payload(payload) else 0.2
+    max_tokens = WEATHER_SUMMARY_MAX_COMPLETION_TOKENS if is_weather_summary_payload(payload) else GROQ_MAX_COMPLETION_TOKENS
+    return call_groq_messages(api_key, messages, max_completion_tokens=max_tokens, temperature=temperature)
 
 
 def call_together(api_key, payload):
@@ -2063,7 +2066,9 @@ def call_together(api_key, payload):
             messages.append({"role": role, "content": content})
 
     messages.append({"role": "user", "content": prompt})
-    return call_together_messages(api_key, messages, max_completion_tokens=TOGETHER_MAX_COMPLETION_TOKENS, temperature=0.2)
+    temperature = 0.55 if is_weather_summary_payload(payload) else 0.2
+    max_tokens = WEATHER_SUMMARY_MAX_COMPLETION_TOKENS if is_weather_summary_payload(payload) else TOGETHER_MAX_COMPLETION_TOKENS
+    return call_together_messages(api_key, messages, max_completion_tokens=max_tokens, temperature=temperature)
 
 
 def call_groq_messages(api_key, messages, max_completion_tokens=GROQ_MAX_COMPLETION_TOKENS, temperature=0.2):
@@ -2261,7 +2266,8 @@ def call_openai(api_key, payload):
         {
             "model": OPENAI_MODEL,
             "input": model_input,
-            "max_output_tokens": LLM_MAX_COMPLETION_TOKENS,
+            "max_output_tokens": WEATHER_SUMMARY_MAX_COMPLETION_TOKENS if is_weather_summary_payload(payload) else LLM_MAX_COMPLETION_TOKENS,
+            "temperature": 0.55 if is_weather_summary_payload(payload) else 0.7,
         },
         ensure_ascii=False,
     ).encode("utf-8")
@@ -2380,7 +2386,45 @@ def extract_ollama_text(data):
     return ""
 
 
+def is_weather_summary_payload(payload):
+    context = (payload or {}).get("context")
+    return isinstance(context, dict) and context.get("task") == "weather_summary"
+
+
+def build_weather_summary_prompt(payload):
+    context = payload.get("context", {}) if isinstance(payload, dict) else {}
+    weather = context.get("weather") if isinstance(context, dict) else {}
+    question = payload.get("question", "") if isinstance(payload, dict) else ""
+    response_language = detect_response_language(question)
+    if response_language != "Chinese":
+        response_language = "English"
+
+    return json.dumps(
+        {
+            "response_language": response_language,
+            "task": "weather_card_summary",
+            "weather": weather if isinstance(weather, dict) else {},
+            "instructions": (
+                "Write one or two compact, natural sentences for a weather card. "
+                "Use only the provided weather data; do not invent forecasts. "
+                "Mention the practical takeaway for a student heading out, such as umbrella, layers, wind, UV, or walking comfort, only when supported by the data. "
+                "Avoid repeating a fixed template. Do not start with 'Current conditions', 'Weather details', or 'It is'. "
+                "You may use Markdown bold for a short lead phrase, for example **Sunny and hot - 33°C**. "
+                "Do not include bullets, coordinates, provider names, or labels. "
+                "Keep the total length under 30 English words or under 40 Chinese characters."
+            ),
+        },
+        ensure_ascii=False,
+    )
+
+
 def build_agent_prompt(payload, no_think=False):
+    if is_weather_summary_payload(payload):
+        prompt = build_weather_summary_prompt(payload)
+        if no_think:
+            return f"/no_think\nGive the final answer directly.\n{prompt}"
+        return prompt
+
     context = payload.get("context", {})
     ranked = payload.get("ranked", [])
     question = payload.get("question", "")

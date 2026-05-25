@@ -197,6 +197,9 @@ def agent_system_prompt():
         "If no tool is needed, answer directly. Match the user's language. Use at most one blank line between "
         "distinct paragraphs or before and after lists, and avoid consecutive blank lines. For short answers, prefer "
         "no blank lines unless a section break is genuinely helpful. When comparing multiple transport modes, prefer "
+        "a Markdown table with columns such as mode, time, distance, and note, instead of a plain paragraph list. "
+        "Use a small number of light emoji when they improve readability or make the answer feel more lively, but do "
+        "not overuse them. "
         "Do not reveal hidden reasoning, scratchpad, analysis, or <think> tags. Keep answers concise but useful."
     )
 

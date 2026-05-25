@@ -346,6 +346,9 @@ function apiBaseLabel() {
 function formatModelDisplayName(value) {
   const text = String(value || "").trim();
   if (!text) return "";
+  if (text === "Qwen/Qwen3-235B-A22B-Instruct-2507-tput") {
+    return "Qwen3-235B-A22B";
+  }
   const slashIndex = text.indexOf("/");
   return slashIndex >= 0 ? text.slice(slashIndex + 1) || text : text;
 }
@@ -670,6 +673,7 @@ function formatWeatherDay(currentTime) {
 }
 
 function setWeatherLoading(message = "Loading weather data...") {
+  weatherSummaryRequestId += 1;
   [$("updateWeatherCurrentButton"), $("updateWeatherDestinationButton")].forEach((button) => {
     if (!button) return;
     button.disabled = true;
@@ -677,7 +681,7 @@ function setWeatherLoading(message = "Loading weather data...") {
   $("weatherTemperature").textContent = "Loading...";
   $("weatherDescription").textContent = message;
   $("weatherDescription").hidden = false;
-  $("weatherSummary").textContent = "Waiting for the LLM summary...";
+  setWeatherSummary("Waiting for the LLM summary...");
   $("weatherMeta").textContent = "Fetching current conditions from Google Weather API.";
 }
 
@@ -728,6 +732,7 @@ function captureWeatherState() {
     if (!element) return state;
     state[id] = {
       textContent: element.textContent,
+      htmlContent: id === "weatherSummary" ? element.innerHTML : undefined,
       hidden: element.hidden,
       className: element.className,
     };
@@ -739,7 +744,11 @@ function restoreWeatherState(state) {
   Object.entries(state || {}).forEach(([id, value]) => {
     const element = $(id);
     if (!element || !value) return;
-    element.textContent = value.textContent;
+    if (id === "weatherSummary" && value.htmlContent !== undefined) {
+      element.innerHTML = value.htmlContent;
+    } else {
+      element.textContent = value.textContent;
+    }
     element.hidden = value.hidden;
     element.className = value.className;
   });
@@ -760,11 +769,12 @@ function renderWeatherData(data, start) {
   $("weatherPrecipitation").textContent = formatPrecipitationProbability(data);
   const time = data?.currentTime ? new Date(data.currentTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "just now";
   $("weatherMeta").textContent = `${start.label || "Selected start point"} · ${start.lat.toFixed(4)}, ${start.lng.toFixed(4)} · Updated ${time}`;
-  $("weatherSummary").textContent = "Generating a short weather summary...";
+  setWeatherSummary("Generating a short weather summary...");
   void refreshWeatherSummary(data, start);
 }
 
 function renderWeatherError(message) {
+  weatherSummaryRequestId += 1;
   const fallbackSummary = buildWeatherFallbackSummary(null, null, message);
   $("weatherDay").textContent = "Today";
   $("weatherIcon").textContent = "--";
@@ -776,7 +786,7 @@ function renderWeatherError(message) {
   $("weatherWind").textContent = "--";
   $("weatherUv").textContent = "--";
   $("weatherPrecipitation").textContent = "--";
-  $("weatherSummary").textContent = fallbackSummary;
+  setWeatherSummary(fallbackSummary);
   $("weatherMeta").textContent = "Check that Weather API is enabled for your Google Maps browser key.";
 }
 
@@ -803,11 +813,90 @@ function buildWeatherFallbackSummary(data, start, errorMessage = "") {
   return `${pieces.join(", ")}${location}.`;
 }
 
+function normalizeWeatherSummary(value) {
+  const clean = sanitizeModelOutput(value).replace(/\s+/g, " ").trim();
+  if (!clean) return "";
+  const sentences = clean.match(/[^.!?。！？]+[.!?。！？]?/g) || [];
+  if (sentences.length <= 2) return clean;
+  return sentences.slice(0, 2).join(" ").trim();
+}
+
+function renderWeatherSummaryMarkdown(value) {
+  const text = normalizeWeatherSummary(value);
+  if (!text) return "";
+  return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+}
+
+function isUsableWeatherSummary(value) {
+  const text = normalizeWeatherSummary(value);
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  return ![
+    "模型没有返回文本结果",
+    "本地模型返回为空",
+    "model did not return",
+    "empty response",
+  ].some((phrase) => lower.includes(phrase));
+}
+
+function setWeatherSummary(value) {
+  $("weatherSummary").innerHTML = renderWeatherSummaryMarkdown(value);
+}
+
+function compactWeatherContext(data, start) {
+  return {
+    location: start?.label || "Selected location",
+    scope: start?.weatherScope || "start point",
+    coordinates: start?.lat && start?.lng ? {
+      lat: Number(start.lat.toFixed(5)),
+      lng: Number(start.lng.toFixed(5)),
+    } : null,
+    currentTime: data?.currentTime || null,
+    condition: data?.weatherCondition?.description?.text || data?.weatherCondition?.type || null,
+    conditionType: data?.weatherCondition?.type || null,
+    isDaytime: data?.isDaytime,
+    temperatureC: data?.temperature?.degrees ?? null,
+    feelsLikeC: data?.feelsLikeTemperature?.degrees ?? null,
+    humidityPercent: data?.relativeHumidity ?? null,
+    wind: data?.wind || null,
+    uvIndex: data?.uvIndex ?? null,
+    precipitation: data?.precipitation || null,
+    precipitationProbability: formatPrecipitationProbability(data),
+  };
+}
+
 async function refreshWeatherSummary(data, start) {
   const summaryKey = `${start?.lat?.toFixed?.(5) || ""},${start?.lng?.toFixed?.(5) || ""}:${data?.currentTime || ""}:${data?.weatherCondition?.description?.text || ""}`;
   if (summaryKey === weatherSummaryUpdatedForKey) return;
   weatherSummaryUpdatedForKey = summaryKey;
-  $("weatherSummary").textContent = buildWeatherFallbackSummary(data, start);
+  const requestId = ++weatherSummaryRequestId;
+  const fallbackSummary = buildWeatherFallbackSummary(data, start);
+
+  try {
+    const response = await apiFetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        stream: false,
+        question: "Write a short, natural weather summary for the weather card.",
+        context: {
+          task: "weather_summary",
+          weather: compactWeatherContext(data, start),
+        },
+        history: [],
+        ranked: [],
+      }),
+    });
+    if (!response.ok) throw new Error("Weather summary request failed");
+    const result = await response.json();
+    if (requestId !== weatherSummaryRequestId) return;
+    const summary = normalizeWeatherSummary(result?.answer || "");
+    setWeatherSummary(isUsableWeatherSummary(summary) ? summary : fallbackSummary);
+  } catch (error) {
+    if (requestId === weatherSummaryRequestId) {
+      setWeatherSummary(fallbackSummary);
+    }
+  }
 }
 
 async function refreshWeatherForStart(start = getStartPoint(), force = false, options = {}) {
