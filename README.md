@@ -8,6 +8,12 @@ Imperial Travel Agent is an MCP-first web app for Imperial College London studen
 
 - Backend / fallback site: https://imperial-travel-agent-api.onrender.com/
 
+
+## Project Guide
+
+- [Project Guide PDF](Imperial_Travel_Agent_Project_Guide_EN.pdf)
+
+
 ## What It Does
 
 - Recommends study spaces based on study goal, comfort, and walking tolerance.
