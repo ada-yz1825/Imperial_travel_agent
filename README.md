@@ -1,6 +1,6 @@
-# Imperial Study Navigator
+# Imperial Travel Agent
 
-Imperial Study Navigator is an MCP-first web app for Imperial College London students. The browser UI lets users ask natural-language questions about study spaces, routes, and weather, while the backend delegates the real work to MCP tools exposed by `mcp_server.py`.
+Imperial Travel Agent is an MCP-first web app for Imperial College London students (ALSO for others). The browser UI lets users ask natural-language questions about study spaces, routes, and weather, while the backend delegates the real work to MCP tools exposed by `mcp_server.py`.
 
 ## Demo
 
