@@ -17,6 +17,7 @@ except ImportError:
 APP_NAME = "Imperial Study Navigator"
 OPENAI_API_URL = "https://api.openai.com/v1/responses"
 GROQ_API_URL = os.environ.get("GROQ_API_URL", "https://api.groq.com/openai/v1/chat/completions")
+TOGETHER_API_URL = os.environ.get("TOGETHER_API_URL", "https://api.together.ai/v1/chat/completions")
 GOOGLE_ROUTES_API_URL = "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix"
 GOOGLE_COMPUTE_ROUTES_API_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
 GOOGLE_GEOCODING_API_URL = "https://maps.googleapis.com/maps/api/geocode/json"
@@ -24,12 +25,19 @@ OLLAMA_API_URL = os.environ.get("OLLAMA_API_URL", "http://localhost:11434/api/ch
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama").lower()
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5.2")
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "qwen/qwen3-32b")
+TOGETHER_MODEL = os.environ.get("TOGETHER_MODEL", "Qwen/Qwen3.5-9B")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3")
-OLLAMA_NUM_PREDICT = int(os.environ.get("OLLAMA_NUM_PREDICT", "240"))
+OLLAMA_NUM_PREDICT = int(os.environ.get("OLLAMA_NUM_PREDICT", "1200"))
 CHAT_HISTORY_LIMIT = int(os.environ.get("CHAT_HISTORY_LIMIT", "6"))
-GROQ_MAX_COMPLETION_TOKENS = int(os.environ.get("GROQ_MAX_COMPLETION_TOKENS", "750"))
-GROQ_JSON_MAX_COMPLETION_TOKENS = int(os.environ.get("GROQ_JSON_MAX_COMPLETION_TOKENS", "1500"))
-GROQ_NAVIGATION_MAX_COMPLETION_TOKENS = int(os.environ.get("GROQ_NAVIGATION_MAX_COMPLETION_TOKENS", "1500"))
+LLM_MAX_COMPLETION_TOKENS = int(os.environ.get("LLM_MAX_COMPLETION_TOKENS", "1800"))
+LLM_JSON_MAX_COMPLETION_TOKENS = int(os.environ.get("LLM_JSON_MAX_COMPLETION_TOKENS", "2200"))
+LLM_NAVIGATION_MAX_COMPLETION_TOKENS = int(os.environ.get("LLM_NAVIGATION_MAX_COMPLETION_TOKENS", "2200"))
+GROQ_MAX_COMPLETION_TOKENS = int(os.environ.get("GROQ_MAX_COMPLETION_TOKENS", str(LLM_MAX_COMPLETION_TOKENS)))
+GROQ_JSON_MAX_COMPLETION_TOKENS = int(os.environ.get("GROQ_JSON_MAX_COMPLETION_TOKENS", str(LLM_JSON_MAX_COMPLETION_TOKENS)))
+GROQ_NAVIGATION_MAX_COMPLETION_TOKENS = int(os.environ.get("GROQ_NAVIGATION_MAX_COMPLETION_TOKENS", str(LLM_NAVIGATION_MAX_COMPLETION_TOKENS)))
+TOGETHER_MAX_COMPLETION_TOKENS = int(os.environ.get("TOGETHER_MAX_COMPLETION_TOKENS", str(LLM_MAX_COMPLETION_TOKENS)))
+TOGETHER_JSON_MAX_COMPLETION_TOKENS = int(os.environ.get("TOGETHER_JSON_MAX_COMPLETION_TOKENS", str(LLM_JSON_MAX_COMPLETION_TOKENS)))
+TOGETHER_NAVIGATION_MAX_COMPLETION_TOKENS = int(os.environ.get("TOGETHER_NAVIGATION_MAX_COMPLETION_TOKENS", str(LLM_NAVIGATION_MAX_COMPLETION_TOKENS)))
 # Characters to emit per stream chunk (increase to reduce round-trips)
 CHAT_STREAM_CHUNK_CHARS = int(os.environ.get("CHAT_STREAM_CHUNK_CHARS", "40"))
 # Delay between emitting chunks (seconds). Lower for faster streaming; zero disables throttling.
@@ -104,12 +112,20 @@ def get_groq_api_key():
     return get_env_value("GROQ_API_KEY")
 
 
+def get_together_api_key():
+    return get_env_value("TOGETHER_API_KEY")
+
+
 def get_openai_model():
     return get_env_value("OPENAI_MODEL") or OPENAI_MODEL
 
 
 def get_groq_model():
     return get_env_value("GROQ_MODEL") or GROQ_MODEL
+
+
+def get_together_model():
+    return get_env_value("TOGETHER_MODEL") or TOGETHER_MODEL
 
 
 def get_ollama_model():
@@ -122,6 +138,8 @@ def current_llm_model():
         return get_openai_model()
     if provider == "groq":
         return get_groq_model()
+    if provider == "together":
+        return get_together_model()
     return get_ollama_model()
 
 
@@ -139,6 +157,13 @@ def check_llm_health():
         return {
             "connected": configured,
             "label": get_groq_model() if configured else "Groq key missing",
+        }
+
+    if provider == "together":
+        configured = bool(get_together_api_key())
+        return {
+            "connected": configured,
+            "label": get_together_model() if configured else "Together key missing",
         }
 
     try:
@@ -518,7 +543,7 @@ def extract_navigation_request_with_llm(query, history=None):
                 api_key,
                 "Extract navigation intent and route endpoints. Return JSON only.",
                 prompt,
-                max_output_tokens=220,
+                max_output_tokens=LLM_JSON_MAX_COMPLETION_TOKENS,
             )
         elif provider == "groq":
             api_key = get_groq_api_key()
@@ -529,6 +554,16 @@ def extract_navigation_request_with_llm(query, history=None):
                 "Extract navigation intent and route endpoints. Return JSON only.",
                 prompt,
                 max_completion_tokens=GROQ_JSON_MAX_COMPLETION_TOKENS,
+            )
+        elif provider == "together":
+            api_key = get_together_api_key()
+            if not api_key:
+                return None
+            raw = call_together_json(
+                api_key,
+                "Extract navigation intent and route endpoints. Return JSON only.",
+                prompt,
+                max_completion_tokens=TOGETHER_JSON_MAX_COMPLETION_TOKENS,
             )
         else:
             raw = call_ollama_once(
@@ -724,6 +759,19 @@ def classify_agent_intent_with_llm(question, route_request):
                     {"role": "user", "content": prompt},
                 ],
                 max_completion_tokens=GROQ_JSON_MAX_COMPLETION_TOKENS,
+                temperature=0,
+            )
+        elif provider == "together":
+            api_key = get_together_api_key()
+            if not api_key:
+                return None
+            raw = call_together_messages(
+                api_key,
+                [
+                    {"role": "system", "content": "You are an intent classifier. Return compact JSON only, with no markdown."},
+                    {"role": "user", "content": prompt},
+                ],
+                max_completion_tokens=TOGETHER_JSON_MAX_COMPLETION_TOKENS,
                 temperature=0,
             )
         else:
@@ -1255,6 +1303,26 @@ def call_navigation_llm(query, route_request, routes, errors, study_options):
             max_completion_tokens=GROQ_NAVIGATION_MAX_COMPLETION_TOKENS,
             temperature=0.15,
         )
+    if provider == "together":
+        api_key = get_together_api_key()
+        if not api_key:
+            return ""
+        return call_together_messages(
+            api_key,
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are Imperial Study Navigator. You receive route tool results from Google Routes API. "
+                        "Use the tool data as facts, compare available transport modes naturally, and give a practical recommendation. "
+                        "Match the user's language exactly. Do not invent route data, line names, prices or step-by-step directions."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            max_completion_tokens=TOGETHER_NAVIGATION_MAX_COMPLETION_TOKENS,
+            temperature=0.15,
+        )
     return call_ollama_once(
         [
             {
@@ -1475,12 +1543,17 @@ def generate_destination_context_note(route_request, destination_name, language)
             api_key = get_openai_api_key()
             if not api_key:
                 return ""
-            return call_openai_text(api_key, developer_text, prompt, max_output_tokens=360, temperature=0.7)
+            return call_openai_text(api_key, developer_text, prompt, max_output_tokens=700, temperature=0.7)
         if provider == "groq":
             api_key = get_groq_api_key()
             if not api_key:
                 return ""
-            return call_groq_text(api_key, developer_text, prompt, max_completion_tokens=360, temperature=0.7)
+            return call_groq_text(api_key, developer_text, prompt, max_completion_tokens=700, temperature=0.7)
+        if provider == "together":
+            api_key = get_together_api_key()
+            if not api_key:
+                return ""
+            return call_together_text(api_key, developer_text, prompt, max_completion_tokens=700, temperature=0.7)
         return call_ollama_once(
             [
                 {"role": "system", "content": developer_text},
@@ -1827,7 +1900,7 @@ def call_openai_navigation(api_key, prompt):
                 },
                 {"role": "user", "content": [{"type": "input_text", "text": prompt}]},
             ],
-            "max_output_tokens": 520,
+            "max_output_tokens": LLM_NAVIGATION_MAX_COMPLETION_TOKENS,
         },
         ensure_ascii=False,
     ).encode("utf-8")
@@ -1938,6 +2011,31 @@ def call_groq_text(api_key, developer_text, prompt, max_completion_tokens=220, t
         temperature=temperature,
     )
 
+
+def call_together_json(api_key, developer_text, prompt, max_completion_tokens=TOGETHER_MAX_COMPLETION_TOKENS):
+    return call_together_messages(
+        api_key,
+        [
+            {"role": "system", "content": developer_text},
+            {"role": "user", "content": prompt},
+        ],
+        max_completion_tokens=max_completion_tokens,
+        temperature=0,
+    )
+
+
+def call_together_text(api_key, developer_text, prompt, max_completion_tokens=TOGETHER_MAX_COMPLETION_TOKENS, temperature=0.7):
+    return call_together_messages(
+        api_key,
+        [
+            {"role": "system", "content": developer_text},
+            {"role": "user", "content": prompt},
+        ],
+        max_completion_tokens=max_completion_tokens,
+        temperature=temperature,
+    )
+
+
 def call_groq(api_key, payload):
     prompt = build_agent_prompt(payload)
     history = payload.get("history", [])[-CHAT_HISTORY_LIMIT:]
@@ -1951,6 +2049,21 @@ def call_groq(api_key, payload):
 
     messages.append({"role": "user", "content": prompt})
     return call_groq_messages(api_key, messages, max_completion_tokens=GROQ_MAX_COMPLETION_TOKENS, temperature=0.2)
+
+
+def call_together(api_key, payload):
+    prompt = build_agent_prompt(payload)
+    history = payload.get("history", [])[-CHAT_HISTORY_LIMIT:]
+    messages = [{"role": "system", "content": system_prompt(payload)}]
+
+    for item in history:
+        role = "assistant" if item.get("role") == "assistant" else "user"
+        content = str(item.get("content", ""))[:1200]
+        if content:
+            messages.append({"role": role, "content": content})
+
+    messages.append({"role": "user", "content": prompt})
+    return call_together_messages(api_key, messages, max_completion_tokens=TOGETHER_MAX_COMPLETION_TOKENS, temperature=0.2)
 
 
 def call_groq_messages(api_key, messages, max_completion_tokens=GROQ_MAX_COMPLETION_TOKENS, temperature=0.2):
@@ -1981,7 +2094,39 @@ def call_groq_messages(api_key, messages, max_completion_tokens=GROQ_MAX_COMPLET
     return extract_groq_text(data)
 
 
+def call_together_messages(api_key, messages, max_completion_tokens=TOGETHER_MAX_COMPLETION_TOKENS, temperature=0.2):
+    request_body = json.dumps(
+        {
+            "model": get_together_model(),
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_completion_tokens,
+        },
+        ensure_ascii=False,
+    ).encode("utf-8")
+
+    request = urllib.request.Request(
+        TOGETHER_API_URL,
+        data=request_body,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": f"{APP_NAME}/1.0",
+        },
+        method="POST",
+    )
+
+    with urllib.request.urlopen(request, timeout=90) as response:
+        data = json.loads(response.read().decode("utf-8", errors="replace"))
+    return extract_chat_completion_text(data)
+
+
 def extract_groq_text(data):
+    return extract_chat_completion_text(data)
+
+
+def extract_chat_completion_text(data):
     choices = data.get("choices", [])
     if choices:
         message = choices[0].get("message", {})
@@ -2116,7 +2261,7 @@ def call_openai(api_key, payload):
         {
             "model": OPENAI_MODEL,
             "input": model_input,
-            "max_output_tokens": 800,
+            "max_output_tokens": LLM_MAX_COMPLETION_TOKENS,
         },
         ensure_ascii=False,
     ).encode("utf-8")
@@ -2280,6 +2425,7 @@ def system_prompt(payload=None):
         "For study decision questions, be concise and include a clear first choice and backup when useful. "
         "For casual chat, explanations or product discussion, answer normally and do not force a place recommendation. "
         "Do not invent live data that was not provided; if data is estimated, say so when relevant. "
+        "Use blank lines between distinct paragraphs and before or after lists so the answer is easy to scan. "
         "Do not output hidden reasoning or <think> tags. "
         f"Detected answer_mode={mode}; domain={domain}; response_language={response_language}."
     )

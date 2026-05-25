@@ -18,6 +18,7 @@ from navigator_core import (
     get_llm_provider,
     get_ollama_model,
     get_openai_model,
+    get_together_model,
     strip_reasoning_text,
 )
 
@@ -239,7 +240,7 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
                 self.stream_chat_from_mcp(payload)
                 return
 
-            self.write_json(mcp_call_tool("chat_complete", {"payload": payload}))
+            self.write_json(mcp_call_tool("agent_answer", {"payload": payload}))
         except MCPClientError as error:
             self.write_mcp_error(error)
         except Exception as error:
@@ -304,7 +305,10 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
         self.end_headers()
 
         try:
-            result = mcp_call_tool("chat_complete", {"payload": payload})
+            result = mcp_call_tool("agent_answer", {"payload": payload})
+            tools_used = result.get("toolsUsed", []) if isinstance(result, dict) else []
+            for tool_name in tools_used:
+                self.stream_json({"tool": tool_name})
             answer = strip_reasoning_text(str(result.get("answer", "") if isinstance(result, dict) else result)).strip()
             if not answer:
                 answer = "模型没有返回文本结果。"
@@ -316,7 +320,11 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
 
             model_name = result.get("model", current_llm_model()) if isinstance(result, dict) else current_llm_model()
             provider_name = result.get("provider", get_llm_provider()) if isinstance(result, dict) else get_llm_provider()
-            self.stream_json({"done": True, "model": model_name, "provider": provider_name})
+            final_event = {"done": True, "model": model_name, "provider": provider_name}
+            if isinstance(result, dict):
+                final_event["toolsUsed"] = tools_used
+                final_event["result"] = result
+            self.stream_json(final_event)
         except BrokenPipeError:
             return
         except MCPClientError as error:
@@ -387,6 +395,8 @@ def main():
         print(f"{APP_NAME} server running at http://localhost:{port} with OpenAI model {get_openai_model()}")
     elif provider == "groq":
         print(f"{APP_NAME} server running at http://localhost:{port} with Groq model {get_groq_model()}")
+    elif provider == "together":
+        print(f"{APP_NAME} server running at http://localhost:{port} with Together model {get_together_model()}")
     else:
         print(f"{APP_NAME} server running at http://localhost:{port} with Ollama model {get_ollama_model()}")
     try:

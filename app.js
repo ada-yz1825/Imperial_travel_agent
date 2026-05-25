@@ -150,10 +150,7 @@ const places = [
     lng: -0.176894,
     image: "./assets/library-images/abdus-salam-library.jpg",
     website: "https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/abdus-salam-library/",
-    distance: 0.2,
     transitMinutes: 4,
-    walkMinutes: 3,
-    crowd: 72,
     comfort: 88,
     budget: 100,
     tags: ["quiet", "wifi", "indoor", "24h", "science", "central"],
@@ -166,10 +163,7 @@ const places = [
     lng: -0.1752,
     image: "./assets/library-images/gostudy-student-space.jpg",
     website: "https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/gostudy/",
-    distance: 0.4,
     transitMinutes: 6,
-    walkMinutes: 5,
-    crowd: 54,
     comfort: 80,
     budget: 100,
     tags: ["wifi", "indoor", "study-space", "group", "low-cost"],
@@ -182,10 +176,7 @@ const places = [
     lng: -0.2197,
     image: "./assets/library-images/charing-cross-library.jpg",
     website: "https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/charing-cross-campus-library/",
-    distance: 6.2,
     transitMinutes: 28,
-    walkMinutes: 8,
-    crowd: 42,
     comfort: 78,
     budget: 100,
     tags: ["quiet", "wifi", "indoor", "medicine", "campus"],
@@ -198,10 +189,7 @@ const places = [
     lng: -0.1819,
     image: "./assets/library-images/chelsea-westminster-library.jpg",
     website: "https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/chelsea-and-westminster-campus-library/",
-    distance: 3.0,
     transitMinutes: 18,
-    walkMinutes: 9,
-    crowd: 36,
     comfort: 76,
     budget: 100,
     tags: ["quiet", "wifi", "indoor", "medicine", "calm"],
@@ -214,10 +202,7 @@ const places = [
     lng: -0.234721,
     image: "./assets/library-images/hammersmith-library.jpg",
     website: "https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/hammersmith-campus-library/",
-    distance: 6.6,
     transitMinutes: 31,
-    walkMinutes: 7,
-    crowd: 40,
     comfort: 79,
     budget: 100,
     tags: ["quiet", "wifi", "indoor", "medicine", "campus"],
@@ -230,10 +215,7 @@ const places = [
     lng: -0.1708,
     image: "./assets/library-images/royal-brompton-library.jpg",
     website: "https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/royal-brompton-campus-library/",
-    distance: 1.7,
     transitMinutes: 15,
-    walkMinutes: 14,
-    crowd: 34,
     comfort: 75,
     budget: 100,
     tags: ["quiet", "wifi", "indoor", "medicine", "calm"],
@@ -246,10 +228,7 @@ const places = [
     lng: -0.174169,
     image: "./assets/library-images/st-marys-library.jpg",
     website: "https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/st-marys-campus-library/",
-    distance: 5.2,
     transitMinutes: 27,
-    walkMinutes: 6,
-    crowd: 44,
     comfort: 78,
     budget: 100,
     tags: ["quiet", "wifi", "indoor", "medicine", "campus"],
@@ -262,10 +241,7 @@ const places = [
     lng: -0.6415,
     image: "./assets/library-images/silwood-park-library.jpg",
     website: "https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/silwood-park-campus-library/",
-    distance: 42.0,
     transitMinutes: 78,
-    walkMinutes: 5,
-    crowd: 18,
     comfort: 82,
     budget: 100,
     tags: ["quiet", "wifi", "indoor", "green", "calm"],
@@ -278,10 +254,7 @@ const places = [
     lng: -0.127675,
     image: "https://commons.wikimedia.org/wiki/Special:FilePath/British%20Library%20%2B%20St%20Pancras%207527-31hug.jpg?width=900",
     website: "https://www.bl.uk/visit",
-    distance: 6.8,
     transitMinutes: 26,
-    walkMinutes: 8,
-    crowd: 62,
     comfort: 86,
     budget: 100,
     tags: ["quiet", "wifi", "indoor", "public", "research", "central"],
@@ -294,10 +267,7 @@ const places = [
     lng: -0.134,
     image: "https://commons.wikimedia.org/wiki/Special:FilePath/View%20of%20the%20Wellcome%20library%2C%20ground%20floor%20Wellcome%20M0013088.jpg?width=900",
     website: "https://wellcomecollection.org/visit-us/the-library",
-    distance: 6.2,
     transitMinutes: 24,
-    walkMinutes: 6,
-    crowd: 48,
     comfort: 84,
     budget: 100,
     tags: ["quiet", "wifi", "indoor", "public", "medicine", "research"],
@@ -310,10 +280,7 @@ const places = [
     lng: -0.093919,
     image: "https://commons.wikimedia.org/wiki/Special:FilePath/Barbican%20library%20%287049041697%29.jpg?width=900",
     website: "https://www.cityoflondon.gov.uk/services/libraries/barbican-library",
-    distance: 8.2,
     transitMinutes: 32,
-    walkMinutes: 7,
-    crowd: 52,
     comfort: 78,
     budget: 100,
     tags: ["wifi", "indoor", "public", "study-space", "arts", "group"],
@@ -326,10 +293,7 @@ const places = [
     lng: -0.057958,
     image: "https://commons.wikimedia.org/wiki/Special:FilePath/Ideas%20Store%20Whitechapel%20%2832550032767%29.jpg?width=900",
     website: "https://ideastore.towerhamlets.gov.uk/digital-content/idea-stores/whitechapel",
-    distance: 9.8,
     transitMinutes: 38,
-    walkMinutes: 5,
-    crowd: 56,
     comfort: 76,
     budget: 100,
     tags: ["wifi", "indoor", "public", "study-space", "learning", "community"],
@@ -379,6 +343,13 @@ function apiBaseLabel() {
   return apiBase || window.location.origin;
 }
 
+function formatModelDisplayName(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const slashIndex = text.indexOf("/");
+  return slashIndex >= 0 ? text.slice(slashIndex + 1) || text : text;
+}
+
 function weatherApiUrl(start, apiKey) {
   const params = new URLSearchParams({
     key: apiKey,
@@ -411,7 +382,7 @@ let routeUpdatedAt = "Estimate";
 let integrationStatus = {
   llm: "Checking",
   google: "Checking",
-  tools: "Conversation",
+  tools: "Pending",
 };
 let startMap = null;
 let startMarker = null;
@@ -441,13 +412,14 @@ const STREAM_RENDER_CHUNK_SIZE = 8;
 const MIN_LOADING_MS = 1500;
 const GEOLOCATION_CACHE_KEY = "imperialNavigatorLastLocation";
 let answerRenderSessionId = 0;
+let loadingRenderSessionId = 0;
 
 function normalise(value, min, max) {
   return Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
 }
 
 function distanceBetweenKm(origin, destination) {
-  if (!origin?.lat || !origin?.lng || !destination?.lat || !destination?.lng) return destination.distance;
+  if (!origin?.lat || !origin?.lng || !destination?.lat || !destination?.lng) return 0;
   const earthRadiusKm = 6371;
   const toRadians = (degrees) => (degrees * Math.PI) / 180;
   const deltaLat = toRadians(destination.lat - origin.lat);
@@ -500,7 +472,6 @@ function scorePlace(place, context) {
   const adjustedTransit = Math.round(baseTransit + trafficImpact);
   const adjustedDistance = Number((Number.isFinite(liveRoute?.distanceKm) ? liveRoute.distanceKm : fallbackDistance).toFixed(2));
   const estimatedWalkMinutes = Math.max(1, Math.round((adjustedDistance / 5) * 60));
-  const adjustedCrowd = place.crowd;
   const walkingPenalty = estimatedWalkMinutes > context.walkTolerance ? (estimatedWalkMinutes - context.walkTolerance) * 1.8 : 0;
   const rainPenalty = 0;
   const matchedTags = profile.wanted.filter((tag) => place.tags.includes(tag));
@@ -509,7 +480,7 @@ function scorePlace(place, context) {
   const weights = getPreferenceWeights(profile);
 
   const speedScore = 100 - normalise(adjustedTransit, 10, 62);
-  const calmScore = 100 - adjustedCrowd;
+  const calmScore = place.tags.includes("quiet") ? 100 : 72;
   const comfortScore = place.comfort - rainPenalty - walkingPenalty + matchScore;
   const budgetScore = place.budget;
 
@@ -525,28 +496,23 @@ function scorePlace(place, context) {
     adjustedDistance,
     estimatedWalkMinutes,
     hasLiveRoute,
-    adjustedCrowd,
     total: Math.round(Math.max(0, Math.min(100, total))),
-    risk: getRisk(place, adjustedCrowd, adjustedTransit, rainPenalty, walkingPenalty),
-    decision: getDecision(place, context, adjustedTransit, adjustedCrowd, rainPenalty),
+    risk: getRisk(place, adjustedTransit, rainPenalty, walkingPenalty),
+    decision: getDecision(place, context, adjustedTransit, rainPenalty),
   };
 }
 
-function getRisk(place, crowd, transit, rainPenalty, walkingPenalty) {
+function getRisk(place, transit, rainPenalty, walkingPenalty) {
   if (rainPenalty > 10) return { label: "Weather risk", className: "warning" };
-  if (crowd > 70) return { label: "Likely busy", className: "caution" };
   if (transit > 48) return { label: "Long journey", className: "caution" };
   if (walkingPenalty > 0) return { label: "Over walk limit", className: "caution" };
   if (place.budget < 62) return { label: "Cost trade-off", className: "caution" };
   return { label: "Good fit", className: "ok" };
 }
 
-function getDecision(place, context, transit, crowd, rainPenalty) {
+function getDecision(place, context, transit, rainPenalty) {
   if (rainPenalty > 10 && place.tags.includes("outdoor")) {
     return "Less ideal in wet weather.";
-  }
-  if (crowd > 70) {
-    return "Strong match, likely busy.";
   }
   if (transit < 26 && place.comfort > 80) {
     return "Short trip, high comfort.";
@@ -841,41 +807,7 @@ async function refreshWeatherSummary(data, start) {
   const summaryKey = `${start?.lat?.toFixed?.(5) || ""},${start?.lng?.toFixed?.(5) || ""}:${data?.currentTime || ""}:${data?.weatherCondition?.description?.text || ""}`;
   if (summaryKey === weatherSummaryUpdatedForKey) return;
   weatherSummaryUpdatedForKey = summaryKey;
-
-  const requestId = ++weatherSummaryRequestId;
-  const prompt = [
-    "Write exactly one short English sentence describing the current weather for a student planning their day.",
-    "Keep it natural, friendly, and under 16 words.",
-    "Do not mention routes, Imperial, or any data labels.",
-    `Location: ${start?.label || "selected start point"}.`,
-    `Weekday: ${formatWeatherDay(data?.currentTime)}.`,
-    `Condition: ${data?.weatherCondition?.description?.text || "current conditions"}.`,
-    `Temperature: ${Number.isFinite(data?.temperature?.degrees) ? `${Math.round(data.temperature.degrees)}°C` : "unknown"}.`,
-    `Feels like: ${Number.isFinite(data?.feelsLikeTemperature?.degrees) ? `${Math.round(data.feelsLikeTemperature.degrees)}°C` : "unknown"}.`,
-    `Humidity: ${Number.isFinite(data?.relativeHumidity) ? `${Math.round(data.relativeHumidity)}%` : "unknown"}.`,
-    `Wind: ${formatWind(data?.wind)}.`,
-  ].join("\n");
-
-  try {
-    const response = await apiFetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        stream: false,
-        question: prompt,
-        history: [],
-        context: { task: "weather_summary" },
-      }),
-    });
-    const payload = await response.json();
-    if (requestId !== weatherSummaryRequestId) return;
-    if (!response.ok) throw new Error(payload.error || "Weather summary request failed");
-    const summary = sanitizeModelOutput(payload.answer || "");
-    $("weatherSummary").textContent = summary || buildWeatherFallbackSummary(data, start);
-  } catch (error) {
-    if (requestId !== weatherSummaryRequestId) return;
-    $("weatherSummary").textContent = buildWeatherFallbackSummary(data, start, error.message || "");
-  }
+  $("weatherSummary").textContent = buildWeatherFallbackSummary(data, start);
 }
 
 async function refreshWeatherForStart(start = getStartPoint(), force = false, options = {}) {
@@ -1025,15 +957,12 @@ async function answerQuestion(question, options = {}) {
   setAgentMode("Pending");
   renderLoadingAnswer("Understanding your request");
   const minLoadingReadyAt = Date.now() + MIN_LOADING_MS;
-  const intent = await classifyIntent(cleaned);
-  if (intent.mode === "navigation") {
-    setAgentMode("Navigation");
-    await answerNavigationQuestion(cleaned, { ...options, minLoadingReadyAt });
-    return;
-  }
+  setAsking(true);
+  const loadingSessionId = renderLoadingAnswer("Generating results");
+  const slowToolMessageTimer = window.setTimeout(() => {
+    updateLoadingAnswer(loadingSessionId, "Tools are being used, it may take a while.");
+  }, 8000);
 
-  const isStudyPlanning = isStudyPlanningQuestion(cleaned);
-  setAgentMode(isStudyPlanning ? "Study planning" : "Conversation");
   clearRoutePreview();
   applyQuestionIntent(cleaned);
   if (shouldUseRoutesForStudyQuestion(cleaned) || controls.scenario.value === "nearest") {
@@ -1042,8 +971,6 @@ async function answerQuestion(question, options = {}) {
   render();
 
   const context = getContext();
-  setAsking(true);
-  renderLoadingAnswer("Generating results");
 
   try {
     const response = await apiFetch("/api/chat", {
@@ -1052,6 +979,7 @@ async function answerQuestion(question, options = {}) {
       body: JSON.stringify({
         stream: true,
         question: cleaned,
+        contextStart: currentStartContext(),
         context: buildAgentContext(context),
         ranked: latestRanked.slice(0, 2).map(toModelPlace),
         history: chatHistory.slice(-6),
@@ -1068,14 +996,23 @@ async function answerQuestion(question, options = {}) {
     }
     await waitForMinimumLoading(minLoadingReadyAt);
     const contentType = response.headers.get("Content-Type") || "";
-    const answer = sanitizeModelOutput(contentType.includes("application/x-ndjson")
+    const agentResult = contentType.includes("application/x-ndjson")
       ? await readStreamingAnswer(response)
-      : await readJsonAnswer(response));
+      : await readJsonAnswer(response);
+    const answer = sanitizeModelOutput(agentResult.answer || "");
+    setAgentMode(formatAgentTools(agentResult.toolsUsed || []));
 
     chatHistory.push({ role: "assistant", content: answer });
     trimChatHistory();
-    latestNavigationData = null;
-    renderAgentActions();
+    if (hasNavigationResult(agentResult)) {
+      latestNavigationData = { ...agentResult, answer };
+      renderRoutePreview(latestNavigationData);
+      renderAgentActions(latestNavigationData, latestNavigationData.recommended);
+    } else {
+      latestNavigationData = null;
+      clearRoutePreview();
+      renderAgentActions();
+    }
     renderChatModalHistory();
     collapseHowItWorksAfterFirstAnswer();
   } catch (error) {
@@ -1094,86 +1031,7 @@ async function answerQuestion(question, options = {}) {
       renderChatModalHistory();
     }
   } finally {
-    setAsking(false);
-  }
-}
-
-async function classifyIntent(question) {
-  try {
-    const response = await apiFetch("/api/intent", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, contextStart: currentStartContext(), history: chatHistory.slice(-6) }),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Intent request failed");
-    return {
-      mode: data.mode === "navigation" ? "navigation" : "study",
-      confidence: data.confidence || 0,
-      reason: data.reason || "",
-    };
-  } catch (error) {
-    if (isNavigationQuery(question)) {
-      return { mode: "navigation", confidence: 0.65, reason: "local route fallback" };
-    }
-    return { mode: "study", confidence: 0, reason: error.message };
-  }
-}
-
-async function answerNavigationQuestion(question, options = {}) {
-  const minLoadingReadyAt = Number.isFinite(options.minLoadingReadyAt)
-    ? options.minLoadingReadyAt
-    : Date.now() + MIN_LOADING_MS;
-  setAsking(true);
-  renderLoadingAnswer("Checking Google Routes for accurate navigation");
-  const ROUTE_SUMMARY_DELAY_MS = 4000;
-
-  const routeSummaryTimer = window.setTimeout(() => {
-    renderLoadingAnswer("Generating routes to your destination");
-  }, ROUTE_SUMMARY_DELAY_MS);
-
-  try {
-    const response = await apiFetch("/api/navigate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: question, contextStart: currentStartContext(), history: chatHistory.slice(-6) }),
-    });
-    const data = await response.json();
-    window.clearTimeout(routeSummaryTimer);
-    if (!response.ok) {
-      const details = Array.isArray(data.details) && data.details.length
-        ? `\n${data.details.join("\n")}`
-        : "";
-      throw new Error(`${data.error || "Navigation request failed"}${details}`);
-    }
-
-    if (!options.skipUserPush) {
-      chatHistory.push({ role: "user", content: question });
-      renderChatModalHistory();
-    }
-    await waitForMinimumLoading(minLoadingReadyAt);
-    const answer = sanitizeModelOutput(data.answer);
-    chatHistory.push({ role: "assistant", content: answer });
-    trimChatHistory();
-    latestNavigationData = { ...data, answer };
-    await renderAnswerWithPacing(answer);
-    renderRoutePreview(data);
-    renderAgentActions(data, data.recommended);
-    renderChatModalHistory();
-    collapseHowItWorksAfterFirstAnswer();
-  } catch (error) {
-    await waitForMinimumLoading(minLoadingReadyAt);
-    cancelAnswerRender();
-    hideAgentActions();
-    clearRoutePreview();
-    $("agentAnswer").innerHTML = `
-      <strong>Navigation is not available yet</strong>
-      <br />${escapeHtml(error.message)}
-      <br />Check that <code>GOOGLE_MAPS_BROWSER_KEY</code> is set for the map display and <code>GOOGLE_MAPS_API_KEY</code> is set for Routes API.
-      <br />Current API endpoint: <code>${escapeHtml(apiBaseLabel())}</code>
-    `;
-  } finally {
-    window.clearTimeout(routeSummaryTimer);
+    window.clearTimeout(slowToolMessageTimer);
     setAsking(false);
   }
 }
@@ -1186,23 +1044,6 @@ function currentStartContext() {
     lng: start.lng,
     source: controls.startPoint.value === "mapSelection" ? "map" : "campus",
   };
-}
-
-function isNavigationQuery(question) {
-  const text = question.toLowerCase();
-  return (
-    /\bfrom\s+.+\s+to\s+.+/.test(text) ||
-    /从.+到.+/.test(question) ||
-    /从.+去.+/.test(question) ||
-    /.+到.+怎么走/.test(question) ||
-    text.includes("directions") ||
-    text.includes("navigate") ||
-    text.includes("route to") ||
-    question.includes("怎么去") ||
-    question.includes("怎么走") ||
-    question.includes("路线") ||
-    question.includes("导航")
-  );
 }
 
 function shouldUseRoutesForStudyQuestion(question) {
@@ -1223,34 +1064,12 @@ function shouldUseRoutesForStudyQuestion(question) {
   );
 }
 
-function isStudyPlanningQuestion(question) {
-  const text = question.toLowerCase();
-  return (
-    text.includes("study") ||
-    text.includes("library") ||
-    text.includes("campus") ||
-    text.includes("quiet") ||
-    text.includes("group") ||
-    text.includes("revise") ||
-    text.includes("revision") ||
-    text.includes("focus") ||
-    text.includes("seat") ||
-    text.includes("nearest") ||
-    text.includes("nearby") ||
-    text.includes("study space") ||
-    question.includes("图书馆") ||
-    question.includes("学习") ||
-    question.includes("自习") ||
-    question.includes("安静") ||
-    question.includes("附近")
-  );
-}
-
 async function readJsonAnswer(response) {
   const data = await response.json();
-  const answer = data.answer || "";
-  await renderAnswerWithPacing(answer);
-  return answer;
+  console.debug("[agent] raw JSON answer:", data.answer);
+  await renderAnswerWithPacing(data.answer || "");
+  const answer = sanitizeModelOutput(data.answer || "");
+  return { ...data, answer };
 }
 
 async function readStreamingAnswer(response) {
@@ -1258,6 +1077,8 @@ async function readStreamingAnswer(response) {
   const decoder = new TextDecoder();
   let buffer = "";
   let answer = "";
+  let finalResult = {};
+  const toolsUsed = [];
   const streamState = beginAnswerRender();
 
   while (true) {
@@ -1271,9 +1092,20 @@ async function readStreamingAnswer(response) {
       if (!line.trim()) continue;
       const event = JSON.parse(line);
       if (event.error) throw new Error(event.error);
+      if (event.tool) {
+        if (!toolsUsed.includes(event.tool)) toolsUsed.push(event.tool);
+        setAgentMode(formatAgentTools(toolsUsed));
+      }
       if (event.delta) {
         answer += event.delta;
         enqueueAnswerRender(streamState, event.delta);
+      }
+      if (event.done) {
+        finalResult = event.result || {};
+        const finalTools = event.toolsUsed || finalResult.toolsUsed || [];
+        finalTools.forEach((tool) => {
+          if (!toolsUsed.includes(tool)) toolsUsed.push(tool);
+        });
       }
     }
   }
@@ -1281,7 +1113,13 @@ async function readStreamingAnswer(response) {
   closeAnswerRender(streamState);
   await waitForAnswerRender(streamState);
 
-  return answer.trim();
+  console.debug("[agent] raw streaming answer:", answer);
+
+  return {
+    ...finalResult,
+    answer: answer.trim(),
+    toolsUsed: finalResult.toolsUsed || toolsUsed,
+  };
 }
 
 function beginAnswerRender() {
@@ -1343,8 +1181,7 @@ function stepAnswerRender(state) {
   const chunk = state.queue.slice(0, STREAM_RENDER_CHUNK_SIZE);
   state.queue = state.queue.slice(chunk.length);
   state.rendered += chunk;
-  const text = sanitizeModelOutput(state.rendered);
-  $("agentAnswer").innerHTML = text ? renderMarkdown(text) : "";
+  $("agentAnswer").innerHTML = state.rendered ? renderMarkdown(state.rendered) : "";
 
   const punctuationDelay = /[。！？!?\n]$/.test(chunk) ? 72 : 0;
   scheduleAnswerRenderStep(state, STREAM_RENDER_BASE_DELAY_MS + punctuationDelay);
@@ -1368,7 +1205,9 @@ async function renderAnswerWithPacing(answer) {
     return;
   }
   const state = beginAnswerRender();
-  enqueueAnswerRender(state, clean);
+  // Pass the raw model answer (not the sanitized 'clean') so we preserve
+  // original blank lines and spacing produced by the model while rendering.
+  enqueueAnswerRender(state, answer);
   closeAnswerRender(state);
   await waitForAnswerRender(state);
 }
@@ -1377,24 +1216,160 @@ function renderLoadingAnswer(message) {
   cancelAnswerRender();
   clearRoutePreview();
   hideAgentActions();
+  const loadingSessionId = ++loadingRenderSessionId;
   $("agentAnswer").innerHTML = `
-    <div class="thinking-panel" role="status" aria-live="polite">
+    <div class="thinking-panel" role="status" aria-live="polite" data-loading-session="${loadingSessionId}">
       <div class="thinking-header">
         <span class="thinking-orbit" aria-hidden="true"></span>
-        <strong>${escapeHtml(message)}</strong>
+        <strong class="thinking-message">${escapeHtml(message)}</strong>
         <span class="thinking-dots" aria-hidden="true"><span></span><span></span><span></span></span>
       </div>
       <div class="thinking-bar" aria-hidden="true"><span></span></div>
     </div>
   `;
+  return loadingSessionId;
+}
+
+function updateLoadingAnswer(loadingSessionId, message) {
+  const panel = $("agentAnswer")?.querySelector(".thinking-panel");
+  if (!panel || panel.dataset.loadingSession !== String(loadingSessionId)) return false;
+  const label = panel.querySelector(".thinking-message");
+  if (!label) return false;
+  label.textContent = message;
+  return true;
 }
 
 function renderMarkdown(value) {
-  return escapeHtml(sanitizeModelOutput(value))
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>')
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/^\s*[-*]\s+(.+)$/gm, "• $1")
-    .replace(/\n/g, "<br />");
+  const text = sanitizeModelOutput(value).replace(/\r\n/g, "\n");
+  if (!text) return "";
+
+  const lines = text.split("\n");
+  const output = [];
+  let paragraphLines = [];
+  let listItems = [];
+  let pendingBlankLineRuns = 0;
+
+  const renderInlineMarkdown = (input) =>
+    escapeHtml(String(input || ""))
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>')
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+
+  const isSeparatorLine = (line) => /^[-*_]{3,}$/.test(line) || /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*:?-{3,}:?\s*\|?\s*$/.test(line);
+  const isTableLine = (line) => line.includes("|") && !/^[\s|:-]+$/.test(line);
+  const parseTableRow = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+  const isValidTableSeparator = (line) => /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*:?-{3,}:?\s*\|?\s*$/.test(line);
+  const isBlankLine = (line) => !line.trim() || /^\s*(?:&nbsp;|&#160;|\u00a0)\s*$/i.test(line);
+
+  const flushParagraph = () => {
+    if (!paragraphLines.length) return;
+    const paragraph = paragraphLines.map((line) => renderInlineMarkdown(line.trim())).join("<br />");
+    output.push(`<p>${paragraph}</p>`);
+    paragraphLines = [];
+  };
+
+  const flushList = () => {
+    if (!listItems.length) return;
+    output.push(`<ul>${listItems.map((item) => `<li>${renderInlineMarkdown(item)}</li>`).join("")}</ul>`);
+    listItems = [];
+  };
+
+  const flushBlocks = () => {
+    flushParagraph();
+    flushList();
+  };
+
+  const flushBlankLineRuns = () => {
+    pendingBlankLineRuns = 0;
+  };
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const rawLine = lines[index];
+    const line = rawLine.trim();
+    if (isBlankLine(rawLine)) {
+      flushBlocks();
+      pendingBlankLineRuns += 1;
+      continue;
+    }
+
+    flushBlankLineRuns();
+
+    if (/^#{1,6}\s+/.test(line)) {
+      flushBlocks();
+      output.push(`<h4>${renderInlineMarkdown(line.replace(/^#{1,6}\s+/, ""))}</h4>`);
+      continue;
+    }
+
+    if (isSeparatorLine(line)) {
+      flushBlocks();
+      continue;
+    }
+
+    if (isTableLine(line)) {
+      flushBlocks();
+      const tableRows = [];
+      while (index < lines.length) {
+        const current = lines[index].trim();
+        if (!current) break;
+        if (isValidTableSeparator(current)) {
+          index += 1;
+          continue;
+        }
+        if (!isTableLine(current)) break;
+        tableRows.push(parseTableRow(current));
+        index += 1;
+      }
+      index -= 1;
+      const columnCount = tableRows[0]?.length || 0;
+      const hasConsistentColumns = columnCount >= 2 && tableRows.every((row) => row.length === columnCount);
+      if (tableRows.length < 2 || !hasConsistentColumns) {
+        paragraphLines.push(line);
+        continue;
+      }
+
+      const header = tableRows[0];
+      const bodyRows = tableRows.slice(1);
+      const headerHtml = header
+        ? `<thead><tr>${header.map((cell) => `<th>${renderInlineMarkdown(cell)}</th>`).join("")}</tr></thead>`
+        : "";
+      const bodyHtml = bodyRows.length
+        ? `<tbody>${bodyRows.map((row) => `<tr>${row.map((cell) => `<td>${renderInlineMarkdown(cell)}</td>`).join("")}</tr>`).join("")}</tbody>`
+        : "";
+      output.push(`
+        <div class="model-output-table-wrap">
+          <table class="model-output-table">${headerHtml}${bodyHtml}</table>
+        </div>
+      `.replace(/\s+\n/g, "").replace(/\n\s+/g, ""));
+      continue;
+    }
+
+    if (/^>\s?/.test(line)) {
+      flushBlocks();
+      output.push(`<blockquote>${renderInlineMarkdown(line.replace(/^>\s?/, ""))}</blockquote>`);
+      continue;
+    }
+
+    if (/^[-*]\s+/.test(line)) {
+      flushParagraph();
+      listItems.push(line.replace(/^[-*]\s+/, ""));
+      continue;
+    }
+
+    flushList();
+    paragraphLines.push(line);
+  }
+
+  flushBlocks();
+  flushBlankLineRuns();
+  return output.join("");
+}
+
+function renderChatMessageContent(role, content) {
+  const text = String(content || "").replace(/\r\n/g, "\n").trim();
+  if (!text) return "";
+  if (role === "user") {
+    return escapeHtml(text).replace(/\n+/g, "<br />");
+  }
+  return renderMarkdown(text);
 }
 
 function sanitizeModelOutput(value) {
@@ -1443,7 +1418,7 @@ function buildAgentContext(context) {
     },
     routeStatus,
     routeUpdatedAt,
-    dataNote: "Library names come from Imperial College London Library Services' Our libraries page. Travel time and distance use Google Routes API when available; crowding and comfort are prototype estimates.",
+    dataNote: "Library names come from Imperial College London Library Services' Our libraries page. Travel time and distance use Google Routes API when available; comfort is a prototype estimate.",
   };
 }
 
@@ -1451,14 +1426,14 @@ function toModelPlace(place) {
   return {
     name: place.name,
     type: place.type,
+    lat: place.lat,
+    lng: place.lng,
     score: place.total,
     decision: place.decision,
     risk: place.risk.label,
     transitMinutes: place.adjustedTransit,
     distanceKm: place.adjustedDistance,
     routeSource: place.hasLiveRoute ? "Google Routes API" : "prototype estimate",
-    walkMinutes: place.estimatedWalkMinutes,
-    crowd: place.adjustedCrowd,
     comfort: place.comfort,
     budget: place.budget,
     tags: place.tags.map(tagLabel),
@@ -1474,6 +1449,21 @@ function setAgentMode(mode) {
   integrationStatus.tools = mode;
   updateAgentModeSignal(mode);
   render();
+}
+
+function formatAgentTools(tools = []) {
+  const labels = {
+    navigate: "Navigation",
+    route_matrix: "Google Routes",
+    weather_current: "Weather",
+  };
+  const normalized = [...new Set((tools || []).filter(Boolean))];
+  if (!normalized.length) return "Pending";
+  return normalized.map((tool) => labels[tool] || tool).join(" + ");
+}
+
+function hasNavigationResult(result) {
+  return Boolean(result?.recommended || result?.mapRoute || result?.navigation?.recommended || result?.navigation?.mapRoute);
 }
 
 function updateAgentModeSignal(mode, animate = true) {
@@ -1758,7 +1748,7 @@ function renderChatModalHistory(isLoading = false) {
       if (shouldPop) nextAnimatedMessageKey = messageKey;
       const popClass = shouldPop ? " chat-message--pop" : "";
       const routeMapButton = shouldShowRouteMapButton(item, index) ? routeMapButtonHtml() : "";
-      return `<div class="chat-message ${role}${popClass}">${renderMarkdown(item.content)}${routeMapButton}<span class="chat-bubble-tail" aria-hidden="true"></span></div>`;
+      return `<div class="chat-message ${role}${popClass}">${renderChatMessageContent(role, item.content)}${routeMapButton}<span class="chat-bubble-tail" aria-hidden="true"></span></div>`;
     })
     .join("");
   const loading = isLoading
@@ -2154,9 +2144,9 @@ async function refreshIntegrationStatus() {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Health check failed");
     integrationStatus = {
-      llm: data.llmConnected ? data.llmStatus || "Connected" : data.llmStatus || "Offline",
+      llm: data.llmConnected ? formatModelDisplayName(data.llmStatus || "Connected") : formatModelDisplayName(data.llmStatus || "Offline"),
       google: integrationStatus.google,
-      tools: integrationStatus.tools || "Conversation",
+      tools: integrationStatus.tools || "Pending",
     };
     setGoogleMapsStatus(Boolean(data.googleMapsBrowserConfigured), Boolean(data.googleMapsConfigured));
     if (data.googleMapsBrowserKey) {
@@ -2171,7 +2161,7 @@ async function refreshIntegrationStatus() {
     integrationStatus = {
       llm: "Local API offline",
       google: "Local API offline",
-      tools: integrationStatus.tools || "Conversation",
+      tools: integrationStatus.tools || "Pending",
     };
     $("startMapStatus").innerHTML = `Local API not connected. Run <code>PORT=8001 python3 server.py</code>, or open this page with <code>?api=http://localhost:8002</code> if you use another port.`;
     renderWeatherError("Local API is not connected, so the browser key is not available.");
@@ -2295,7 +2285,7 @@ let pendingExternalHref = null;
 const TOOL_INFO_COPY = {
   routes: "Google Routes provides live travel time, distance, and route geometry when the agent enters navigation mode.\n\nIt supports route comparison across public transport, walking, cycling, and driving, and powers the route preview map.",
   llm: "The LLM handles conversation, intent understanding, and study-space recommendations. When route planning is needed, it uses Google Routes data rather than guessing travel time.",
-  agent: "When your question involves studying, libraries, campus facilities, or travel directions, the agent can switch mode automatically:\n\n• Study Planning — recommends Imperial study spaces based on your goal and selected starting point.\n• Navigation — calls Google Routes to calculate travel time, distance, and route geometry.\n• Conversation — answers general questions without using external route tools.\n\nThe mode updates automatically after each question.",
+  agent: "The model now chooses tools itself. The top signal shows the tool currently used by the model, or Pending when no tool is used.",
   weatherLocation: "Current-location weather requires browser location permission.",
   weatherDestination: "Please ask the agent for a navigation route first, then update weather at the parsed destination.",
 };
@@ -2357,13 +2347,13 @@ function showToolInfo(kind, overrideContent = "") {
 
 function renderAgentToolInfo() {
   return `
-    <p>When your question involves studying, libraries, campus facilities, or travel directions, the agent can switch mode automatically:</p>
+    <p>The model chooses tools itself while answering. If no tool is needed, the signal stays Pending.</p>
     <div class="tool-info-list">
-      <div class="tool-info-item"><strong>Study Planning</strong> recommends Imperial study spaces based on your goal and selected starting point.</div>
-      <div class="tool-info-item"><strong>Navigation</strong> calls Google Routes to calculate travel time, distance, and route geometry.</div>
-      <div class="tool-info-item"><strong>Conversation</strong> answers general questions without using external route tools.</div>
+      <div class="tool-info-item"><strong>Navigation</strong> uses Google Routes for live travel time, distance, and route geometry.</div>
+      <div class="tool-info-item"><strong>Google Routes</strong> compares travel estimates to study-space candidates.</div>
+      <div class="tool-info-item"><strong>Weather</strong> uses Google Weather API for current conditions at a start point or destination.</div>
     </div>
-    <p>The mode updates automatically after each question.</p>
+    <p>The signal updates to the model-selected tool after each answer starts streaming.</p>
   `;
 }
 

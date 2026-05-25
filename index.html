@@ -85,7 +85,7 @@
               <div class="agent-brand" aria-label="Agent tools status">
                 <div id="agentToolsTile" class="agent-tools info-tile" role="button" tabindex="0" aria-label="About agent mode or tools">
                   <span>Agent mode or tools</span>
-                  <strong id="airSignal">Conversation</strong>
+                  <strong id="airSignal">Pending</strong>
                 </div>
               </div>
             </div>
@@ -105,6 +105,7 @@
                 <button type="button" data-question="I want a quiet Imperial library for focused study. Where should I go?">Quiet study</button>
                 <button type="button" data-question="How do I get to White City Campus from my current selected start point?">Go to White City</button>
                 <button type="button" data-question="Which library is nearby from my selected starting point?">Nearby library</button>
+                <button type="button" data-question="What's the current weather at my selected start point right now?">Current weather</button>
               </div>
               <div class="agent-answer" id="agentAnswer">
                 Travel or study recommendations will appear here; if the query involves route planning, live route plans will also be shown here.
@@ -284,7 +285,7 @@
         <div class="confirm-modal-body">
           <div id="startupWaitText" class="tool-info-text">
             <p>Please allow about 30 seconds for system to start up.</p>
-            <p>Please check for API status later. When it is ready, the used LLM model will be displayed, and Google Routes will show "Keys ready".</p>
+            <p>When it is ready, the used LLM model will be displayed, and Google Routes will show "Keys ready".</p>
           </div>
         </div>
         <div class="confirm-modal-actions">

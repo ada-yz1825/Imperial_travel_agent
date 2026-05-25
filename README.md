@@ -34,7 +34,7 @@ Imperial Study Navigator is a web app for Imperial College London students. It c
 ## Requirements
 
 - Python 3
-- A Groq API key for the hosted LLM mode
+- A Together AI API key for the hosted LLM mode
 - Google Maps keys for the browser map and routing features
 
 The app is dependency-light and uses Python's built-in HTTP server stack. There is no npm install step.
@@ -52,11 +52,11 @@ PORT=8001 python3 server.py
 
 ## How It Works
 
-The frontend sends user questions to the backend. The backend classifies the request into one of three modes:
+The frontend sends user questions to the backend. The backend passes the request to a tool-calling model, which decides whether to answer directly or call MCP tools:
 
-- Conversation: normal chat.
-- Study planning: Imperial study-space recommendations.
-- Navigation: route planning when the user clearly asks for travel or directions.
+- Navigation: Google Routes route comparison and map geometry.
+- Weather: Google Weather API current conditions.
+- Study planning: Imperial study-space recommendations and route estimates.
 
 For navigation, the app uses the selected starting location when the user does not provide an explicit origin. It then compares travel modes, shows a route preview, can surface weather context when available, and can open Google Maps for the full route.
 
@@ -81,7 +81,7 @@ For navigation, the app uses the selected starting location when the user does n
 
 - Imperial study-space data is maintained locally in `server.py`.
 - Route times, distances, and route geometry come from Google Routes API.
-- The LLM is used for intent recognition, natural-language answers, and route summaries.
+- The LLM is used for tool selection, natural-language answers, and route summaries.
 - Crowding and comfort values are heuristic estimates rather than live occupancy data.
 
 ## Troubleshooting
@@ -102,6 +102,25 @@ If LLM answers are missing:
 - Confirm the LLM provider and API key are configured correctly.
 - If using Ollama mode, make sure Ollama is running.
 - Check `/api/health` for `llmConnected`.
+
+## Render Environment Variables
+
+For the current hosted setup, configure these in Render:
+
+```text
+LLM_PROVIDER=together
+TOGETHER_API_KEY=your_together_key
+TOGETHER_MODEL=Qwen2.5-7B-Instruct-Turbo
+TOGETHER_MAX_COMPLETION_TOKENS=2200
+TOGETHER_JSON_MAX_COMPLETION_TOKENS=2200
+TOGETHER_NAVIGATION_MAX_COMPLETION_TOKENS=2400
+AGENT_MAX_COMPLETION_TOKENS=2200
+AGENT_TOOL_CALL_LIMIT=7
+GOOGLE_MAPS_API_KEY=your_server_routes_key
+GOOGLE_MAPS_BROWSER_KEY=your_browser_maps_and_weather_key
+CORS_ALLOWED_ORIGINS=https://ada-yz1825.github.io
+GOOGLE_WEATHER_REFERER=https://ada-yz1825.github.io/
+```
 
 If route or intent behavior feels wrong:
 
