@@ -16,17 +16,6 @@ Imperial Study Navigator is an MCP-first web app for Imperial College London stu
 - Renders agent answers, route previews, and chat history in the browser.
 - Uses the same MCP tool layer for both chat answers and navigation flows.
 
-## Architecture
-
-```mermaid
-flowchart LR
-  UI[index.html + app.js]\nBrowser UI --> HTTP[server.py\nHTTP adapter]
-  HTTP --> MCP[mcp_server.py\nMCP tool server]
-  MCP --> Core[navigator_core.py\nLLM + Google tool logic]
-  Core --> Google[Google Routes / Weather APIs]
-  Core --> LLM[OpenAI / Groq / Together / Ollama]
-```
-
 ### Runtime Flow
 
 1. `app.js` sends user input to `server.py`.
