@@ -115,6 +115,13 @@ input {
   text-shadow: 0 3px 18px rgba(0, 0, 0, 0.35);
 }
 
+/* Hero-specific eyebrow: larger and Title Case (capitalize) */
+.hero-panel .eyebrow {
+  font-size: clamp(0.95rem, 1.8vw, 1.2rem);
+  text-transform: capitalize;
+  letter-spacing: 0;
+}
+
 .eyebrow {
   margin: 0 0 8px;
   color: inherit;
@@ -134,7 +141,7 @@ p {
 h1 {
   max-width: 760px;
   margin-bottom: 14px;
-  font-size: clamp(2.7rem, 6vw, 5.8rem);
+  font-size: clamp(2.7rem, 5vw, 5.7rem);
   line-height: 0.98;
   letter-spacing: 0;
 }
@@ -142,7 +149,7 @@ h1 {
 .hero-text {
   max-width: 650px;
   margin-bottom: 0;
-  font-size: 1.3rem;
+  font-size: 1em;
   line-height: 1.7;
 }
 
