@@ -1,129 +1,164 @@
 # Imperial Study Navigator
 
-Imperial Study Navigator is a web app for Imperial College London students. It combines a conversational agent, study-space recommendations, route planning, and a map-based starting point picker. The interface supports general chat, study planning, and navigation, and responds in the same language as the user where possible.
+Imperial Study Navigator is an MCP-first web app for Imperial College London students. The browser UI lets users ask natural-language questions about study spaces, routes, and weather, while the backend delegates the real work to MCP tools exposed by `mcp_server.py`.
 
 ## Demo
 
 - Live website: https://ada-yz1825.github.io/Imperial_travel_agent/
 
-- Fallback site: https://imperial-travel-agent-api.onrender.com/
+- Backend / fallback site: https://imperial-travel-agent-api.onrender.com/
 
-## What the Page Includes
+## What It Does
 
-- A hero section with the main product name and short description.
-- A starting-point picker using Google Maps plus campus presets.
-- Study-space recommendations based on study goal and walking comfort limit.
-- A conversational agent area for planning, exploration, and navigation.
-- Route preview support with transport mode switching.
-- Useful Imperial links.
-- A footer disclaimer stating this is an independent project.
+- Recommends study spaces based on study goal, comfort, and walking tolerance.
+- Compares travel modes and returns live route data from Google Routes.
+- Shows current weather for a start point or destination.
+- Renders agent answers, route previews, and chat history in the browser.
+- Uses the same MCP tool layer for both chat answers and navigation flows.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  UI[index.html + app.js]\nBrowser UI --> HTTP[server.py\nHTTP adapter]
+  HTTP --> MCP[mcp_server.py\nMCP tool server]
+  MCP --> Core[navigator_core.py\nLLM + Google tool logic]
+  Core --> Google[Google Routes / Weather APIs]
+  Core --> LLM[OpenAI / Groq / Together / Ollama]
+```
+
+### Runtime Flow
+
+1. `app.js` sends user input to `server.py`.
+2. `server.py` forwards the request to MCP tools.
+3. `mcp_server.py` decides whether to call `agent_answer`, `navigate`, `route_matrix`, `weather_current`, or another tool.
+4. `navigator_core.py` performs the actual LLM and Google API work.
+5. The frontend renders the response, tables, route preview, and chat history.
 
 ## Project Structure
 
 ```text
 .
-├── index.html          # Main page structure
-├── styles.css          # Layout, styling, and animations
-├── app.js              # Frontend logic and page behavior
-├── server.py           # Static server and API backend
-├── assets/             # Study-space and library images
-├── image.jpg           # Background image
-└── image_files/        # Logo and related image assets
+├── app.js              # Frontend logic, rendering, and API calls
+├── index.html          # Page structure
+├── styles.css          # Layout and visual styling
+├── server.py           # HTTP adapter that talks to MCP
+├── mcp_server.py       # MCP stdio/HTTP server and tool registry
+├── navigator_core.py   # Shared LLM, routing, weather, and parsing logic
+├── assets/             # Library images and other assets
+├── image.jpg           # Hero background image
+└── image_files/        # Additional legacy/static front-end assets
 ```
+
+## MCP Tools
+
+The MCP server currently exposes these tools:
+
+- `agent_answer` - tool-calling LLM entrypoint for browser chat
+- `chat_complete` - direct LLM completion helper
+- `classify_intent` - classifies study vs navigation intent
+- `route_matrix` - live Google Routes matrix for study-space comparisons
+- `navigate` - parses navigation requests and returns route JSON
+- `weather_current` - current weather lookup
+- `health` - backend and integration status
+
+## API Endpoints
+
+The HTTP adapter in `server.py` keeps the browser API small and stable:
+
+- `GET /api/health`
+- `POST /api/chat`
+- `POST /api/navigate`
+- `POST /api/routes`
+- `POST /api/intent`
 
 ## Requirements
 
 - Python 3
-- A Together AI API key for the hosted LLM mode
-- Google Maps keys for the browser map and routing features
+- A configured LLM provider: `openai`, `groq`, `together`, or `ollama`
+- Google Maps / Routes keys for routing features
+- Google Weather access if you want live weather results
 
-The app is dependency-light and uses Python's built-in HTTP server stack. There is no npm install step.
+The project does not use npm packages. The backend and MCP layers are implemented with the Python standard library plus your configured API providers.
 
-## Optional Local Mode
+## Getting Started
 
-To try a local model with Ollama:
+### 1. Configure environment variables
+
+At minimum, set the provider and the required keys for the features you want to use.
+
+Example for hosted use:
 
 ```bash
-ollama run qwen3
-export LLM_PROVIDER=ollama
-export OLLAMA_MODEL=qwen3
-PORT=8001 python3 server.py
+export LLM_PROVIDER=together
+export TOGETHER_API_KEY=your_together_key
+export GOOGLE_MAPS_API_KEY=your_routes_key
+export GOOGLE_MAPS_BROWSER_KEY=your_browser_maps_and_weather_key
 ```
 
-## How It Works
+### 2. Run the HTTP adapter
 
-The frontend sends user questions to the backend. The backend passes the request to a tool-calling model, which decides whether to answer directly or call MCP tools:
+```bash
+python3 server.py
+```
 
-- Navigation: Google Routes route comparison and map geometry.
-- Weather: Google Weather API current conditions.
-- Study planning: Imperial study-space recommendations and route estimates.
+By default, the server serves the frontend and talks to `mcp_server.py` over stdio. Open the app in the browser at the local server address shown in the terminal.
 
-For navigation, the app uses the selected starting location when the user does not provide an explicit origin. It then compares travel modes, shows a route preview, can surface weather context when available, and can open Google Maps for the full route.
+### 3. Optional: use a custom MCP server location
 
-## API Endpoints
+If you want `server.py` to talk to a remote MCP server instead of launching `mcp_server.py` locally, set one of these:
 
-- `GET /api/health`  
-  Returns LLM and Google Maps configuration status.
+```bash
+export IMPERIAL_MCP_SERVER_URL=http://localhost:8002/mcp
+# or
+export IMPERIAL_MCP_COMMAND="python3 /path/to/mcp_server.py"
+```
 
-- `POST /api/intent`  
-  Classifies a question as conversation, study planning, or navigation.
+## Optional Local LLM Mode
 
-- `POST /api/chat`  
-  Returns an LLM answer for general chat and study planning.
+To use Ollama locally:
 
-- `POST /api/navigate`  
-  Parses a navigation request, calls Google Routes, and returns the answer plus route data.
-
-- `POST /api/routes`  
-  Updates study-space recommendation route estimates.
+```bash
+export LLM_PROVIDER=ollama
+export OLLAMA_MODEL=qwen3
+ollama run qwen3
+python3 server.py
+```
 
 ## Current Data Sources
 
-- Imperial study-space data is maintained locally in `server.py`.
-- Route times, distances, and route geometry come from Google Routes API.
-- The LLM is used for tool selection, natural-language answers, and route summaries.
-- Crowding and comfort values are heuristic estimates rather than live occupancy data.
+- Imperial study-space metadata is defined locally in `navigator_core.py`.
+- Live route times, distances, and polyline geometry come from Google Routes.
+- Live weather comes from Google Weather.
+- Chat responses and tool selection come from the configured LLM provider.
+- Crowd/comfort scores are heuristic estimates, not live occupancy data.
 
 ## Troubleshooting
 
-If the page cannot connect:
+If the UI is blank or the backend is offline:
 
-- Check that the deployed backend is reachable.
-- Open `/api/health` to confirm status.
+- Check `GET /api/health`.
+- Make sure `server.py` is running.
+- Confirm your LLM provider and Google keys are configured.
 
-If navigation says Google Maps is unavailable:
+If route data is missing:
 
-- Confirm your environment variables include the required Google Maps keys.
-- Confirm Routes API is enabled in Google Cloud.
-- Restart `server.py` after changing environment variables.
+- Confirm `GOOGLE_MAPS_API_KEY` is set.
+- Confirm Google Routes API is enabled in Google Cloud.
+- Restart the server after changing environment variables.
 
-If LLM answers are missing:
+If weather data is missing:
 
-- Confirm the LLM provider and API key are configured correctly.
-- If using Ollama mode, make sure Ollama is running.
-- Check `/api/health` for `llmConnected`.
+- Confirm `GOOGLE_MAPS_BROWSER_KEY` is set.
+- Check the browser key referrer restrictions.
 
-## Render Environment Variables
+If you want to inspect the behavior:
 
-For the current hosted setup, configure these in Render:
+- Frontend rendering and request flow are in `app.js`.
+- The HTTP/MCP bridge is in `server.py`.
+- Tool definitions and tool-calling behavior are in `mcp_server.py`.
+- Shared LLM/Google logic is in `navigator_core.py`.
 
-```text
-LLM_PROVIDER=together
-TOGETHER_API_KEY=your_together_key
-TOGETHER_MODEL=Qwen2.5-7B-Instruct-Turbo
-TOGETHER_MAX_COMPLETION_TOKENS=2200
-TOGETHER_JSON_MAX_COMPLETION_TOKENS=2200
-TOGETHER_NAVIGATION_MAX_COMPLETION_TOKENS=2400
-AGENT_MAX_COMPLETION_TOKENS=2200
-AGENT_TOOL_CALL_LIMIT=7
-GOOGLE_MAPS_API_KEY=your_server_routes_key
-GOOGLE_MAPS_BROWSER_KEY=your_browser_maps_and_weather_key
-CORS_ALLOWED_ORIGINS=https://ada-yz1825.github.io
-GOOGLE_WEATHER_REFERER=https://ada-yz1825.github.io/
-```
+## Hosting Notes
 
-If route or intent behavior feels wrong:
-
-- Backend logic is in `server.py`.
-- Frontend request flow is in `app.js`.
-- UI copy and layout are in `index.html` and `styles.css`.
+For hosted deployments, keep the browser frontend pointed at the correct backend API base and set the same provider/Google variables in the deployment environment. The app is designed so the frontend stays thin while the MCP layer owns the actual reasoning, routing, and weather lookups.
