@@ -140,7 +140,7 @@ def agent_tool_schema_definitions():
             "type": "function",
             "function": {
                 "name": "route_matrix",
-                "description": "Get live Google Routes travel estimates from one start point to multiple study-space destinations.",
+                "description": "Get live Google Routes travel estimates from one start point to multiple destinations.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -189,10 +189,10 @@ def agent_tool_names():
 
 def agent_system_prompt():
     return (
-        "You are Imperial Study Navigator. The browser gives you the user's question, selected start point, "
-        "candidate study spaces, and recent chat history. Decide for yourself whether a tool is needed. "
+        "You are Imperial Travel Agent. The browser gives you the user's question, selected start point, "
+        "candidate destinations, and recent chat history. Decide for yourself whether a tool is needed. "
         "Use tools when they materially improve factual accuracy: navigate for routes/directions, route_matrix for live "
-        "travel estimates to study spaces, and weather_current for current weather. "
+        "travel estimates to destinations, and weather_current for current weather. "
         "You may call multiple tools in sequence, observe the result, then decide whether another tool is needed. "
         "If no tool is needed, answer directly. Match the user's language. Use at most one blank line between "
         "distinct paragraphs or before and after lists, and avoid consecutive blank lines. For short answers, prefer "
@@ -825,7 +825,7 @@ def mcp_tool_descriptions():
         },
         {
             "name": "route_matrix",
-            "description": "Call Google Routes matrix for study-space travel estimates.",
+            "description": "Call Google Routes matrix for travel estimates to destinations.",
             "inputSchema": {"type": "object", "properties": {"start": {"type": "object"}, "destinations": {"type": "array"}}},
         },
         {
@@ -855,7 +855,7 @@ def handle_mcp_request(message):
         return {
             "protocolVersion": "2024-11-05",
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "imperial-study-navigator-mcp", "version": "1.0"},
+            "serverInfo": {"name": "imperial-travel-agent-mcp", "version": "1.0"},
         }
     if method == "tools/list":
         return {"tools": mcp_tool_descriptions()}

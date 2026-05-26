@@ -14,7 +14,7 @@ except ImportError:
     ZoneInfo = None
 
 
-APP_NAME = "Imperial Study Navigator"
+APP_NAME = "Imperial Travel Agent"
 OPENAI_API_URL = "https://api.openai.com/v1/responses"
 GROQ_API_URL = os.environ.get("GROQ_API_URL", "https://api.groq.com/openai/v1/chat/completions")
 TOGETHER_API_URL = os.environ.get("TOGETHER_API_URL", "https://api.together.ai/v1/chat/completions")
@@ -1294,7 +1294,7 @@ def call_navigation_llm(query, route_request, routes, errors, study_options):
                 {
                     "role": "system",
                     "content": (
-                        "You are Imperial Study Navigator. You receive route tool results from Google Routes API. "
+                        "You are Imperial Travel Agent. You receive route tool results from Google Routes API. "
                         "Use the tool data as facts, compare available transport modes naturally, and give a practical recommendation. "
                         "Match the user's language exactly. Do not invent route data, line names, prices or step-by-step directions."
                     ),
@@ -1314,7 +1314,7 @@ def call_navigation_llm(query, route_request, routes, errors, study_options):
                 {
                     "role": "system",
                     "content": (
-                        "You are Imperial Study Navigator. You receive route tool results from Google Routes API. "
+                        "You are Imperial Travel Agent. You receive route tool results from Google Routes API. "
                         "Use the tool data as facts, compare available transport modes naturally, and give a practical recommendation. "
                         "Match the user's language exactly. Do not invent route data, line names, prices or step-by-step directions."
                     ),
@@ -1329,7 +1329,7 @@ def call_navigation_llm(query, route_request, routes, errors, study_options):
             {
                 "role": "system",
                 "content": (
-                    "You are Imperial Study Navigator. You receive route tool results from Google Routes API. "
+                    "You are Imperial Travel Agent. You receive route tool results from Google Routes API. "
                     "Use the tool data as facts, compare available transport modes naturally, and give a practical recommendation. "
                     "Match the user's language exactly. If the user writes Chinese, answer in Chinese. "
             "Do not sound like a rigid template. Keep the answer concise and warm. "
@@ -1893,7 +1893,7 @@ def call_openai_navigation(api_key, prompt):
                         {
                             "type": "input_text",
                             "text": (
-                                "You are Imperial Study Navigator. Use Google route tool results as facts. "
+                                "You are Imperial Travel Agent. Use Google route tool results as facts. "
                                 "Match the user's language and answer naturally."
                             ),
                         }
@@ -2460,7 +2460,7 @@ def system_prompt(payload=None):
     domain = detect_domain(question)
     response_language = detect_response_language(question)
     return (
-        "You are Imperial Study Navigator, a conversational study-space and route planning assistant for Imperial College London. "
+        "You are Imperial Travel Agent, a conversational travel and route planning assistant for Imperial College London. "
         "Match the user's language exactly: if the user writes in Chinese, answer in Chinese; otherwise answer in English. "
         "Do not mix languages unless the user does. "
         "By default, chat naturally and helpfully without forcing a report format. "
