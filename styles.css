@@ -1129,6 +1129,44 @@ body.route-map-fullscreen-open {
   display: grid;
   gap: 20px;
 }
+
+.startup-wait-panel {
+  width: min(520px, 96%);
+}
+
+.startup-wait-panel .confirm-modal-body {
+  display: grid;
+  place-items: center;
+}
+
+.startup-wait-visual {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 14px;
+}
+
+.startup-wait-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 5px solid rgba(39, 103, 168, 0.14);
+  border-top-color: var(--blue);
+  animation: startup-spin 1s linear infinite;
+}
+
+.startup-wait-panel .tool-info-text {
+  justify-items: center;
+  text-align: center;
+}
+
+.startup-wait-panel .tool-info-text p {
+  max-width: 36ch;
+}
+
+@keyframes startup-spin {
+  to { transform: rotate(360deg); }
+}
 .confirm-modal-body p,
 .tool-info-text {
   margin: 0;

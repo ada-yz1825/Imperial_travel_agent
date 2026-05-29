@@ -384,7 +384,9 @@ let routeStatus = "Routes on demand";
 let routeUpdatedAt = "Estimate";
 let integrationStatus = {
   llm: "Checking",
-  google: "Checking",
+  routes: "Checking",
+  maps: "Checking",
+  mcp: "Checking",
   tools: "Pending",
 };
 let startMap = null;
@@ -534,8 +536,10 @@ function render() {
 
   const context = getContext();
 
-  $("weatherSignal").textContent = integrationStatus.llm;
-  $("trafficSignal").textContent = integrationStatus.google;
+  $("llmSignal").textContent = integrationStatus.llm;
+  $("routesSignal").textContent = integrationStatus.routes;
+  const mapsSig = $("mapsSignal"); if (mapsSig) mapsSig.textContent = integrationStatus.maps;
+  const mcpSig = $("mcpSignal"); if (mcpSig) mcpSig.textContent = integrationStatus.mcp;
   updateAgentModeSignal(integrationStatus.tools, false);
   maybeShowStartupWaitModal();
 
@@ -599,14 +603,17 @@ function toggleHowItWorks() {
 
 function setGoogleMapsStatus(browserReady, routesReady) {
   routesKeyConfigured = routesReady;
-  if (browserReady && routesReady) {
-    integrationStatus.google = "Keys ready";
-  } else {
-    const browserStatus = browserReady ? "Browser key ready" : "Browser key missing";
-    const routesStatus = routesReady ? "Routes key ready" : "Routes key missing";
-    integrationStatus.google = `${browserStatus} · ${routesStatus}`;
-  }
-  $("trafficSignal").textContent = integrationStatus.google;
+  integrationStatus.maps = browserReady ? "Browser key ready" : "Browser key missing";
+  integrationStatus.routes = formatApiKeysStatus(browserReady, routesReady);
+  const routesEl = $("routesSignal"); if (routesEl) routesEl.textContent = integrationStatus.routes;
+  const mapsEl = $("mapsSignal"); if (mapsEl) mapsEl.textContent = integrationStatus.maps;
+}
+
+function formatApiKeysStatus(browserReady, routesReady) {
+  const missing = [];
+  if (!browserReady) missing.push("Browser key missing");
+  if (!routesReady) missing.push("Routes key missing");
+  return missing.length ? missing.join(" · ") : "Keys Ready";
 }
 
 function formatTemperature(value) {
@@ -1139,7 +1146,7 @@ async function refreshTflStatus() {
 }
 
 function isStartupCheckingState() {
-  return integrationStatus.llm === "Checking" && integrationStatus.google === "Checking";
+  return integrationStatus.llm === "Checking" && integrationStatus.routes === "Checking";
 }
 
 function maybeShowStartupWaitModal() {
@@ -2717,7 +2724,9 @@ async function refreshIntegrationStatus() {
     if (!response.ok) throw new Error(data.error || "Health check failed");
     integrationStatus = {
       llm: data.llmConnected ? formatModelDisplayName(data.llmStatus || "Connected") : formatModelDisplayName(data.llmStatus || "Offline"),
-      google: integrationStatus.google,
+      routes: integrationStatus.routes || "Checking",
+      maps: integrationStatus.maps || "Checking",
+      mcp: data.mcpConnected ? "Connected" : "Offline",
       tools: integrationStatus.tools || "Pending",
     };
     setGoogleMapsStatus(Boolean(data.googleMapsBrowserConfigured), Boolean(data.googleMapsConfigured));
@@ -2732,7 +2741,9 @@ async function refreshIntegrationStatus() {
   } catch (error) {
     integrationStatus = {
       llm: "Local API offline",
-      google: "Local API offline",
+      routes: "Local API offline",
+      maps: "Local API offline",
+      mcp: "Local API offline",
       tools: integrationStatus.tools || "Pending",
     };
     $("startMapStatus").innerHTML = `Local API not connected. Run <code>PORT=8001 python3 server.py</code>, or open this page with <code>?api=http://localhost:8002</code> if you use another port.`;
@@ -2881,7 +2892,7 @@ const agentToolsTile = $("agentToolsTile");
 let pendingExternalHref = null;
 
 const TOOL_INFO_COPY = {
-  routes: "Google Routes provides live travel time, distance, and route geometry when the agent enters navigation mode.\n\nIt supports route comparison across public transport, walking, cycling, and driving, and powers the route preview map.",
+  routes: "API Keys power the live-data layer of the app.\n\nThe Google Maps browser key loads the map, geocodes places, and enables weather lookups. The Google Routes key provides live travel time, distance, and route geometry when the agent enters navigation mode, and supports route comparison across public transport, walking, cycling, and driving.\n\nThe Weather API returns current conditions for your selected start point or navigation destination. The TfL Status API reports live London line disruptions so route previews and status cards can surface service issues. When all configured keys and services are available, this tile shows Keys Ready.",
   llm: "The LLM handles conversation, intent understanding, and study-space recommendations. When route planning is needed, it uses Google Routes data rather than guessing travel time.",
   agent: "The model now chooses tools itself. The top signal shows the tool currently used by the model, or Pending when no tool is used.",
   weatherLocation: "Current-location weather requires browser location permission.",
@@ -2969,7 +2980,6 @@ function hideToolInfo() {
 }
 
 const startupWaitModalEl = $("startupWaitModal");
-const closeStartupWaitBtn = $("closeStartupWait");
 
 function showStartupWaitModal() {
   if (!startupWaitModalEl) return;
@@ -3045,14 +3055,6 @@ if (closeToolInfoBtn) {
 if (toolInfoModalEl) {
   toolInfoModalEl.addEventListener("click", (event) => {
     if (event.target === toolInfoModalEl) hideToolInfo();
-  });
-}
-if (closeStartupWaitBtn) {
-  closeStartupWaitBtn.addEventListener("click", hideStartupWaitModal);
-}
-if (startupWaitModalEl) {
-  startupWaitModalEl.addEventListener("click", (event) => {
-    if (event.target === startupWaitModalEl) hideStartupWaitModal();
   });
 }
 
