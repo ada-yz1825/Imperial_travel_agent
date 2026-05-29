@@ -1,5 +1,9 @@
 import json
+import html
+import math
+import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -47,6 +51,20 @@ from navigator_core import (
 OPENAI_CHAT_COMPLETIONS_API_URL = "https://api.openai.com/v1/chat/completions"
 AGENT_TOOL_CALL_LIMIT = int(get_env_value("AGENT_TOOL_CALL_LIMIT") or "7")
 AGENT_MAX_COMPLETION_TOKENS = int(get_env_value("AGENT_MAX_COMPLETION_TOKENS") or str(LLM_MAX_COMPLETION_TOKENS))
+TFL_LINE_STATUS_MODES = "tube,overground,dlr,elizabeth-line,tram"
+TFL_LINE_STATUS_URL = f"https://api.tfl.gov.uk/line/mode/{TFL_LINE_STATUS_MODES}/status"
+TFL_STOP_POINT_MODES = "bus,tube,dlr,elizabeth-line,overground,tram,national-rail"
+TFL_STOP_POINT_TYPES = "NaptanMetroStation,NaptanRailStation,NaptanPublicBusCoachTram"
+
+
+def emit_mcp_progress(payload):
+    message = {
+        "jsonrpc": "2.0",
+        "method": "notifications/progress",
+        "params": payload,
+    }
+    sys.stdout.write(json.dumps(message, ensure_ascii=False) + "\n")
+    sys.stdout.flush()
 
 
 class MCPToolError(Exception):
@@ -91,10 +109,16 @@ def agent_observation_payload(name, result):
         }
         if result.get("details"):
             summary["details"] = result.get("details")
+        if result.get("lineStatuses"):
+            summary["lineStatuses"] = result.get("lineStatuses")
+        if result.get("lineStatusError"):
+            summary["lineStatusError"] = result.get("lineStatusError")
         return summary
     if name == "route_matrix" and isinstance(result, dict):
         return result
     if name == "weather_current" and isinstance(result, dict):
+        return result
+    if name == "tfl_status" and isinstance(result, dict):
         return result
     return result
 
@@ -102,7 +126,7 @@ def agent_observation_payload(name, result):
 def summarize_route_option(route):
     if not isinstance(route, dict):
         return route
-    return {
+    summary = {
         "mode": route.get("mode"),
         "modeLabel": route.get("modeLabel"),
         "durationMinutes": route.get("durationMinutes"),
@@ -110,10 +134,40 @@ def summarize_route_option(route):
         "description": route.get("description"),
         "condition": route.get("condition"),
     }
+    if route.get("transitLines"):
+        summary["transitLines"] = route.get("transitLines")
+    if route.get("transitSteps"):
+        summary["transitSteps"] = route.get("transitSteps")[:8]
+    return summary
 
 
 def agent_tool_schema_definitions():
     return [
+        {
+            "type": "function",
+            "function": {
+                "name": "web_search",
+                "description": "Search the web for encyclopedia-style or public factual questions, returning concise sourced snippets and links.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "The user's factual or encyclopedia-style search query.",
+                        },
+                        "language": {
+                            "type": "string",
+                            "description": "Preferred language code such as en or zh. Infer from the user's query when omitted.",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Maximum number of results to return, from 1 to 5.",
+                        },
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
         {
             "type": "function",
             "function": {
@@ -180,6 +234,23 @@ def agent_tool_schema_definitions():
                 },
             },
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "tfl_status",
+                "description": "Look up live TfL line status. Use after navigate when a transit route includes TfL line names, or when the user asks about delays/status.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "lines": {
+                            "type": "array",
+                            "description": "Optional TfL line names from navigate, such as Central line or Elizabeth line.",
+                            "items": {"type": "string"},
+                        }
+                    },
+                },
+            },
+        },
     ]
 
 
@@ -191,13 +262,20 @@ def agent_system_prompt():
     return (
         "You are Imperial Travel Agent. The browser gives you the user's question, selected start point, "
         "candidate destinations, and recent chat history. Decide for yourself whether a tool is needed. "
-        "Use tools when they materially improve factual accuracy: navigate for routes/directions, route_matrix for live "
-        "travel estimates to destinations, and weather_current for current weather. "
+        "Use tools when they materially improve factual accuracy: web_search for encyclopedia-style or public factual questions, "
+        "navigate for routes/directions, route_matrix for live travel estimates to destinations, weather_current for current weather, "
+        "and tfl_status for live London line disruption/status checks. "
         "You may call multiple tools in sequence, observe the result, then decide whether another tool is needed. "
+        "If navigate returns transitLines and the user asks for route advice, delay impact, or whether it is a good time to travel, "
+        "call tfl_status with the provided statusQuery values, or the shortName for bus routes, before the final answer. "
+        "Only mention specific line names, stops, and statuses that tools provide. "
+        "If navigate does not provide transitLines, say the route tool did not provide specific line details instead of guessing. "
+        "When using web_search, ground the answer in the returned sources and include a concise Markdown source link when useful. "
         "If no tool is needed, answer directly. Match the user's language. Use at most one blank line between "
         "distinct paragraphs or before and after lists, and avoid consecutive blank lines. For short answers, prefer "
         "no blank lines unless a section break is genuinely helpful. When comparing multiple transport modes, prefer "
         "a Markdown table with columns such as mode, time, distance, and note, instead of a plain paragraph list. "
+        "Do not insert empty Markdown table placeholder rows such as '| | |' between headings and content. "
         "Use a small number of light emoji when they improve readability or make the answer feel more lively, but do "
         "not overuse them. "
         "Do not reveal hidden reasoning, scratchpad, analysis, or <think> tags. Keep answers concise but useful."
@@ -310,7 +388,10 @@ def parse_tool_arguments(raw_arguments):
 
 def normalize_agent_tool_arguments(name, arguments, payload):
     normalized = dict(arguments or {})
-    if name == "navigate":
+    if name == "web_search":
+        normalized.setdefault("query", payload.get("question", ""))
+        normalized.setdefault("limit", 3)
+    elif name == "navigate":
         normalized.setdefault("query", payload.get("question", ""))
         normalized.setdefault("contextStart", payload.get("contextStart"))
         normalized.setdefault("history", payload.get("history", [])[-6:])
@@ -346,18 +427,67 @@ def normalize_agent_tool_arguments(name, arguments, payload):
                     "lng": context_start["lng"],
                 }
         normalized["location"] = location
+    elif name == "tfl_status":
+        lines = normalized.get("lines")
+        if isinstance(lines, str):
+            normalized["lines"] = [lines]
+        elif not isinstance(lines, list):
+            normalized["lines"] = []
     return normalized
 
 
 def execute_agent_tool(name, arguments, payload):
     arguments = normalize_agent_tool_arguments(name, arguments, payload)
+    if name == "web_search":
+        return mcp_tool_web_search(arguments)
     if name == "navigate":
         return mcp_tool_navigate(arguments)
     if name == "route_matrix":
         return mcp_tool_route_matrix(arguments)
     if name == "weather_current":
         return mcp_tool_weather_current(arguments)
+    if name == "tfl_status":
+        return mcp_tool_tfl_status(arguments)
     raise MCPToolError(f"Unknown agent tool: {name}", status=404, payload={"error": f"Unknown agent tool: {name}"})
+
+
+def status_queries_from_navigation(result):
+    if not isinstance(result, dict):
+        return []
+    recommended = result.get("recommended") or {}
+    queries = []
+    for line in recommended.get("transitLines") or []:
+        if not isinstance(line, dict):
+            continue
+        query = line.get("statusQuery") or line.get("shortName") or line.get("name")
+        if query and query not in queries:
+            queries.append(query)
+    return queries
+
+
+def maybe_attach_tfl_status(tool_result):
+    queries = status_queries_from_navigation(tool_result)
+    if not queries:
+        return None
+    emit_mcp_progress({"type": "tool", "name": "tfl_status", "status": "started"})
+    try:
+        tfl_result = mcp_tool_tfl_status({"lines": queries})
+        tool_result["lineStatuses"] = tfl_result
+        return {
+            "name": "tfl_status",
+            "arguments": {"lines": queries},
+            "status": "ok",
+            "_fullResult": tfl_result,
+            "result": agent_observation_payload("tfl_status", tfl_result),
+        }
+    except Exception as error:
+        tool_result["lineStatusError"] = str(error)
+        return {
+            "name": "tfl_status",
+            "arguments": {"lines": queries},
+            "status": "error",
+            "error": str(error),
+        }
 
 
 def extract_agent_result_fields(tool_calls):
@@ -374,7 +504,503 @@ def extract_agent_result_fields(tool_calls):
             result["navigation"] = payload
         elif item.get("name") == "weather_current":
             result["weather"] = payload
+        elif item.get("name") == "tfl_status":
+            result["tflStatus"] = payload
     return result
+
+
+def clean_search_text(value, limit=700):
+    text = html.unescape(str(value or ""))
+    text = " ".join(text.replace("\n", " ").split())
+    return text[:limit].rstrip()
+
+
+def infer_search_language(query, language=None):
+    code = str(language or "").strip().lower()
+    if code.startswith("zh"):
+        return "zh"
+    if code.startswith("en"):
+        return "en"
+    text = str(query or "")
+    return "zh" if any("\u4e00" <= char <= "\u9fff" for char in text) else "en"
+
+
+def wikipedia_search_url(query, language, limit):
+    params = urllib.parse.urlencode(
+        {
+            "action": "query",
+            "generator": "search",
+            "gsrsearch": query,
+            "gsrlimit": str(limit),
+            "prop": "extracts|info",
+            "exintro": "1",
+            "explaintext": "1",
+            "inprop": "url",
+            "format": "json",
+            "origin": "*",
+        }
+    )
+    return f"https://{language}.wikipedia.org/w/api.php?{params}"
+
+
+def duckduckgo_instant_url(query):
+    params = urllib.parse.urlencode(
+        {
+            "q": query,
+            "format": "json",
+            "no_redirect": "1",
+            "no_html": "1",
+            "skip_disambig": "1",
+        }
+    )
+    return f"https://api.duckduckgo.com/?{params}"
+
+
+def fetch_json_url(url, timeout=15):
+    request = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "application/json",
+            "User-Agent": f"{APP_NAME}/1.0",
+        },
+        method="GET",
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return json.loads(response.read().decode("utf-8", errors="replace"))
+
+
+def clean_tfl_text(value, limit=260):
+    text = " ".join(str(value or "").replace("\n", " ").split())
+    return text[:limit].rstrip()
+
+
+def tfl_status_url():
+    api_key = get_env_value("TFL_API_KEY") or get_env_value("TFL_APP_KEY")
+    if not api_key:
+        return TFL_LINE_STATUS_URL
+    separator = "&" if "?" in TFL_LINE_STATUS_URL else "?"
+    return f"{TFL_LINE_STATUS_URL}{separator}{urllib.parse.urlencode({'app_key': api_key})}"
+
+
+def with_tfl_api_key(url):
+    api_key = get_env_value("TFL_API_KEY") or get_env_value("TFL_APP_KEY")
+    if not api_key:
+        return url
+    separator = "&" if "?" in url else "?"
+    return f"{url}{separator}{urllib.parse.urlencode({'app_key': api_key})}"
+
+
+def tfl_line_status_by_ids_url(line_ids):
+    joined_ids = ",".join(urllib.parse.quote(str(line_id), safe="") for line_id in line_ids if str(line_id or "").strip())
+    url = f"https://api.tfl.gov.uk/Line/{joined_ids}/Status"
+    return with_tfl_api_key(url)
+
+
+def tfl_stop_point_nearby_url(lat, lng):
+    params = urllib.parse.urlencode(
+        {
+            "lat": f"{lat:.6f}",
+            "lon": f"{lng:.6f}",
+            "stopTypes": TFL_STOP_POINT_TYPES,
+            "radius": "160",
+        }
+    )
+    return with_tfl_api_key(f"https://api.tfl.gov.uk/StopPoint?{params}")
+
+
+def tfl_stop_point_search_url(query, modes=None):
+    params = urllib.parse.urlencode(
+        {
+            "modes": modes or TFL_STOP_POINT_MODES,
+            "includeHubs": "true",
+            "maxResults": "8",
+        }
+    )
+    return with_tfl_api_key(f"https://api.tfl.gov.uk/StopPoint/Search/{urllib.parse.quote(str(query or ''), safe='')}?{params}")
+
+
+def tfl_stop_point_by_id_url(stop_id):
+    return with_tfl_api_key(f"https://api.tfl.gov.uk/StopPoint/{urllib.parse.quote(str(stop_id), safe='')}")
+
+
+def normalize_tfl_line(line):
+    statuses = line.get("lineStatuses") if isinstance(line, dict) else []
+    statuses = statuses if isinstance(statuses, list) else []
+    status = min(statuses, key=lambda item: item.get("statusSeverity", 10)) if statuses else {}
+    severity = status.get("statusSeverity", 10)
+    reason = clean_tfl_text(status.get("reason") or status.get("disruption", {}).get("description"))
+    return {
+        "id": line.get("id"),
+        "name": line.get("name"),
+        "mode": line.get("modeName"),
+        "status": status.get("statusSeverityDescription") or "Status unknown",
+        "severity": severity,
+        "reason": reason,
+    }
+
+
+def fetch_tfl_line_status():
+    data = fetch_json_url(tfl_status_url(), timeout=20)
+    lines = [normalize_tfl_line(line) for line in data if isinstance(line, dict)]
+    lines.sort(key=lambda item: (item.get("mode") or "", item.get("name") or ""))
+    disrupted = [line for line in lines if line.get("severity", 10) < 10]
+    return {
+        "provider": "tfl_unified_api",
+        "updatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "summary": {
+            "total": len(lines),
+            "disrupted": len(disrupted),
+            "good": len(lines) - len(disrupted),
+        },
+        "lines": lines,
+    }
+
+
+def fetch_tfl_line_status_by_ids(line_ids):
+    if not line_ids:
+        return []
+    data = fetch_json_url(tfl_line_status_by_ids_url(line_ids), timeout=20)
+    return [normalize_tfl_line(line) for line in data if isinstance(line, dict)]
+
+
+def tfl_stop_candidates(data):
+    if isinstance(data, list):
+        return [item for item in data if isinstance(item, dict)]
+    if not isinstance(data, dict):
+        return []
+    for key in ("stopPoints", "matches", "children"):
+        value = data.get(key)
+        if isinstance(value, list):
+            return [item for item in value if isinstance(item, dict)]
+    return [data] if data.get("id") or data.get("naptanId") else []
+
+
+def tfl_stop_lat_lng(stop):
+    lat = stop.get("lat") or stop.get("latitude")
+    lng = stop.get("lon") or stop.get("lng") or stop.get("longitude")
+    if isinstance(lat, (int, float)) and isinstance(lng, (int, float)):
+        return {"lat": lat, "lng": lng}
+    return None
+
+
+def distance_meters(first, second):
+    if not first or not second:
+        return 999999
+    lat1 = math.radians(first["lat"])
+    lat2 = math.radians(second["lat"])
+    delta_lat = math.radians(second["lat"] - first["lat"])
+    delta_lng = math.radians(second["lng"] - first["lng"])
+    a = math.sin(delta_lat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(delta_lng / 2) ** 2
+    return 6371000 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def normalize_stop_line(line, fallback_mode=""):
+    if isinstance(line, str):
+        return {"id": line, "name": line, "mode": fallback_mode}
+    if not isinstance(line, dict):
+        return None
+    name = line.get("name") or line.get("lineName") or line.get("id")
+    if not name:
+        return None
+    return {
+        "id": line.get("id") or line.get("lineId") or name,
+        "name": name,
+        "mode": line.get("modeName") or line.get("mode") or fallback_mode,
+    }
+
+
+def normalize_stop_modes(stop):
+    modes = []
+    for mode in stop.get("modes") or []:
+        if mode and mode not in modes:
+            modes.append(mode)
+    for group in stop.get("lineModeGroups") or []:
+        mode = group.get("modeName") if isinstance(group, dict) else None
+        if mode and mode not in modes:
+            modes.append(mode)
+    return modes
+
+
+def normalize_stop_lines(stop):
+    lines = []
+    seen = set()
+    for line in stop.get("lines") or []:
+        normalized = normalize_stop_line(line)
+        if not normalized:
+            continue
+        key = normalized.get("id") or normalized.get("name")
+        if key in seen:
+            continue
+        seen.add(key)
+        lines.append(normalized)
+    for group in stop.get("lineModeGroups") or []:
+        if not isinstance(group, dict):
+            continue
+        mode = group.get("modeName") or ""
+        for line_id in group.get("lineIdentifier") or []:
+            normalized = normalize_stop_line(str(line_id), fallback_mode=mode)
+            key = normalized.get("id")
+            if key in seen:
+                continue
+            seen.add(key)
+            lines.append(normalized)
+    return lines
+
+
+def normalize_tfl_stop_point(stop, source):
+    return {
+        "id": stop.get("id") or stop.get("naptanId") or stop.get("icsId"),
+        "name": clean_tfl_text(stop.get("commonName") or stop.get("name"), limit=140),
+        "modes": normalize_stop_modes(stop),
+        "lines": normalize_stop_lines(stop),
+        "metadataSource": source,
+    }
+
+
+def best_tfl_stop_candidate(candidates, location):
+    if not candidates:
+        return None
+    if not location:
+        return candidates[0]
+    return min(candidates, key=lambda item: distance_meters(location, tfl_stop_lat_lng(item)))
+
+
+def preferred_tfl_modes_for_stop(stop):
+    vehicle = str(stop.get("vehicleType") or "").upper()
+    route_lines = stop.get("routeLines") if isinstance(stop.get("routeLines"), list) else []
+    route_text = " ".join(
+        str(line.get("name") or line.get("shortName") or line.get("statusQuery") or "")
+        for line in route_lines
+        if isinstance(line, dict)
+    ).lower()
+    if vehicle == "BUS" or re.search(r"\b\d+[a-z]?\b", route_text):
+        return {"bus"}
+    if vehicle in {"SUBWAY", "METRO_RAIL", "RAIL", "HEAVY_RAIL", "COMMUTER_TRAIN", "TRAIN"}:
+        return {"tube", "elizabeth-line", "overground", "dlr", "tram", "national-rail"}
+    if "elizabeth" in route_text:
+        return {"elizabeth-line", "tube", "overground", "national-rail"}
+    if any(name in route_text for name in ("district", "circle", "jubilee", "central", "victoria", "piccadilly", "northern", "bakerloo", "metropolitan")):
+        return {"tube", "elizabeth-line", "overground", "dlr", "national-rail"}
+    return set()
+
+
+def stop_matches_preferred_modes(stop, preferred_modes):
+    if not preferred_modes:
+        return True
+    modes = set(normalize_stop_modes(stop))
+    if modes & preferred_modes:
+        return True
+    for line in normalize_stop_lines(stop):
+        if line.get("mode") in preferred_modes:
+            return True
+    return False
+
+
+def filter_stop_candidates_for_route(candidates, preferred_modes):
+    if not preferred_modes:
+        return candidates
+    filtered = [candidate for candidate in candidates if stop_matches_preferred_modes(candidate, preferred_modes)]
+    return filtered or candidates
+
+
+def fetch_tfl_stop_by_id(stop_id):
+    if not stop_id:
+        return None
+    try:
+        data = fetch_json_url(tfl_stop_point_by_id_url(stop_id), timeout=12)
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def fetch_tfl_stop_metadata(stop, cache):
+    name = stop.get("name")
+    location = stop.get("location") or {}
+    preferred_modes = preferred_tfl_modes_for_stop(stop)
+    cache_key = f"{name}:{round(location.get('lat', 0), 5)}:{round(location.get('lng', 0), 5)}:{','.join(sorted(preferred_modes))}"
+    if cache_key in cache:
+        return cache[cache_key]
+
+    candidates = []
+    source = ""
+    try:
+        if isinstance(location.get("lat"), (int, float)) and isinstance(location.get("lng"), (int, float)):
+            candidates = tfl_stop_candidates(fetch_json_url(tfl_stop_point_nearby_url(location["lat"], location["lng"]), timeout=12))
+            source = "tfl_stoppoint_nearby"
+            candidates = filter_stop_candidates_for_route(candidates, preferred_modes)
+        if not candidates and name:
+            search_modes = ",".join(sorted(preferred_modes)) if preferred_modes else None
+            candidates = tfl_stop_candidates(fetch_json_url(tfl_stop_point_search_url(name, modes=search_modes), timeout=12))
+            source = "tfl_stoppoint_search"
+            candidates = filter_stop_candidates_for_route(candidates, preferred_modes)
+    except Exception:
+        cache[cache_key] = None
+        return None
+
+    candidate = best_tfl_stop_candidate(candidates, location)
+    if not candidate:
+        cache[cache_key] = None
+        return None
+    if not candidate.get("lines") and (candidate.get("id") or candidate.get("naptanId")):
+        detailed = fetch_tfl_stop_by_id(candidate.get("id") or candidate.get("naptanId"))
+        if detailed:
+            candidate = detailed
+            source = "tfl_stoppoint_detail"
+    metadata = normalize_tfl_stop_point(candidate, source)
+    cache[cache_key] = metadata
+    return metadata
+
+
+def enrich_route_stop_metadata(route, cache=None):
+    stops = route.get("routeStops") if isinstance(route, dict) else None
+    if not isinstance(stops, list) or not stops:
+        return
+    cache = cache if isinstance(cache, dict) else {}
+    for stop in stops[:10]:
+        metadata = fetch_tfl_stop_metadata(stop, cache)
+        if not metadata:
+            continue
+        stop["servedModes"] = metadata.get("modes", [])
+        stop["servedLines"] = metadata.get("lines", [])
+        stop["metadataSource"] = metadata.get("metadataSource")
+        stop["tflStopId"] = metadata.get("id")
+        if metadata.get("name"):
+            stop["tflName"] = metadata.get("name")
+
+
+def canonical_tfl_name(value):
+    text = html.unescape(str(value or "")).lower()
+    text = text.replace("&", " and ")
+    text = re.sub(r"\b(line|london|underground|tube|rail|service)\b", " ", text)
+    return re.sub(r"[^a-z0-9]+", "", text)
+
+
+def tfl_line_aliases(line):
+    aliases = {canonical_tfl_name(line.get("id")), canonical_tfl_name(line.get("name"))}
+    name = str(line.get("name") or "")
+    aliases.add(canonical_tfl_name(name.replace("Line", "")))
+    aliases.add(canonical_tfl_name(f"{name} line"))
+    return {alias for alias in aliases if alias}
+
+
+def filter_tfl_lines(lines, requested_lines):
+    requested = [canonical_tfl_name(item) for item in requested_lines or [] if str(item or "").strip()]
+    requested = [item for item in requested if item]
+    if not requested:
+        return lines
+    matched = []
+    for line in lines:
+        aliases = tfl_line_aliases(line)
+        if any(query in aliases or query == canonical_tfl_name(line.get("name")) for query in requested):
+            matched.append(line)
+    return matched
+
+
+def tfl_id_candidates(value):
+    text = html.unescape(str(value or "")).strip().lower()
+    text = re.sub(r"\b(line|london|underground|tube|rail|service)\b", " ", text)
+    text = " ".join(text.replace("&", " and ").split())
+    candidates = {text}
+    candidates.add(text.replace(" and ", "-"))
+    candidates.add(text.replace(" ", "-"))
+    candidates.add(re.sub(r"[^a-z0-9-]+", "", text))
+    candidates.add(canonical_tfl_name(value))
+    return [candidate for candidate in candidates if candidate]
+
+
+def merge_tfl_lines(primary, extra):
+    merged = []
+    seen = set()
+    for line in list(primary or []) + list(extra or []):
+        key = line.get("id") or canonical_tfl_name(line.get("name"))
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        merged.append(line)
+    return merged
+
+
+def mcp_tool_tfl_status(arguments):
+    requested_lines = (arguments or {}).get("lines") or []
+    if isinstance(requested_lines, str):
+        requested_lines = [requested_lines]
+    try:
+        payload = fetch_tfl_line_status()
+    except urllib.error.HTTPError as error:
+        detail = read_http_error(error)
+        raise MCPToolError(f"TfL status request failed: {detail}", status=error.code, payload={"error": f"TfL status request failed: {detail}"})
+    except Exception as error:
+        raise MCPToolError(f"TfL status unavailable: {error}", status=503, payload={"error": f"TfL status unavailable: {error}"})
+
+    lines = filter_tfl_lines(payload.get("lines", []), requested_lines)
+    if requested_lines:
+        missing = []
+        matched_aliases = set()
+        for line in lines:
+            matched_aliases.update(tfl_line_aliases(line))
+        for requested in requested_lines:
+            if canonical_tfl_name(requested) not in matched_aliases:
+                missing.extend(tfl_id_candidates(requested))
+        if missing:
+            try:
+                lines = merge_tfl_lines(lines, fetch_tfl_line_status_by_ids(missing))
+            except Exception:
+                pass
+    disrupted = [line for line in lines if line.get("severity", 10) < 10]
+    return {
+        "provider": payload.get("provider"),
+        "updatedAt": payload.get("updatedAt"),
+        "requestedLines": requested_lines,
+        "summary": {
+            "total": len(lines),
+            "disrupted": len(disrupted),
+            "good": len(lines) - len(disrupted),
+        },
+        "lines": lines,
+        "note": "" if lines else "No matching TfL lines were found for the requested names.",
+    }
+
+
+def mcp_tool_web_search(arguments):
+    query = str((arguments or {}).get("query") or "").strip()
+    if not query:
+        raise MCPToolError("web_search requires a query.", status=400, payload={"error": "web_search requires a query."})
+
+    limit = max(1, min(5, int((arguments or {}).get("limit") or 3)))
+    language = infer_search_language(query, (arguments or {}).get("language"))
+    results = []
+
+    try:
+        data = fetch_json_url(wikipedia_search_url(query, language, limit), timeout=15)
+        pages = (data.get("query") or {}).get("pages") or {}
+        ordered_pages = sorted(pages.values(), key=lambda item: item.get("index", 9999))
+        for page in ordered_pages:
+            title = clean_search_text(page.get("title"), limit=160)
+            extract = clean_search_text(page.get("extract"), limit=650)
+            url = page.get("fullurl") or f"https://{language}.wikipedia.org/wiki/{urllib.parse.quote(title.replace(' ', '_'))}"
+            if title and (extract or url):
+                results.append({"title": title, "url": url, "snippet": extract, "source": "Wikipedia"})
+    except Exception:
+        results = []
+
+    if not results:
+        try:
+            data = fetch_json_url(duckduckgo_instant_url(query), timeout=15)
+            title = clean_search_text(data.get("Heading") or query, limit=160)
+            snippet = clean_search_text(data.get("AbstractText") or data.get("Definition"), limit=650)
+            url = data.get("AbstractURL") or data.get("DefinitionURL")
+            if title and (snippet or url):
+                results.append({"title": title, "url": url, "snippet": snippet, "source": "DuckDuckGo"})
+        except Exception:
+            results = []
+
+    return {
+        "query": query,
+        "language": language,
+        "provider": "wikipedia_duckduckgo",
+        "results": results,
+        "note": "" if results else "No web search results were found for this query.",
+    }
 
 
 def public_tool_trace(tool_trace):
@@ -451,7 +1077,9 @@ def mcp_tool_agent_answer(arguments):
                 try:
                     if name not in agent_tool_names():
                         raise MCPToolError(f"Tool is not available to the agent: {name}", status=404)
+                    emit_mcp_progress({"type": "tool", "name": name, "status": "started"})
                     tool_result = execute_agent_tool(name, parsed_arguments, payload)
+                    extra_trace_item = maybe_attach_tfl_status(tool_result) if name == "navigate" else None
                     trace_item["_fullResult"] = tool_result
                     trace_item["result"] = agent_observation_payload(name, tool_result)
                     messages.append(
@@ -463,6 +1091,7 @@ def mcp_tool_agent_answer(arguments):
                         }
                     )
                 except Exception as error:
+                    extra_trace_item = None
                     trace_item["status"] = "error"
                     trace_item["error"] = str(error)
                     messages.append(
@@ -474,6 +1103,8 @@ def mcp_tool_agent_answer(arguments):
                         }
                     )
                 tool_trace.append(trace_item)
+                if extra_trace_item:
+                    tool_trace.append(extra_trace_item)
 
         final = mcp_tool_chat_complete({"payload": payload})
         answer = final.get("answer", "") if isinstance(final, dict) else str(final or "")
@@ -507,7 +1138,7 @@ def mcp_tool_health(arguments):
         "googleMapsBrowserConfigured": bool(get_google_maps_browser_key()),
         "googleMapsBrowserKey": get_google_maps_browser_key(),
         "mcpConnected": True,
-        "mcpTools": ["agent_answer", "chat_complete", "classify_intent", "route_matrix", "navigate", "weather_current"],
+        "mcpTools": ["agent_answer", "chat_complete", "classify_intent", "web_search", "route_matrix", "navigate", "weather_current", "tfl_status"],
     }
 
 
@@ -769,8 +1400,10 @@ def mcp_tool_navigate(arguments):
             route_options.sort(key=lambda item: (0 if item["mode"] == requested_mode else 1, item["durationMinutes"]))
         else:
             route_options.sort(key=lambda item: item["durationMinutes"])
+        stop_metadata_cache = {}
         for route in route_options:
             attach_route_geometry(api_key, route_request, route)
+            enrich_route_stop_metadata(route, stop_metadata_cache)
         answer = "" if agent_tool_mode else build_navigation_answer(query, route_request, route_options, route_errors)
         return {
             "answer": answer,
@@ -795,9 +1428,11 @@ def mcp_tool_registry():
         "health": mcp_tool_health,
         "chat_complete": mcp_tool_chat_complete,
         "classify_intent": mcp_tool_classify_intent,
+        "web_search": mcp_tool_web_search,
         "route_matrix": mcp_tool_route_matrix,
         "navigate": mcp_tool_navigate,
         "weather_current": mcp_tool_weather_current,
+        "tfl_status": mcp_tool_tfl_status,
     }
 
 
@@ -824,6 +1459,19 @@ def mcp_tool_descriptions():
             "inputSchema": {"type": "object", "properties": {"question": {"type": "string"}}},
         },
         {
+            "name": "web_search",
+            "description": "Search Wikipedia and web instant-answer sources for factual or encyclopedia-style questions.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "language": {"type": "string"},
+                    "limit": {"type": "integer"},
+                },
+                "required": ["query"],
+            },
+        },
+        {
             "name": "route_matrix",
             "description": "Call Google Routes matrix for travel estimates to destinations.",
             "inputSchema": {"type": "object", "properties": {"start": {"type": "object"}, "destinations": {"type": "array"}}},
@@ -837,6 +1485,14 @@ def mcp_tool_descriptions():
             "name": "weather_current",
             "description": "Call Google Weather API for current conditions at a coordinate or named place.",
             "inputSchema": {"type": "object", "properties": {"location": {"type": "object"}}},
+        },
+        {
+            "name": "tfl_status",
+            "description": "Call TfL Unified API for live line status. Optionally filter by line names.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"lines": {"type": "array", "items": {"type": "string"}}},
+            },
         },
     ]
 

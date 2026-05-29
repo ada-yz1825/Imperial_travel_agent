@@ -414,6 +414,274 @@ def call_google_matrix_route(api_key, origin, destination, mode, departure_time)
     }
 
 
+def clean_route_text(value, limit=180):
+    text = " ".join(str(value or "").replace("\n", " ").split())
+    return text[:limit].rstrip()
+
+
+def localized_text(value):
+    if isinstance(value, dict):
+        return value.get("text") or value.get("localizedText") or ""
+    return ""
+
+
+def transit_stop_name(stop):
+    if not isinstance(stop, dict):
+        return ""
+    return clean_route_text(stop.get("name") or stop.get("stopName") or stop.get("displayName"), limit=120)
+
+
+def transit_stop_lat_lng(stop):
+    if not isinstance(stop, dict):
+        return None
+    location = stop.get("location") or {}
+    lat_lng = location.get("latLng") or stop.get("latLng") or {}
+    lat = lat_lng.get("latitude") or lat_lng.get("lat")
+    lng = lat_lng.get("longitude") or lat_lng.get("lng")
+    if isinstance(lat, (int, float)) and isinstance(lng, (int, float)):
+        return {"lat": lat, "lng": lng}
+    return None
+
+
+def normalize_transit_step(step):
+    transit = step.get("transitDetails") if isinstance(step, dict) else None
+    if not isinstance(transit, dict):
+        return None
+
+    line = transit.get("transitLine") or {}
+    vehicle = line.get("vehicle") or {}
+    stop_details = transit.get("stopDetails") or {}
+    departure_stop = stop_details.get("departureStop") or transit.get("departureStop") or {}
+    arrival_stop = stop_details.get("arrivalStop") or transit.get("arrivalStop") or {}
+    localized = step.get("localizedValues") or {}
+    navigation = step.get("navigationInstruction") or {}
+    agencies = line.get("agencies") or []
+    agency = agencies[0] if agencies and isinstance(agencies[0], dict) else {}
+    line_name = clean_route_text(line.get("name") or line.get("localizedName") or "", limit=120)
+    line_short_name = clean_route_text(
+        line.get("nameShort") or line.get("shortName") or line.get("short_name") or "",
+        limit=80,
+    )
+    vehicle_name = vehicle.get("name", {})
+    if isinstance(vehicle_name, dict):
+        vehicle_name = vehicle_name.get("text")
+    vehicle_type = clean_route_text(vehicle.get("type") or vehicle_name, limit=80)
+
+    return {
+        "travelMode": step.get("travelMode"),
+        "instruction": clean_route_text(navigation.get("instructions") or navigation.get("maneuver"), limit=180),
+        "duration": step.get("staticDuration") or step.get("duration"),
+        "durationText": localized_text(localized.get("staticDuration") or localized.get("duration")),
+        "distanceText": localized_text(localized.get("distance")),
+        "lineName": line_name,
+        "lineShortName": line_short_name,
+        "lineColor": normalize_route_color(line.get("color")),
+        "lineTextColor": normalize_route_color(line.get("textColor")),
+        "statusQuery": line_short_name if vehicle_type.upper() == "BUS" and line_short_name else line_name or line_short_name,
+        "vehicleType": vehicle_type,
+        "agencyName": clean_route_text(agency.get("name"), limit=120),
+        "departureStop": transit_stop_name(departure_stop),
+        "departureStopLocation": transit_stop_lat_lng(departure_stop),
+        "arrivalStop": transit_stop_name(arrival_stop),
+        "arrivalStopLocation": transit_stop_lat_lng(arrival_stop),
+    }
+
+
+def dedupe_transit_lines(transit_steps):
+    seen = set()
+    lines = []
+    for step in transit_steps:
+        name = step.get("lineName") or step.get("lineShortName")
+        short_name = step.get("lineShortName")
+        if not name and not short_name:
+            continue
+        key = (name or "").lower(), (short_name or "").lower(), (step.get("vehicleType") or "").lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        lines.append(
+            {
+                "name": name,
+                "shortName": short_name,
+                "statusQuery": short_name if (step.get("vehicleType") or "").upper() == "BUS" and short_name else name or short_name,
+                "color": step.get("lineColor"),
+                "textColor": step.get("lineTextColor"),
+                "vehicleType": step.get("vehicleType"),
+                "agencyName": step.get("agencyName"),
+            }
+        )
+    return lines
+
+
+def extract_transit_steps(route):
+    transit_steps = []
+    for leg in route.get("legs") or []:
+        for step in leg.get("steps") or []:
+            normalized = normalize_transit_step(step)
+            if normalized:
+                transit_steps.append(normalized)
+    return transit_steps
+
+
+def normalize_route_color(value):
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if re.fullmatch(r"#?[0-9a-fA-F]{6}", text):
+        return text if text.startswith("#") else f"#{text}"
+    return ""
+
+
+def normalize_route_segment(step):
+    if not isinstance(step, dict):
+        return None
+    encoded_polyline = (step.get("polyline") or {}).get("encodedPolyline")
+    if not encoded_polyline:
+        return None
+    transit = normalize_transit_step(step)
+    segment = {
+        "travelMode": step.get("travelMode"),
+        "polyline": encoded_polyline,
+    }
+    if transit:
+        segment.update(
+            {
+                "lineName": transit.get("lineName"),
+                "lineShortName": transit.get("lineShortName"),
+                "lineColor": transit.get("lineColor"),
+                "lineTextColor": transit.get("lineTextColor"),
+                "statusQuery": transit.get("statusQuery"),
+                "vehicleType": transit.get("vehicleType"),
+                "departureStop": transit.get("departureStop"),
+                "departureStopLocation": transit.get("departureStopLocation"),
+                "arrivalStop": transit.get("arrivalStop"),
+                "arrivalStopLocation": transit.get("arrivalStopLocation"),
+            }
+        )
+    return segment
+
+
+def extract_route_segments(route):
+    segments = []
+    for leg in route.get("legs") or []:
+        for step in leg.get("steps") or []:
+            segment = normalize_route_segment(step)
+            if segment:
+                segments.append(segment)
+    return segments
+
+
+def route_line_from_transit_step(step):
+    return {
+        "name": step.get("lineName"),
+        "shortName": step.get("lineShortName"),
+        "statusQuery": step.get("statusQuery"),
+        "color": step.get("lineColor"),
+        "textColor": step.get("lineTextColor"),
+        "vehicleType": step.get("vehicleType"),
+        "agencyName": step.get("agencyName"),
+    }
+
+
+def route_stop_key(name, location):
+    lat = location.get("lat") if isinstance(location, dict) else None
+    lng = location.get("lng") if isinstance(location, dict) else None
+    if isinstance(lat, (int, float)) and isinstance(lng, (int, float)):
+        return f"{name.lower()}:{round(lat, 5)}:{round(lng, 5)}"
+    return name.lower()
+
+
+def add_route_stop(stops, stop):
+    if not stop.get("name") or not stop.get("location"):
+        return
+    key = route_stop_key(stop["name"], stop["location"])
+    existing = stops[-1] if stops else None
+    if existing and route_stop_key(existing["name"], existing["location"]) == key:
+        existing["role"] = "transfer" if existing.get("role") != stop.get("role") else existing.get("role")
+        existing.setdefault("routeLines", [])
+        if stop.get("routeLine") and stop["routeLine"] not in existing["routeLines"]:
+            existing["routeLines"].append(stop["routeLine"])
+        return
+    stop["routeLines"] = [stop["routeLine"]] if stop.get("routeLine") else []
+    stops.append(stop)
+
+
+def extract_route_stops(route):
+    transit_steps = []
+    segment_index = 0
+    for leg in route.get("legs") or []:
+        for step in leg.get("steps") or []:
+            transit = normalize_transit_step(step)
+            if transit:
+                transit_steps.append((segment_index, transit))
+            if (step.get("polyline") or {}).get("encodedPolyline"):
+                segment_index += 1
+
+    stops = []
+    for index, (segment_index, transit) in enumerate(transit_steps):
+        route_line = route_line_from_transit_step(transit)
+        departure_role = "board" if index == 0 else "transfer"
+        arrival_role = "alight" if index == len(transit_steps) - 1 else "transfer"
+        add_route_stop(
+            stops,
+            {
+                "name": transit.get("departureStop"),
+                "location": transit.get("departureStopLocation"),
+                "role": departure_role,
+                "routeLine": route_line,
+                "vehicleType": transit.get("vehicleType"),
+                "segmentIndex": segment_index,
+            },
+        )
+        add_route_stop(
+            stops,
+            {
+                "name": transit.get("arrivalStop"),
+                "location": transit.get("arrivalStopLocation"),
+                "role": arrival_role,
+                "routeLine": route_line,
+                "vehicleType": transit.get("vehicleType"),
+                "segmentIndex": segment_index,
+            },
+        )
+    return stops
+
+
+def compute_route_field_mask(mode):
+    fields = [
+        "routes.duration",
+        "routes.distanceMeters",
+        "routes.description",
+        "routes.localizedValues",
+        "routes.polyline.encodedPolyline",
+    ]
+    if mode == "TRANSIT":
+        fields.extend(
+            [
+                "routes.legs.steps.travelMode",
+                "routes.legs.steps.staticDuration",
+                "routes.legs.steps.distanceMeters",
+                "routes.legs.steps.localizedValues",
+                "routes.legs.steps.navigationInstruction",
+                "routes.legs.steps.polyline.encodedPolyline",
+                "routes.legs.steps.transitDetails.stopDetails.departureStop.name",
+                "routes.legs.steps.transitDetails.stopDetails.departureStop.location.latLng.latitude",
+                "routes.legs.steps.transitDetails.stopDetails.departureStop.location.latLng.longitude",
+                "routes.legs.steps.transitDetails.stopDetails.arrivalStop.name",
+                "routes.legs.steps.transitDetails.stopDetails.arrivalStop.location.latLng.latitude",
+                "routes.legs.steps.transitDetails.stopDetails.arrivalStop.location.latLng.longitude",
+                "routes.legs.steps.transitDetails.transitLine.name",
+                "routes.legs.steps.transitDetails.transitLine.nameShort",
+                "routes.legs.steps.transitDetails.transitLine.color",
+                "routes.legs.steps.transitDetails.transitLine.textColor",
+                "routes.legs.steps.transitDetails.transitLine.agencies.name",
+                "routes.legs.steps.transitDetails.transitLine.vehicle.name",
+                "routes.legs.steps.transitDetails.transitLine.vehicle.type",
+            ]
+        )
+    return ",".join(fields)
+
+
 def call_google_compute_route(api_key, origin, destination, mode, departure_time):
     body = {
         "origin": waypoint(origin),
@@ -434,7 +702,7 @@ def call_google_compute_route(api_key, origin, destination, mode, departure_time
         headers={
             "Content-Type": "application/json",
             "X-Goog-Api-Key": api_key,
-            "X-Goog-FieldMask": "routes.duration,routes.distanceMeters,routes.description,routes.localizedValues,routes.polyline.encodedPolyline",
+            "X-Goog-FieldMask": compute_route_field_mask(mode),
         },
         method="POST",
     )
@@ -449,7 +717,7 @@ def call_google_compute_route(api_key, origin, destination, mode, departure_time
     route = routes[0]
     duration_seconds = parse_duration_seconds(route.get("duration", ""))
     distance_meters = route.get("distanceMeters")
-    return {
+    result = {
         "mode": mode,
         "modeLabel": mode_label(mode),
         "durationMinutes": max(1, round(duration_seconds / 60)) if duration_seconds else None,
@@ -457,6 +725,13 @@ def call_google_compute_route(api_key, origin, destination, mode, departure_time
         "description": route.get("description", ""),
         "polyline": route.get("polyline", {}).get("encodedPolyline", ""),
     }
+    if mode == "TRANSIT":
+        transit_steps = extract_transit_steps(route)
+        result["transitSteps"] = transit_steps
+        result["transitLines"] = dedupe_transit_lines(transit_steps)
+        result["routeSegments"] = extract_route_segments(route)
+        result["routeStops"] = extract_route_stops(route)
+    return result
 
 
 def attach_route_geometry(api_key, route_request, route):
@@ -477,6 +752,14 @@ def attach_route_geometry(api_key, route_request, route):
     route["polyline"] = geometry["polyline"]
     if geometry.get("description"):
         route["description"] = geometry["description"]
+    if geometry.get("transitSteps"):
+        route["transitSteps"] = geometry["transitSteps"]
+    if geometry.get("transitLines"):
+        route["transitLines"] = geometry["transitLines"]
+    if geometry.get("routeSegments"):
+        route["routeSegments"] = geometry["routeSegments"]
+    if geometry.get("routeStops"):
+        route["routeStops"] = geometry["routeStops"]
 
 
 def parse_navigation_query(query, history=None):

@@ -5,6 +5,8 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
@@ -21,6 +23,9 @@ from navigator_core import (
     get_together_model,
     strip_reasoning_text,
 )
+
+TFL_LINE_STATUS_MODES = "tube,overground,dlr,elizabeth-line,tram"
+TFL_LINE_STATUS_URL = f"https://api.tfl.gov.uk/line/mode/{TFL_LINE_STATUS_MODES}/status"
 
 
 class MCPClientError(Exception):
@@ -52,12 +57,13 @@ class StdioMCPClient:
         self.process = None
         self.next_id = 1
 
-    def call_tool(self, name, arguments=None):
+    def call_tool(self, name, arguments=None, progress_callback=None):
         with self.lock:
             self.ensure_started_locked()
             result = self.send_request_locked(
                 "tools/call",
                 {"name": name, "arguments": arguments or {}},
+                progress_callback=progress_callback,
             )
             return parse_mcp_tool_result(result)
 
@@ -87,19 +93,32 @@ class StdioMCPClient:
         request = {"jsonrpc": "2.0", "method": method, "params": params or {}}
         self.write_json_line_locked(request)
 
-    def send_request_locked(self, method, params=None):
+    def send_request_locked(self, method, params=None, progress_callback=None):
         request_id = self.next_id
         self.next_id += 1
         request = {"jsonrpc": "2.0", "id": request_id, "method": method, "params": params or {}}
         self.write_json_line_locked(request)
-        line = self.process.stdout.readline() if self.process and self.process.stdout else ""
-        if not line:
-            raise MCPClientError("MCP server did not return a response.", status=503)
-        try:
-            response = json.loads(line)
-        except json.JSONDecodeError as error:
-            raise MCPClientError(f"MCP server returned invalid JSON: {error}", status=503)
-        if response.get("id") != request_id:
+        while True:
+            line = self.process.stdout.readline() if self.process and self.process.stdout else ""
+            if not line:
+                raise MCPClientError("MCP server did not return a response.", status=503)
+            try:
+                response = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise MCPClientError(f"MCP server returned invalid JSON: {error}", status=503)
+            if response.get("method") == "notifications/progress":
+                if progress_callback:
+                    try:
+                        progress_callback(response.get("params") or {})
+                    except BrokenPipeError:
+                        raise
+                    except Exception:
+                        pass
+                continue
+            if response.get("id") == request_id:
+                break
+            if response.get("id") is None:
+                continue
             raise MCPClientError("MCP server returned an unexpected response id.", status=503)
         if response.get("error"):
             error = response["error"]
@@ -134,7 +153,7 @@ class HttpMCPClient:
         self.lock = threading.Lock()
         self.next_id = 1
 
-    def call_tool(self, name, arguments=None):
+    def call_tool(self, name, arguments=None, progress_callback=None):
         with self.lock:
             request_id = self.next_id
             self.next_id += 1
@@ -184,8 +203,63 @@ def get_mcp_client():
     return MCP_CLIENT
 
 
-def mcp_call_tool(name, arguments=None):
-    return get_mcp_client().call_tool(name, arguments or {})
+def mcp_call_tool(name, arguments=None, progress_callback=None):
+    return get_mcp_client().call_tool(name, arguments or {}, progress_callback=progress_callback)
+
+
+def clean_tfl_text(value, limit=260):
+    text = " ".join(str(value or "").replace("\n", " ").split())
+    return text[:limit].rstrip()
+
+
+def tfl_status_url():
+    api_key = get_env_value("TFL_API_KEY") or get_env_value("TFL_APP_KEY")
+    if not api_key:
+        return TFL_LINE_STATUS_URL
+    separator = "&" if "?" in TFL_LINE_STATUS_URL else "?"
+    return f"{TFL_LINE_STATUS_URL}{separator}{urllib.parse.urlencode({'app_key': api_key})}"
+
+
+def normalize_tfl_line(line):
+    statuses = line.get("lineStatuses") if isinstance(line, dict) else []
+    statuses = statuses if isinstance(statuses, list) else []
+    status = min(statuses, key=lambda item: item.get("statusSeverity", 10)) if statuses else {}
+    severity = status.get("statusSeverity", 10)
+    reason = clean_tfl_text(status.get("reason") or status.get("disruption", {}).get("description"))
+    return {
+        "id": line.get("id"),
+        "name": line.get("name"),
+        "mode": line.get("modeName"),
+        "status": status.get("statusSeverityDescription") or "Status unknown",
+        "severity": severity,
+        "reason": reason,
+    }
+
+
+def fetch_tfl_line_status():
+    request = urllib.request.Request(
+        tfl_status_url(),
+        headers={
+            "Accept": "application/json",
+            "User-Agent": f"{APP_NAME}/1.0",
+        },
+        method="GET",
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        data = json.loads(response.read().decode("utf-8", errors="replace"))
+    lines = [normalize_tfl_line(line) for line in data if isinstance(line, dict)]
+    lines.sort(key=lambda item: (item.get("mode") or "", item.get("name") or ""))
+    disrupted = [line for line in lines if line.get("severity", 10) < 10]
+    return {
+        "provider": "tfl_unified_api",
+        "updatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "summary": {
+            "total": len(lines),
+            "disrupted": len(disrupted),
+            "good": len(lines) - len(disrupted),
+        },
+        "lines": lines,
+    }
 
 
 class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
@@ -205,6 +279,10 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
                 self.write_json(mcp_call_tool("health", {}))
             except MCPClientError as error:
                 self.write_mcp_error(error)
+            return
+
+        if self.path == "/api/tfl-status":
+            self.handle_tfl_status()
             return
 
         super().do_GET()
@@ -270,6 +348,15 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
         except Exception as error:
             self.write_json({"error": f"Navigation failed: {error}"}, status=500)
 
+    def handle_tfl_status(self):
+        try:
+            self.write_json(fetch_tfl_line_status())
+        except urllib.error.HTTPError as error:
+            detail = error.read().decode("utf-8", errors="replace")
+            self.write_json({"error": f"TfL status request failed: {detail}"}, status=error.code)
+        except Exception as error:
+            self.write_json({"error": f"TfL status unavailable: {error}"}, status=503)
+
     def read_json(self):
         length = int(self.headers.get("Content-Length", "0"))
         raw = self.rfile.read(length)
@@ -305,10 +392,21 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
         self.end_headers()
 
         try:
-            result = mcp_call_tool("agent_answer", {"payload": payload})
+            streamed_tools = []
+
+            def stream_progress(event):
+                if event.get("type") != "tool" or not event.get("name"):
+                    return
+                tool_name = event["name"]
+                if tool_name not in streamed_tools:
+                    streamed_tools.append(tool_name)
+                    self.stream_json({"tool": tool_name, "toolStatus": event.get("status") or "started"})
+
+            result = mcp_call_tool("agent_answer", {"payload": payload}, progress_callback=stream_progress)
             tools_used = result.get("toolsUsed", []) if isinstance(result, dict) else []
             for tool_name in tools_used:
-                self.stream_json({"tool": tool_name})
+                if tool_name not in streamed_tools:
+                    self.stream_json({"tool": tool_name, "toolStatus": "completed"})
             answer = strip_reasoning_text(str(result.get("answer", "") if isinstance(result, dict) else result)).strip()
             if not answer:
                 answer = "模型没有返回文本结果。"

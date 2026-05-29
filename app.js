@@ -390,10 +390,13 @@ let integrationStatus = {
 let startMap = null;
 let startMarker = null;
 let routeMap = null;
-let routePolyline = null;
+let routePolylines = [];
 let routeMarkers = [];
+let routeInfoWindow = null;
 let pendingRoutePreview = null;
 let activeRoutePreview = null;
+let routeMapFullscreen = false;
+let routeMapPlaceholder = null;
 let googleMapsLoading = false;
 let routesKeyConfigured = false;
 let googleMapsBrowserKey = "";
@@ -401,8 +404,8 @@ let weatherRequestId = 0;
 let weatherUpdatedForKey = "";
 let weatherSummaryRequestId = 0;
 let weatherSummaryUpdatedForKey = "";
+let tflStatusRequestId = 0;
 let latestNavigationData = null;
-let hasCollapsedHowItWorksAfterFirstAnswer = false;
 const chatHistory = [];
 let lastAnimatedChatMessageKey = "";
 let startupWaitModalShown = false;
@@ -559,12 +562,10 @@ function updateRecommendationLoadMoreButton() {
   button.disabled = false;
 }
 
-function collapseHowItWorksAfterFirstAnswer() {
-  if (hasCollapsedHowItWorksAfterFirstAnswer) return;
+function collapseHowItWorks() {
   const section = $("howItWorks");
   const button = $("expandHowItWorks");
   if (!section || !button) return;
-  hasCollapsedHowItWorksAfterFirstAnswer = true;
   section.hidden = true;
   button.hidden = false;
   updateHowItWorksToggle();
@@ -935,6 +936,208 @@ async function refreshWeatherForStart(start = getStartPoint(), force = false, op
   }
 }
 
+function tflStatusClass(severity) {
+  if (Number(severity) >= 10) return "is-good";
+  if (Number(severity) >= 8) return "is-warning";
+  return "is-disrupted";
+}
+
+function tflLineColor(id) {
+  const colors = {
+    bakerloo: "#B36305",
+    central: "#E32017",
+    circle: "#FFD300",
+    district: "#00782A",
+    dlr: "#00A4A7",
+    elizabeth: "#6950A1",
+    "hammersmith-city": "#F3A9BB",
+    jubilee: "#A0A5A9",
+    liberty: "#61686B",
+    lioness: "#FFA600",
+    metropolitan: "#9B0056",
+    mildmay: "#006FE6",
+    northern: "#000000",
+    piccadilly: "#003688",
+    suffragette: "#18A95D",
+    tram: "#84B817",
+    victoria: "#0098D4",
+    "waterloo-city": "#95CDBA",
+    weaver: "#9B1B30",
+    windrush: "#E2231A",
+  };
+  return colors[id] || "#2767a8";
+}
+
+function sortTflLines(lines) {
+  const order = [
+    "bakerloo",
+    "central",
+    "circle",
+    "district",
+    "hammersmith-city",
+    "jubilee",
+    "metropolitan",
+    "northern",
+    "piccadilly",
+    "victoria",
+    "waterloo-city",
+    "elizabeth",
+    "dlr",
+    "liberty",
+    "lioness",
+    "mildmay",
+    "suffragette",
+    "weaver",
+    "windrush",
+    "tram",
+  ];
+  const index = new Map(order.map((id, position) => [id, position]));
+  return [...lines].sort((first, second) => {
+    const firstIsGood = Number(first.severity) >= 10;
+    const secondIsGood = Number(second.severity) >= 10;
+    if (firstIsGood !== secondIsGood) return firstIsGood ? 1 : -1;
+
+    const firstIndex = index.has(first.id) ? index.get(first.id) : 999;
+    const secondIndex = index.has(second.id) ? index.get(second.id) : 999;
+    return firstIndex - secondIndex || String(first.name || "").localeCompare(String(second.name || ""));
+  });
+}
+
+function formatTflMode(mode) {
+  const labels = {
+    "elizabeth-line": "Elizabeth line",
+    dlr: "DLR",
+    overground: "Overground",
+    tram: "Tram",
+    tube: "Tube",
+  };
+  return labels[mode] || mode || "TfL";
+}
+
+function displayTflLineName(line) {
+  const names = {
+    "hammersmith-city": "H'smith & City",
+    "waterloo-city": "Waterloo & City",
+  };
+  return names[line.id] || line.name || "Unknown line";
+}
+
+function setTflStatusLoading() {
+  $("tflStatusTitle").textContent = "London lines right now: loading status...";
+  hideTflTooltip();
+  $("tflLines").innerHTML = "";
+  $("tflStatusMeta").textContent = "Live status from Transport for London.";
+  const button = $("refreshTflStatus");
+  if (button) button.disabled = true;
+}
+
+function renderTflStatusError(message) {
+  $("tflStatusTitle").textContent = "London lines right now: status unavailable";
+  $("tflLines").innerHTML = "";
+  $("tflStatusMeta").textContent = message || "Try refreshing in a moment.";
+}
+
+function renderTflStatus(data) {
+  const lines = sortTflLines(Array.isArray(data?.lines) ? data.lines : []);
+  const summary = data?.summary || {};
+  const disrupted = Number(summary.disrupted || 0);
+  const total = Number(summary.total || lines.length || 0);
+  const statusText = disrupted
+    ? `${disrupted} of ${total} TfL lines reporting disruption.`
+    : `${total} TfL lines reporting good service.`;
+  $("tflStatusTitle").textContent = `London lines right now: ${statusText}`;
+
+  $("tflLines").innerHTML = lines.map((line, index) => {
+    const reason = line.reason || "";
+    const color = tflLineColor(line.id);
+    const reasonAttributes = reason
+      ? ` data-reason="${escapeHtml(reason)}" aria-label="${escapeHtml(`${line.status || "Status"}: ${reason}`)}"`
+      : "";
+    return `
+      <div class="tfl-line ${tflStatusClass(line.severity)}" style="--line-color: ${escapeHtml(color)}; --line-index: ${index}">
+        <div class="tfl-line-copy">
+          <div class="tfl-line-name" title="${escapeHtml(line.name || "Unknown line")}">${escapeHtml(displayTflLineName(line))}</div>
+          <span class="tfl-line-mode">${escapeHtml(formatTflMode(line.mode))}</span>
+        </div>
+        <span class="tfl-line-status"${reasonAttributes} tabindex="${reason ? "0" : "-1"}">${escapeHtml(line.status || "Unknown")}</span>
+      </div>
+    `;
+  }).join("");
+
+  const updated = data?.updatedAt ? new Date(data.updatedAt) : null;
+  const updatedText = updated && !Number.isNaN(updated.getTime())
+    ? updated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : "just now";
+  $("tflStatusMeta").textContent = `Live status from Transport for London · Updated ${updatedText}`;
+}
+
+function ensureTflTooltip() {
+  let tooltip = document.getElementById("tflTooltip");
+  if (tooltip) return tooltip;
+  tooltip = document.createElement("div");
+  tooltip.id = "tflTooltip";
+  tooltip.className = "tfl-tooltip";
+  tooltip.hidden = true;
+  document.body.appendChild(tooltip);
+  return tooltip;
+}
+
+function showTflTooltip(target) {
+  const reason = target?.dataset?.reason;
+  if (!reason) return;
+  const tooltip = ensureTflTooltip();
+  tooltip.textContent = reason;
+  tooltip.hidden = false;
+  tooltip.classList.remove("is-hiding");
+  tooltip.classList.add("is-visible");
+  const targetRect = target.getBoundingClientRect();
+  const tooltipRect = tooltip.getBoundingClientRect();
+  const gap = 10;
+  const minLeft = 12;
+  const maxLeft = window.innerWidth - tooltipRect.width - 12;
+  const idealLeft = targetRect.left + (targetRect.width / 2) - (tooltipRect.width / 2);
+  const left = Math.max(minLeft, Math.min(maxLeft, idealLeft));
+  const top = Math.max(12, targetRect.top - tooltipRect.height - gap);
+  const tailLeft = targetRect.left + (targetRect.width / 2) - left;
+  tooltip.style.left = `${left + window.scrollX}px`;
+  tooltip.style.top = `${top + window.scrollY}px`;
+  tooltip.style.setProperty("--tooltip-tail-left", `${tailLeft}px`);
+}
+
+function hideTflTooltip() {
+  const tooltip = document.getElementById("tflTooltip");
+  if (!tooltip || tooltip.hidden) return;
+  tooltip.classList.remove("is-visible");
+  tooltip.classList.add("is-hiding");
+  window.setTimeout(() => {
+    if (tooltip.classList.contains("is-hiding")) {
+      tooltip.hidden = true;
+      tooltip.classList.remove("is-hiding");
+    }
+  }, 160);
+}
+
+async function refreshTflStatus() {
+  const requestId = ++tflStatusRequestId;
+  setTflStatusLoading();
+  try {
+    const response = await apiFetch("/api/tfl-status");
+    const data = await response.json();
+    if (requestId !== tflStatusRequestId) return;
+    if (!response.ok) throw new Error(data.error || "TfL status request failed");
+    renderTflStatus(data);
+  } catch (error) {
+    if (requestId === tflStatusRequestId) {
+      renderTflStatusError(error.message || "TfL line status is currently unavailable.");
+    }
+  } finally {
+    if (requestId === tflStatusRequestId) {
+      const button = $("refreshTflStatus");
+      if (button) button.disabled = false;
+    }
+  }
+}
+
 function isStartupCheckingState() {
   return integrationStatus.llm === "Checking" && integrationStatus.google === "Checking";
 }
@@ -1048,9 +1251,6 @@ async function answerQuestion(question, options = {}) {
   const minLoadingReadyAt = Date.now() + MIN_LOADING_MS;
   setAsking(true);
   const loadingSessionId = renderLoadingAnswer("Generating results");
-  const slowToolMessageTimer = window.setTimeout(() => {
-    updateLoadingAnswer(loadingSessionId, "Tools are being used, it may take a while.");
-  }, 8000);
 
   clearRoutePreview();
   applyQuestionIntent(cleaned);
@@ -1083,10 +1283,11 @@ async function answerQuestion(question, options = {}) {
       chatHistory.push({ role: "user", content: cleaned });
       renderChatModalHistory();
     }
-    await waitForMinimumLoading(minLoadingReadyAt);
     const contentType = response.headers.get("Content-Type") || "";
-    const agentResult = contentType.includes("application/x-ndjson")
-      ? await readStreamingAnswer(response)
+    const isStreamingResponse = contentType.includes("application/x-ndjson");
+    if (!isStreamingResponse) await waitForMinimumLoading(minLoadingReadyAt);
+    const agentResult = isStreamingResponse
+      ? await readStreamingAnswer(response, { loadingSessionId })
       : await readJsonAnswer(response);
     const answer = sanitizeModelOutput(agentResult.answer || "");
     setAgentMode(formatAgentTools(agentResult.toolsUsed || []));
@@ -1103,7 +1304,7 @@ async function answerQuestion(question, options = {}) {
       renderAgentActions();
     }
     renderChatModalHistory();
-    collapseHowItWorksAfterFirstAnswer();
+    collapseHowItWorks();
   } catch (error) {
     await waitForMinimumLoading(minLoadingReadyAt);
     cancelAnswerRender();
@@ -1120,7 +1321,6 @@ async function answerQuestion(question, options = {}) {
       renderChatModalHistory();
     }
   } finally {
-    window.clearTimeout(slowToolMessageTimer);
     setAsking(false);
   }
 }
@@ -1161,7 +1361,7 @@ async function readJsonAnswer(response) {
   return { ...data, answer };
 }
 
-async function readStreamingAnswer(response) {
+async function readStreamingAnswer(response, options = {}) {
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -1184,6 +1384,7 @@ async function readStreamingAnswer(response) {
       if (event.tool) {
         if (!toolsUsed.includes(event.tool)) toolsUsed.push(event.tool);
         setAgentMode(formatAgentTools(toolsUsed));
+        updateLoadingAnswer(options.loadingSessionId, formatLoadingTools(toolsUsed));
       }
       if (event.delta) {
         answer += event.delta;
@@ -1344,6 +1545,7 @@ function renderMarkdown(value) {
       .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 
   const isSeparatorLine = (line) => /^[-*_]{3,}$/.test(line) || /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*:?-{3,}:?\s*\|?\s*$/.test(line);
+  const isEmptyPipeLine = (line) => /^\s*\|(?:\s*\|)+\s*$/.test(line);
   const isTableLine = (line) => line.includes("|") && !/^[\s|:-]+$/.test(line);
   const parseTableRow = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
   const isValidTableSeparator = (line) => /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*:?-{3,}:?\s*\|?\s*$/.test(line);
@@ -1381,6 +1583,11 @@ function renderMarkdown(value) {
     }
 
     flushBlankLineRuns();
+
+    if (isEmptyPipeLine(line)) {
+      flushBlocks();
+      continue;
+    }
 
     if (/^#{1,6}\s+/.test(line)) {
       flushBlocks();
@@ -1545,10 +1752,19 @@ function formatAgentTools(tools = []) {
     navigate: "Navigation",
     route_matrix: "Google Routes",
     weather_current: "Weather",
+    web_search: "Web Search",
+    tfl_status: "TfL Status",
   };
   const normalized = [...new Set((tools || []).filter(Boolean))];
   if (!normalized.length) return "Pending";
   return normalized.map((tool) => labels[tool] || tool).join(" + ");
+}
+
+function formatLoadingTools(tools = []) {
+  const label = formatAgentTools(tools);
+  if (label === "Pending") return "Generating results";
+  const suffix = [...new Set((tools || []).filter(Boolean))].length > 1 ? "tools" : "tool";
+  return `Using ${label} ${suffix}`;
 }
 
 function hasNavigationResult(result) {
@@ -1568,7 +1784,7 @@ function updateAgentModeSignal(mode, animate = true) {
 }
 
 function escapeHtml(value) {
-  return value.replace(/[&<>"']/g, (char) => {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => {
     const entities = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" };
     return entities[char];
   });
@@ -1645,8 +1861,8 @@ function renderRouteModeOptions(routes, selectedMode) {
   const select = $("routeModeSelect");
   select.innerHTML = routes
     .map((route) => {
-      const distance = Number.isFinite(route.distanceKm) ? `, ${route.distanceKm} km` : "";
-      const label = `${route.modeLabel || route.mode} · ${route.durationMinutes} min${distance}`;
+      // Only show transport mode in the select (no duration/distance)
+      const label = `${route.modeLabel || route.mode}`;
       return `<option value="${route.mode}" ${route.mode === selectedMode ? "selected" : ""}>${escapeHtml(label)}</option>`;
     })
     .join("");
@@ -1660,6 +1876,40 @@ function drawSelectedRoutePreview() {
   const route = routes.find((item) => item.mode === selectedMode) || routes[0];
   drawRoutePreview(activeRoutePreview, route);
   updateGoogleMapsLink(activeRoutePreview, route);
+}
+
+function setRouteMapFullscreen(enabled) {
+  const shell = $("routeMapShell");
+  const mapElement = $("routeMap");
+  const button = $("routeFullscreenButton");
+  if (!shell || !button) return;
+  routeMapFullscreen = Boolean(enabled);
+  if (routeMapFullscreen && !routeMapPlaceholder) {
+    routeMapPlaceholder = document.createComment("route-map-shell-placeholder");
+    shell.parentNode.insertBefore(routeMapPlaceholder, shell);
+    document.body.appendChild(shell);
+  } else if (!routeMapFullscreen && routeMapPlaceholder?.parentNode) {
+    routeMapPlaceholder.parentNode.insertBefore(shell, routeMapPlaceholder);
+    routeMapPlaceholder.remove();
+    routeMapPlaceholder = null;
+  }
+  shell.classList.toggle("is-fullscreen", routeMapFullscreen);
+  document.body.classList.toggle("route-map-fullscreen-open", routeMapFullscreen);
+  button.textContent = routeMapFullscreen ? "Exit full screen" : "Full screen";
+  button.setAttribute("aria-label", routeMapFullscreen ? "Exit route map full screen" : "Open route map full screen");
+  if (mapElement) {
+    mapElement.style.height = routeMapFullscreen ? "100%" : "360px";
+    mapElement.style.minHeight = routeMapFullscreen ? "100%" : "360px";
+  }
+  window.setTimeout(() => {
+    if (routeMap && window.google?.maps) {
+      google.maps.event.trigger(routeMap, "resize");
+    }
+  }, 80);
+}
+
+function toggleRouteMapFullscreen() {
+  setRouteMapFullscreen(!routeMapFullscreen);
 }
 
 function drawRoutePreview(data, recommended) {
@@ -1703,27 +1953,260 @@ function drawRoutePreview(data, recommended) {
     });
   }
 
-  if (routePolyline) routePolyline.setMap(null);
+  routePolylines.forEach((polyline) => polyline.setMap(null));
+  routePolylines = [];
   routeMarkers.forEach((marker) => marker.setMap(null));
   routeMarkers = [];
+  if (routeInfoWindow) routeInfoWindow.close();
 
-  routePolyline = new google.maps.Polyline({
-    path,
-    geodesic: true,
-    strokeColor: "#2767a8",
-    strokeOpacity: 0.95,
-    strokeWeight: 5,
-    map: routeMap,
-  });
+  routePolylines = drawRoutePolylines(recommended, path);
 
   routeMarkers = [
     new google.maps.Marker({ map: routeMap, position: path[0], label: "A", title: data.origin || "Origin" }),
     new google.maps.Marker({ map: routeMap, position: path[path.length - 1], label: "B", title: data.destination || "Destination" }),
+    ...routeStopMarkersForRoute(recommended),
   ];
 
   const bounds = new google.maps.LatLngBounds();
   path.forEach((point) => bounds.extend(point));
   routeMap.fitBounds(bounds, 32);
+}
+
+function drawRoutePolylines(route, fallbackPath) {
+  const segments = Array.isArray(route?.routeSegments) ? route.routeSegments : [];
+  const segmentPolylines = segments
+    .map((segment) => drawRouteSegment(segment))
+    .filter(Boolean);
+  if (segmentPolylines.length) return segmentPolylines;
+  return [
+    new google.maps.Polyline({
+      path: fallbackPath,
+      geodesic: true,
+      strokeColor: "#2767a8",
+      strokeOpacity: 0.95,
+      strokeWeight: 5,
+      map: routeMap,
+    }),
+  ];
+}
+
+function drawRouteSegment(segment) {
+  const path = decodePolyline(segment?.polyline || "");
+  if (!path.length) return null;
+  const style = routeSegmentStyle(segment);
+  return new google.maps.Polyline({
+    path,
+    geodesic: true,
+    strokeColor: style.color,
+    strokeOpacity: style.opacity,
+    strokeWeight: style.weight,
+    icons: style.icons,
+    map: routeMap,
+  });
+}
+
+function routeSegmentStyle(segment) {
+  const mode = String(segment?.travelMode || "").toUpperCase();
+  if (mode === "WALK") {
+    return {
+      color: "#6f7c8f",
+      opacity: 0,
+      weight: 4,
+      icons: [{
+        icon: { path: "M 0,-1 0,1", strokeOpacity: 0.8, strokeWeight: 3, strokeColor: "#6f7c8f", scale: 3 },
+        offset: "0",
+        repeat: "12px",
+      }],
+    };
+  }
+  return {
+    color: routeTransitColor(segment),
+    opacity: 0.95,
+    weight: mode === "TRANSIT" ? 6 : 5,
+    icons: undefined,
+  };
+}
+
+function routeTransitColor(segment) {
+  if (isHexColor(segment?.lineColor)) return segment.lineColor;
+  const key = canonicalTransitColorKey(segment?.statusQuery || segment?.lineShortName || segment?.lineName);
+  if (/^\d+[a-z]?$/.test(key)) return "#D12027";
+  return tflLineColor(key) || "#2767a8";
+}
+
+function isHexColor(value) {
+  return /^#[0-9a-fA-F]{6}$/.test(String(value || ""));
+}
+
+function canonicalTransitColorKey(value) {
+  const text = String(value || "").toLowerCase().replace(/&/g, "and");
+  const compact = text.replace(/\b(line|london|underground|tube|rail|service)\b/g, "").trim();
+  return compact.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+function transferMarkersForRoute(route) {
+  const segments = Array.isArray(route?.routeSegments) ? route.routeSegments : [];
+  const markers = [];
+  for (let index = 1; index < segments.length; index += 1) {
+    const previousPath = decodePolyline(segments[index - 1]?.polyline || "");
+    const currentPath = decodePolyline(segments[index]?.polyline || "");
+    const position = currentPath[0] || previousPath[previousPath.length - 1];
+    if (!position) continue;
+    markers.push(new google.maps.Marker({
+      map: routeMap,
+      position,
+      title: transferMarkerTitle(segments[index]),
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 5,
+        fillColor: "#ffffff",
+        fillOpacity: 1,
+        strokeColor: transferMarkerColor(segments[index]),
+        strokeOpacity: 1,
+        strokeWeight: 3,
+      },
+      zIndex: 3,
+    }));
+  }
+  return markers;
+}
+
+function routeStopMarkersForRoute(route) {
+  const stops = Array.isArray(route?.routeStops) ? route.routeStops : [];
+  if (!stops.length) return transferMarkersForRoute(route);
+  return stops
+    .map((stop) => {
+      const position = stop?.location;
+      if (!isLatLngPlace(position)) return null;
+      const marker = new google.maps.Marker({
+        map: routeMap,
+        position,
+        title: routeStopTitle(stop),
+        icon: routeStopIcon(stop),
+        zIndex: routeStopZIndex(stop),
+      });
+      marker.addListener("mouseover", () => openRouteStopInfo(marker, stop));
+      marker.addListener("click", () => openRouteStopInfo(marker, stop));
+      return marker;
+    })
+    .filter(Boolean);
+}
+
+function routeStopIcon(stop) {
+  const color = routeStopColor(stop);
+  const isTransitStop = stop?.role === "board" || stop?.role === "alight" || stop?.role === "transfer";
+  return {
+    path: google.maps.SymbolPath.CIRCLE,
+    scale: isTransitStop ? 8 : 6,
+    fillColor: "#ffffff",
+    fillOpacity: 1,
+    strokeColor: color,
+    strokeOpacity: 1,
+    strokeWeight: isTransitStop ? 4 : 3,
+  };
+}
+
+function routeStopColor(stop) {
+  const lines = Array.isArray(stop?.routeLines) && stop.routeLines.length
+    ? stop.routeLines
+    : [stop?.routeLine].filter(Boolean);
+  const line = lines[0] || {};
+  return routeTransitColor({
+    lineColor: line.color,
+    statusQuery: line.statusQuery,
+    lineShortName: line.shortName,
+    lineName: line.name,
+    travelMode: stop?.vehicleType ? "TRANSIT" : "WALK",
+  });
+}
+
+function routeStopZIndex(stop) {
+  const roles = { transfer: 6, board: 5, alight: 5 };
+  return roles[stop?.role] || 4;
+}
+
+function routeStopTitle(stop) {
+  const label = routeStopRoleLabel(stop?.role);
+  return `${label}: ${stop?.name || "Stop"}`;
+}
+
+function routeStopRoleLabel(role) {
+  const labels = {
+    board: "Board",
+    alight: "Alight",
+    transfer: "Transfer",
+  };
+  return labels[role] || "Stop";
+}
+
+function openRouteStopInfo(marker, stop) {
+  if (!routeInfoWindow) routeInfoWindow = new google.maps.InfoWindow();
+  routeInfoWindow.setContent(routeStopInfoHtml(stop));
+  routeInfoWindow.open({ anchor: marker, map: routeMap, shouldFocus: false });
+}
+
+function routeStopInfoHtml(stop) {
+  const stationName = stop?.tflName || stop?.name || "Stop";
+  const routeLines = routeStopRouteLines(stop);
+  const servedLines = routeStopServedLines(stop);
+  return `
+    <div class="route-stop-info">
+      <div class="route-stop-role">${escapeHtml(routeStopRoleLabel(stop?.role))}</div>
+      <div class="route-stop-name">${escapeHtml(stationName)}</div>
+      ${routeLines.length ? `<div class="route-stop-section"><span>Route</span>${routeLineChipsHtml(routeLines, 4)}</div>` : ""}
+      ${servedLines.length ? `<div class="route-stop-section route-stop-section--other"><span>Other lines here</span>${routeLineChipsHtml(servedLines, 12)}</div>` : `<div class="route-stop-empty">TfL line list unavailable for this stop.</div>`}
+    </div>
+  `;
+}
+
+function routeStopRouteLines(stop) {
+  const lines = Array.isArray(stop?.routeLines) && stop.routeLines.length
+    ? stop.routeLines
+    : [stop?.routeLine].filter(Boolean);
+  return lines.map((line) => ({
+    id: line.statusQuery || line.shortName || line.name,
+    name: line.shortName || line.name,
+    mode: line.vehicleType,
+    color: line.color,
+  })).filter((line) => line.name);
+}
+
+function routeStopServedLines(stop) {
+  const lines = Array.isArray(stop?.servedLines) ? stop.servedLines : [];
+  const seen = new Set();
+  return lines
+    .map((line) => ({
+      id: line.id || line.name,
+      name: line.name || line.id,
+      mode: line.mode,
+      color: tflLineColor(canonicalTransitColorKey(line.id || line.name)),
+    }))
+    .filter((line) => {
+      const key = `${line.id}:${line.mode}`;
+      if (!line.name || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function routeLineChipsHtml(lines, limit) {
+  const visible = lines.slice(0, limit);
+  const more = lines.length - visible.length;
+  const chips = visible.map((line) => {
+    const color = isHexColor(line.color) ? line.color : tflLineColor(canonicalTransitColorKey(line.id || line.name));
+    return `<span class="route-stop-chip" style="--chip-color: ${escapeHtml(color)}">${escapeHtml(String(line.name || line.id))}</span>`;
+  }).join("");
+  return `${chips}${more > 0 ? `<span class="route-stop-more">+${more} more</span>` : ""}`;
+}
+
+function transferMarkerColor(segment) {
+  return String(segment?.travelMode || "").toUpperCase() === "WALK" ? "#6f7c8f" : routeTransitColor(segment);
+}
+
+function transferMarkerTitle(segment) {
+  const line = segment?.lineShortName || segment?.lineName;
+  if (line) return `Transfer to ${line}`;
+  return "Transfer";
 }
 
 function clearRoutePreview() {
@@ -1734,12 +2217,12 @@ function clearRoutePreview() {
     preview.classList.remove("route-preview--pop");
     preview.hidden = true;
   }
-  if (routePolyline) {
-    routePolyline.setMap(null);
-    routePolyline = null;
-  }
+  setRouteMapFullscreen(false);
+  routePolylines.forEach((polyline) => polyline.setMap(null));
+  routePolylines = [];
   routeMarkers.forEach((marker) => marker.setMap(null));
   routeMarkers = [];
+  if (routeInfoWindow) routeInfoWindow.close();
 }
 
 function renderAgentActions(data = null, route = data?.recommended) {
@@ -2342,6 +2825,20 @@ $("recommendations").addEventListener("keydown", (event) => {
 $("useCurrentLocation").addEventListener("click", requestCurrentLocation);
 $("updateWeatherCurrentButton").addEventListener("click", updateWeatherAtCurrentLocation);
 $("updateWeatherDestinationButton").addEventListener("click", updateWeatherAtDestination);
+$("refreshTflStatus").addEventListener("click", refreshTflStatus);
+$("tflLines").addEventListener("mouseover", (event) => {
+  const target = event.target.closest(".tfl-line-status[data-reason]");
+  if (target) showTflTooltip(target);
+});
+$("tflLines").addEventListener("mouseout", (event) => {
+  if (event.target.closest(".tfl-line-status[data-reason]")) hideTflTooltip();
+});
+$("tflLines").addEventListener("focusin", (event) => {
+  const target = event.target.closest(".tfl-line-status[data-reason]");
+  if (target) showTflTooltip(target);
+});
+$("tflLines").addEventListener("focusout", hideTflTooltip);
+$("tflLines").addEventListener("scroll", hideTflTooltip);
 $("questionForm").addEventListener("submit", (event) => {
   event.preventDefault();
   answerQuestion($("userQuestion").value);
@@ -2353,6 +2850,18 @@ document.querySelectorAll("[data-question]").forEach((button) => {
   });
 });
 $("routeUpdateButton").addEventListener("click", drawSelectedRoutePreview);
+// Auto-update the route preview when the user changes transport mode
+const routeModeSelectEl = $("routeModeSelect");
+if (routeModeSelectEl) {
+  routeModeSelectEl.addEventListener("change", () => {
+    // update immediately without requiring the Update button
+    drawSelectedRoutePreview();
+  });
+}
+$("routeFullscreenButton").addEventListener("click", toggleRouteMapFullscreen);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && routeMapFullscreen) setRouteMapFullscreen(false);
+});
 $("openChatButton").addEventListener("click", openChatModal);
 $("closeChatButton").addEventListener("click", closeChatModal);
 $("chatModal").addEventListener("click", (event) => {
@@ -2390,7 +2899,7 @@ if (googleLinkEl) {
 }
 
 // Intercept clicks on Useful links so we show the same external-confirm modal
-document.querySelectorAll('.useful-links a.link-cta').forEach((el) => {
+document.querySelectorAll('.useful-links a.link-cta, .footer-useful-links a.footer-useful-link').forEach((el) => {
   el.addEventListener('click', (e) => {
     const href = e.currentTarget && e.currentTarget.href;
     if (!href) return;
@@ -2441,8 +2950,10 @@ function renderAgentToolInfo() {
       <div class="tool-info-item"><strong>Navigation</strong> uses Google Routes for live travel time, distance, and route geometry.</div>
       <div class="tool-info-item"><strong>Google Routes</strong> compares travel estimates to study-space candidates.</div>
       <div class="tool-info-item"><strong>Weather</strong> uses Google Weather API for current conditions at a start point or destination.</div>
+      <div class="tool-info-item"><strong>TfL Status</strong> checks live disruption status for London lines used by a route.</div>
+      <div class="tool-info-item"><strong>Web Search</strong> looks up encyclopedia-style and public factual questions with source links.</div>
     </div>
-    <p>The signal updates to the model-selected tool after each answer starts streaming.</p>
+    <p>The signal updates as soon as the model starts a tool call.</p>
   `;
 }
 
@@ -2565,3 +3076,4 @@ $("modalChatForm").addEventListener("submit", async (event) => {
 
 render();
 refreshIntegrationStatus();
+refreshTflStatus();

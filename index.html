@@ -51,14 +51,13 @@
           </div>
 
           <div class="control-module recommendation-module">
-            <h3 class="left-section-title">Study space recommendations</h3>
+            <h3 class="left-section-title">Study & work spaces</h3>
             <div class="field-group">
-              <label for="scenario">Study goal</label>
+              <label for="scenario">Preference</label>
               <select id="scenario">
-                <option value="focus">Quiet study</option>
-                <option value="group">Group study</option>
-                <option value="medicine">Medical resources</option>
-                <option value="late">Late study</option>
+                <option value="focus">Quiet space</option>
+                <option value="group">Group work</option>
+                <option value="late">Late night work</option>
                 <option value="nearest">Nearest seat</option>
               </select>
             </div>
@@ -97,7 +96,7 @@
                   id="userQuestion"
                   type="text"
                   autocomplete="off"
-                  placeholder="Where are you going? How would you like to study?"
+                  placeholder="Where are you going? Ask about routes, weather, or anything else."
                 />
                 <button id="askButton" type="submit">Ask</button>
               </div>
@@ -108,7 +107,7 @@
                 <button type="button" data-question="What's the current weather at my selected start point right now?">Current weather</button>
               </div>
               <div class="agent-answer" id="agentAnswer">
-                Travel or study recommendations will appear here; if the query involves route planning, live route plans will also be shown here.
+                Ask the agent about routes, weather or anything. Your personalised recommendations will appear here.
               </div>
               <div class="route-preview" id="routePreview" hidden>
                 <div class="route-preview-header">
@@ -135,7 +134,10 @@
                     </div>
                   </div>
                 </div>
-                <div class="route-map" id="routeMap" aria-label="Recommended route map"></div>
+                <div class="route-map-shell" id="routeMapShell">
+                  <button id="routeFullscreenButton" class="route-fullscreen-button" type="button" aria-label="Open route map full screen">Full screen</button>
+                  <div class="route-map" id="routeMap" aria-label="Recommended route map"></div>
+                </div>
               </div>
               <div class="agent-actions" id="agentActions" hidden>
                 <a id="googleMapsLink" class="cta" href="https://www.google.com/maps/search/?api=1&query=Imperial%20College%20London" target="_blank" rel="noreferrer">Open Google maps for Route</a>
@@ -144,8 +146,8 @@
             </form>
 
             <div class="how-it-works-shell">
-              <button id="expandHowItWorks" class="secondary-action expandable-action how-toggle" type="button" aria-expanded="false" hidden>Expand introductions to the agent</button>
-              <section class="how-it-works" id="howItWorks" aria-label="How it works">
+              <button id="expandHowItWorks" class="secondary-action expandable-action how-toggle" type="button" aria-expanded="false">Expand introductions to the agent</button>
+              <section class="how-it-works" id="howItWorks" aria-label="How it works" hidden>
                 <p class="eyebrow">How it works?</p>
                 <div class="how-grid">
                   <div>
@@ -221,18 +223,16 @@
             </div>
           </section>
 
-          <section class="decision-module useful-links" aria-label="Useful links">
-            <p class="eyebrow">Useful links</p>
-            <div class="useful-list">
-              <ul>
-                <li><a class="link-cta" href="https://www.imperial.ac.uk" target="_blank" rel="noreferrer">Imperial College London</a></li>
-                <li><a class="link-cta" href="https://www.imperial.ac.uk/library" target="_blank" rel="noreferrer">Imperial Libraries</a></li>
-                <li><a class="link-cta" href="https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/abdus-salam-library/" target="_blank" rel="noreferrer">Abdus Salam Library</a></li>
-                <li><a class="link-cta" href="https://www.imperial.ac.uk/white-city-campus/" target="_blank" rel="noreferrer">White City Campus</a></li>
-                <li><a class="link-cta" href="https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/hammersmith-campus-library/" target="_blank" rel="noreferrer">Hammersmith Library</a></li>
-                <li><a class="link-cta" href="https://www.imperial.ac.uk/admin-services/property/travel/shuttle-bus/" target="_blank" rel="noreferrer">Imperial shuttle</a></li>
-              </ul>
+          <section class="decision-module tfl-module" aria-label="TfL line status">
+            <div class="tfl-header">
+              <div>
+                <p class="eyebrow">TfL status</p>
+                <h3 id="tflStatusTitle">London lines right now</h3>
+              </div>
+              <button id="refreshTflStatus" class="secondary-action tfl-refresh-button" type="button">Refresh</button>
             </div>
+            <div class="tfl-lines" id="tflLines"></div>
+            <p class="tfl-meta" id="tflStatusMeta">Live status from Transport for London.</p>
           </section>
 
         </section>
@@ -295,6 +295,17 @@
     </div>
 
     <footer class="page-signature" role="contentinfo" aria-label="Page author">
+      <section class="footer-useful-links" aria-label="Useful links">
+        <p class="footer-useful-links-title">Useful links</p>
+        <ul class="footer-useful-links-list">
+          <li><a class="footer-useful-link" href="https://www.imperial.ac.uk" target="_blank" rel="noreferrer">Imperial College London</a></li>
+          <li><a class="footer-useful-link" href="https://www.imperial.ac.uk/library" target="_blank" rel="noreferrer">Imperial Libraries</a></li>
+          <li><a class="footer-useful-link" href="https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/abdus-salam-library/" target="_blank" rel="noreferrer">Abdus Salam Library</a></li>
+          <li><a class="footer-useful-link" href="https://www.imperial.ac.uk/white-city-campus/" target="_blank" rel="noreferrer">White City Campus</a></li>
+          <li><a class="footer-useful-link" href="https://www.imperial.ac.uk/admin-services/library/use-the-library/our-libraries/hammersmith-campus-library/" target="_blank" rel="noreferrer">Hammersmith Library</a></li>
+          <li><a class="footer-useful-link" href="https://www.imperial.ac.uk/admin-services/property/travel/shuttle-bus/" target="_blank" rel="noreferrer">Imperial shuttle</a></li>
+        </ul>
+      </section>
       <div class="page-signature-inner">
         <span class="sig-name">Created by Yiqi Zhu</span>
         <span class="sig-degree">MSc Environmental Data Science and Machine Learning at Imperial College London</span>
