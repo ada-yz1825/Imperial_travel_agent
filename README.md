@@ -1,63 +1,105 @@
 # Imperial Travel Agent
 
-Imperial Travel Agent is an MCP-first web app for Imperial College London students (ALSO for others). The browser UI lets users ask natural-language questions about study spaces, routes, and weather, while the backend delegates the real work to MCP tools exposed by `mcp_server.py`.
+Imperial Travel Agent is an MCP-first travel and study-space assistant for Imperial College London students and visitors. The web app combines a tool-calling LLM, Google Routes, Google Weather, TfL live status data, and local Imperial study-space metadata so users can ask natural-language questions, compare routes, check disruption risk, and find suitable places to study or work.
 
 ## Demo
 
 - Live website: https://ada-yz1825.github.io/Imperial_travel_agent/
-
 - Backend / fallback site: https://imperial-travel-agent-api.onrender.com/
+- Project guide: [Imperial Travel Agent Project Guide](Imperial_Travel_Agent_Project_Guide_EN.pdf)
 
+## Highlights
 
-## Project Guide
-
-- [Project Guide PDF](Imperial_Travel_Agent_Project_Guide_EN.pdf)
-
+- Bilingual interface with English and Chinese switching.
+- Tool-calling agent for navigation, route comparison, live weather, TfL status, and web search.
+- Study-space recommendations based on goal, comfort score, and walking tolerance.
+- Public transport routing with Google Routes transit steps, line names, stops, and transfer details.
+- Interactive route map with line-colored transit segments and station hover popups.
+- Live TfL status panel with disruption badges, translated Chinese status details, and official-style line colors.
+- Weather module with current conditions, localized labels, AI-generated 1-2 sentence summaries, and metric explanations.
+- Smooth streaming answer rendering, Markdown table support, and mobile-optimized layout.
+- GitHub Pages-compatible static frontend with a separate backend API adapter.
 
 ## What It Does
 
-- Recommends study spaces based on study goal, comfort, and walking tolerance.
-- Compares travel modes and returns live route data from Google Routes.
-- Shows current weather for a start point or destination.
-- Renders agent answers, route previews, and chat history in the browser.
-- Uses the same MCP tool layer for both chat answers and navigation flows.
+### Travel Agent
 
-### Runtime Flow
+The agent accepts natural-language questions such as:
 
-1. `app.js` sends user input to `server.py`.
-2. `server.py` forwards the request to MCP tools.
-3. `mcp_server.py` decides whether to call `agent_answer`, `navigate`, `route_matrix`, `weather_current`, or another tool.
-4. `navigator_core.py` performs the actual LLM and Google API work.
-5. The frontend renders the response, tables, route preview, and chat history.
+- "How do I get from South Kensington Campus to White City?"
+- "Will the Tube delay affect this route?"
+- "What's the weather at my destination?"
+- "Search the web for information about a place or topic."
+
+When a route needs live data, the agent uses tools instead of guessing. For public transport, `navigate` returns transit lines and steps from Google Routes. If the route involves TfL lines, the agent can then call `tfl_status` and include live disruption information in the answer.
+
+### Study & Work Spaces
+
+The app ranks Imperial-related libraries and study spaces using local metadata, walking tolerance, study scenario, and comfort heuristics. It can suggest quiet spaces, group-work spaces, late-night options, or nearby seats.
+
+### Weather
+
+The weather module can update conditions for:
+
+- the selected start point,
+- the browser's current location,
+- the parsed destination from a navigation result.
+
+It shows temperature, feels-like temperature, humidity, wind, UV index, and precipitation probability. The AI summary is regenerated in the active language and constrained to short, practical guidance.
+
+### TfL Status
+
+The TfL module shows live London line status using the TfL Unified API. Each line uses its recognizable color, a compact status badge, and a hover tooltip for detailed disruption information. In Chinese mode, service states and common disruption details are translated while line and station names are preserved.
+
+### Route Map
+
+For public transport routes, the map can show:
+
+- route segments colored by transit line,
+- walking and transit transfer sections,
+- start and destination markers,
+- station hover popups with station name, board/transfer/alight role, route line, and other available lines.
+
+## Runtime Flow
+
+1. `app.js` handles UI state, streaming output, map rendering, language switching, and API calls.
+2. `server.py` serves the frontend and exposes a small HTTP API for the browser.
+3. `mcp_server.py` owns the MCP tool registry and tool-calling behavior.
+4. `navigator_core.py` performs shared LLM, Google Routes, weather, parsing, and route-normalization work.
+5. The frontend renders Markdown, route previews, weather cards, TfL status, chat history, and map interactions.
 
 ## Project Structure
 
 ```text
 .
-├── app.js              # Frontend logic, rendering, and API calls
-├── index.html          # Page structure
-├── styles.css          # Layout and visual styling
-├── server.py           # HTTP adapter that talks to MCP
-├── mcp_server.py       # MCP stdio/HTTP server and tool registry
-├── navigator_core.py   # Shared LLM, routing, weather, and parsing logic
-├── assets/             # Library images and other assets
-├── image.jpg           # Hero background image
-└── image_files/        # Additional legacy/static front-end assets
+├── app.js                    # Frontend logic, rendering, streaming, maps, i18n
+├── index.html                # Page structure and GitHub Pages entrypoint
+├── styles.css                # Layout, animations, responsive design, visual styling
+├── favicon.svg               # GitHub Pages-compatible browser tab icon
+├── server.py                 # HTTP adapter that talks to MCP
+├── mcp_server.py             # MCP stdio/HTTP server and tool registry
+├── navigator_core.py         # Shared LLM, routing, weather, and parsing logic
+├── assets/                   # Study-space/library images
+├── image_files/image.jpg     # High-resolution page background image
+├── image_files/              # Additional static frontend assets
+└── .github/workflows/        # GitHub Pages deployment workflow
 ```
 
 ## MCP Tools
 
-The MCP server currently exposes these tools:
+The MCP server exposes these main tools:
 
-- `agent_answer` - tool-calling LLM entrypoint for browser chat
-- `chat_complete` - direct LLM completion helper
-- `classify_intent` - classifies study vs navigation intent
-- `route_matrix` - live Google Routes matrix for study-space comparisons
-- `navigate` - parses navigation requests and returns route JSON
-- `weather_current` - current weather lookup
-- `health` - backend and integration status
+- `agent_answer` - tool-calling LLM entrypoint for browser chat.
+- `chat_complete` - direct LLM completion helper.
+- `classify_intent` - classifies study-space vs navigation intent.
+- `route_matrix` - live Google Routes matrix for study-space comparisons.
+- `navigate` - parses navigation requests and returns route JSON, transit steps, transit lines, route segments, and route stops.
+- `weather_current` - current weather lookup.
+- `tfl_status` - live TfL line status lookup, optionally filtered to route-relevant lines.
+- `web_search` - web search for public factual or encyclopedia-style questions.
+- `health` - backend and integration status.
 
-## API Endpoints
+## Browser API Endpoints
 
 The HTTP adapter in `server.py` keeps the browser API small and stable:
 
@@ -66,23 +108,24 @@ The HTTP adapter in `server.py` keeps the browser API small and stable:
 - `POST /api/navigate`
 - `POST /api/routes`
 - `POST /api/intent`
+- `GET /api/tfl-status`
 
 ## Requirements
 
 - Python 3
 - A configured LLM provider: `openai`, `groq`, `together`, or `ollama`
-- Google Maps / Routes keys for routing features
+- Google Maps browser key for map, geocoding, and weather features
+- Google Routes key for route planning and route comparison
 - Google Weather access if you want live weather results
+- Network access to TfL Unified API for live London line status
 
-The project does not use npm packages. The backend and MCP layers are implemented with the Python standard library plus your configured API providers.
+The project does not use npm packages. The backend and MCP layers are implemented with Python and the configured external API providers.
 
 ## Getting Started
 
 ### 1. Configure environment variables
 
-At minimum, set the provider and the required keys for the features you want to use.
-
-Example for hosted use:
+At minimum, set the provider and the keys for the features you want to use.
 
 ```bash
 export LLM_PROVIDER=together
@@ -91,17 +134,7 @@ export GOOGLE_MAPS_API_KEY=your_routes_key
 export GOOGLE_MAPS_BROWSER_KEY=your_browser_maps_and_weather_key
 ```
 
-### 2. Run the HTTP adapter
-
-```bash
-python3 server.py
-```
-
-By default, the server serves the frontend and talks to `mcp_server.py` over stdio. Open the app in the browser at the local server address shown in the terminal.
-
-### 3. Optional: use a custom MCP server location
-
-If you want `server.py` to talk to a remote MCP server instead of launching `mcp_server.py` locally, set one of these:
+For a browser frontend hosted separately from the backend, set an API base if needed:
 
 ```bash
 export IMPERIAL_MCP_SERVER_URL=http://localhost:8002/mcp
@@ -109,9 +142,21 @@ export IMPERIAL_MCP_SERVER_URL=http://localhost:8002/mcp
 export IMPERIAL_MCP_COMMAND="python3 /path/to/mcp_server.py"
 ```
 
-## Optional Local LLM Mode
+### 2. Run locally
 
-To use Ollama locally:
+```bash
+python3 server.py
+```
+
+The server serves the frontend and starts `mcp_server.py` over stdio by default. Open the local address shown in the terminal.
+
+To use a specific port:
+
+```bash
+PORT=8002 python3 server.py
+```
+
+### 3. Optional local LLM mode
 
 ```bash
 export LLM_PROVIDER=ollama
@@ -120,13 +165,38 @@ ollama run qwen3
 python3 server.py
 ```
 
-## Current Data Sources
+## Data Sources
 
 - Imperial study-space metadata is defined locally in `navigator_core.py`.
-- Live route times, distances, and polyline geometry come from Google Routes.
+- Study-space images live in `assets/library-images/`.
+- The page background image lives at `image_files/image.jpg`.
+- Live routes, transit steps, stop locations, and route geometry come from Google Routes.
 - Live weather comes from Google Weather.
-- Chat responses and tool selection come from the configured LLM provider.
-- Crowd/comfort scores are heuristic estimates, not live occupancy data.
+- Live London line status comes from the TfL Unified API.
+- Agent answers and tool selection come from the configured LLM provider.
+- Crowd and comfort scores are heuristic estimates, not live occupancy data.
+
+## GitHub Pages Deployment
+
+The static frontend is deployed with `.github/workflows/pages.yml`.
+
+The workflow copies:
+
+```text
+index.html
+app.js
+styles.css
+favicon.svg
+assets/
+image_files/
+```
+
+Important notes:
+
+- The background image is `image_files/image.jpg`, not a root-level `image.jpg`.
+- Keep `favicon.svg` at the repository root so the relative icon path works on GitHub Pages.
+- The frontend can be hosted statically, but live agent features still require the backend API.
+- If GitHub Pages is served from a project subpath, keep frontend asset paths relative, such as `./styles.css` and `./favicon.svg`.
 
 ## Troubleshooting
 
@@ -135,6 +205,7 @@ If the UI is blank or the backend is offline:
 - Check `GET /api/health`.
 - Make sure `server.py` is running.
 - Confirm your LLM provider and Google keys are configured.
+- Check the frontend API base if using a hosted static page with a remote backend.
 
 If route data is missing:
 
@@ -145,15 +216,29 @@ If route data is missing:
 If weather data is missing:
 
 - Confirm `GOOGLE_MAPS_BROWSER_KEY` is set.
-- Check the browser key referrer restrictions.
+- Confirm Weather API is enabled for the browser key.
+- Check browser key referrer restrictions.
 
-If you want to inspect the behavior:
+If maps do not render on a custom port:
+
+- Add that local origin or deployed domain to the Google Maps browser key allowlist.
+
+If GitHub Pages fails during build:
+
+- Make sure the workflow does not reference removed root assets such as `image.jpg`.
+- Confirm `image_files/image.jpg` and `favicon.svg` exist and are committed.
+
+## Development Notes
 
 - Frontend rendering and request flow are in `app.js`.
-- The HTTP/MCP bridge is in `server.py`.
+- HTTP routing and static serving are in `server.py`.
 - Tool definitions and tool-calling behavior are in `mcp_server.py`.
-- Shared LLM/Google logic is in `navigator_core.py`.
+- Shared LLM and Google API logic is in `navigator_core.py`.
+- Styling, responsive behavior, and UI animation are in `styles.css`.
 
-## Hosting Notes
+## Limitations
 
-For hosted deployments, keep the browser frontend pointed at the correct backend API base and set the same provider/Google variables in the deployment environment. The app is designed so the frontend stays thin while the MCP layer owns the actual reasoning, routing, and weather lookups.
+- Study-space occupancy is not live.
+- TfL disruption reason translation is rule-based; line and station names are preserved.
+- Routes, weather, and transport status depend on external API availability.
+- The app performs best for London and Imperial-related journeys.

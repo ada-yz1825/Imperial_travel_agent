@@ -28,7 +28,7 @@ jobs:
         run: |
           rm -rf site
           mkdir -p site
-          cp index.html app.js styles.css image.jpg site/
+          cp index.html app.js styles.css favicon.svg site/
           cp -R assets image_files site/
           touch site/.nojekyll
 
