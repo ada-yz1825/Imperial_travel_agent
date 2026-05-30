@@ -2052,6 +2052,8 @@ function drawRoutePreview(data, recommended) {
       streetViewControl: false,
       fullscreenControl: false,
     });
+    routeMap.addListener("click", () => closeRouteStopInfo());
+    routeMap.addListener("dragstart", () => closeRouteStopInfo());
   }
 
   routePolylines.forEach((polyline) => polyline.setMap(null));
@@ -2260,6 +2262,7 @@ function createRouteStopOverlay() {
   const overlay = new google.maps.OverlayView();
   overlay.position = null;
   overlay.container = null;
+  overlay.contentHtml = "";
   overlay.isOpen = false;
 
   overlay.onAdd = function onAdd() {
@@ -2276,6 +2279,12 @@ function createRouteStopOverlay() {
     });
     this.container = container;
     this.getPanes().floatPane.appendChild(container);
+    if (this.contentHtml) {
+      this.renderContent();
+      window.requestAnimationFrame(() => {
+        if (this.container) this.container.classList.add("route-stop-popup--open");
+      });
+    }
   };
 
   overlay.draw = function draw() {
@@ -2299,16 +2308,22 @@ function createRouteStopOverlay() {
       routeStopOverlayCloseTimer = null;
     }
     this.position = position;
+    this.contentHtml = html;
     this.isOpen = true;
     if (!this.getMap()) this.setMap(routeMap);
     if (this.container) {
-      this.container.innerHTML = routeStopPopupHtml(html);
-      this.container.classList.remove("route-stop-popup--closing");
-      this.container.classList.remove("route-stop-popup--open");
-      void this.container.offsetWidth;
-      this.container.classList.add("route-stop-popup--open");
+      this.renderContent(true);
     }
     this.draw();
+  };
+
+  overlay.renderContent = function renderContent(animate = false) {
+    if (!this.container) return;
+    this.container.innerHTML = routeStopPopupHtml(this.contentHtml);
+    this.container.classList.remove("route-stop-popup--closing");
+    this.container.classList.remove("route-stop-popup--open");
+    if (animate) void this.container.offsetWidth;
+    this.container.classList.add("route-stop-popup--open");
   };
 
   overlay.close = function close(immediate = false) {
