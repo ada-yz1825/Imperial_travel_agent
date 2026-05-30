@@ -1624,7 +1624,7 @@ function updateLoadingAnswer(loadingSessionId, message) {
 }
 
 function renderMarkdown(value) {
-  const text = sanitizeModelOutput(value).replace(/\r\n/g, "\n");
+  const text = sanitizeModelOutput(value).replace(/\r\n/g, "\n").trim();
   if (!text) return "";
 
   const lines = text.split("\n");

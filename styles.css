@@ -694,6 +694,11 @@ button:hover {
   color: var(--blue);
 }
 
+.agent-answer-output > :first-child,
+.chat-message > :first-child {
+  margin-top: 0;
+}
+
 .left-section-title {
   margin: 6px 0 12px;
   color: var(--blue);
