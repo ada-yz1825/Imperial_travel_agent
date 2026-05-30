@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Imperial Travel Agent</title>
-    <link rel="stylesheet" href="./styles.css?v=route-map-4" />
+    <link rel="stylesheet" href="./styles.css?v=stop-popup-1" />
   </head>
   <body>
     <main class="app-shell">
@@ -101,13 +101,13 @@
                 <button id="askButton" type="submit">Ask</button>
               </div>
               <div class="quick-prompts" aria-label="quick questions">
-                <button type="button" data-question="I want a quiet Imperial library for focused study. Where should I go?">Quiet study</button>
                 <button type="button" data-question="How do I get to White City Campus from my current selected start point?">Go to White City</button>
                 <button type="button" data-question="Which library is nearby from my selected starting point?">Nearby library</button>
                 <button type="button" data-question="What's the current weather at my selected start point right now?">Current weather</button>
+                <button type="button" data-question="What's the current TfL status, and are any lines disrupted right now?">TfL status</button>
               </div>
               <div class="agent-answer" id="agentAnswer">
-                Ask the agent about routes, weather or anything. Your personalised recommendations will appear here.
+                <span class="agent-answer-placeholder-text">Ready when you are. Ask the agent a question to get started.</span>
               </div>
               <div class="route-preview" id="routePreview" hidden>
                 <div class="route-preview-header">
@@ -314,6 +314,6 @@
       </div>
     </footer>
 
-    <script src="./app.js?v=route-map-4"></script>
+    <script src="./app.js?v=stop-popup-1"></script>
   </body>
 </html>

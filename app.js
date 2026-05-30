@@ -395,6 +395,8 @@ let routeMap = null;
 let routePolylines = [];
 let routeMarkers = [];
 let routeInfoWindow = null;
+let routeStopOverlay = null;
+let routeStopOverlayCloseTimer = null;
 let pendingRoutePreview = null;
 let activeRoutePreview = null;
 let routeMapFullscreen = false;
@@ -412,10 +414,11 @@ const chatHistory = [];
 let lastAnimatedChatMessageKey = "";
 let startupWaitModalShown = false;
 let startupWaitModalTimer = null;
-// Base ms between render steps — lower for snappier updates
-const STREAM_RENDER_BASE_DELAY_MS = 8;
-// How many characters to render per step — increase to show more text at once
-const STREAM_RENDER_CHUNK_SIZE = 8;
+// Streamed answers render on animation frames so text flows continuously instead
+// of popping in as visibly separate chunks.
+const STREAM_RENDER_FRAME_DELAY_MS = 16;
+const STREAM_RENDER_BASE_CPS = 130;
+const STREAM_RENDER_MAX_FRAME_CHARS = 18;
 // Minimum loading duration gating (ms). Lower to reduce perceived wait time.
 const MIN_LOADING_MS = 1500;
 const GEOLOCATION_CACHE_KEY = "imperialNavigatorLastLocation";
@@ -764,6 +767,11 @@ function restoreWeatherState(state) {
 
 function renderWeatherData(data, start) {
   setWeatherScope(start?.weatherScope === "destination" ? "destination" : "start point", start?.label);
+  const weatherCard = $("weatherCard");
+  if (weatherCard) {
+    weatherCard.classList.remove("weather-card--loading");
+    animateClass(weatherCard, "weather-card--reveal");
+  }
   $("weatherDay").textContent = weatherConditionLabel(data?.weatherCondition?.type, data?.isDaytime);
   $("weatherIcon").textContent = weatherIconEmoji(data?.weatherCondition?.type, data?.isDaytime);
   $("weatherIcon").removeAttribute("title");
@@ -777,12 +785,17 @@ function renderWeatherData(data, start) {
   $("weatherPrecipitation").textContent = formatPrecipitationProbability(data);
   const time = data?.currentTime ? new Date(data.currentTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "just now";
   $("weatherMeta").textContent = `${start.label || "Selected start point"} · ${start.lat.toFixed(4)}, ${start.lng.toFixed(4)} · Updated ${time}`;
-  setWeatherSummary("Generating a short weather summary...");
+  setWeatherSummaryLoading("Generating a short weather summary");
   void refreshWeatherSummary(data, start);
 }
 
 function renderWeatherError(message) {
   weatherSummaryRequestId += 1;
+  const weatherCard = $("weatherCard");
+  if (weatherCard) {
+    weatherCard.classList.remove("weather-card--loading");
+    animateClass(weatherCard, "weather-card--reveal");
+  }
   const fallbackSummary = buildWeatherFallbackSummary(null, null, message);
   $("weatherDay").textContent = "Today";
   $("weatherIcon").textContent = "--";
@@ -848,7 +861,19 @@ function isUsableWeatherSummary(value) {
 }
 
 function setWeatherSummary(value) {
-  $("weatherSummary").innerHTML = renderWeatherSummaryMarkdown(value);
+  const summaryEl = $("weatherSummary");
+  if (!summaryEl) return;
+  summaryEl.innerHTML = renderWeatherSummaryMarkdown(value);
+  animateClass(summaryEl, "weather-summary--reveal");
+}
+
+function setWeatherSummaryLoading(message = "Generating a short weather summary") {
+  $("weatherSummary").innerHTML = `
+    <span class="weather-summary-loading" role="status" aria-live="polite">
+      <span class="weather-summary-loading-text">${escapeHtml(message)}</span>
+      <span class="weather-summary-loading-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+    </span>
+  `;
 }
 
 function compactWeatherContext(data, start) {
@@ -920,6 +945,7 @@ async function refreshWeatherForStart(start = getStartPoint(), force = false, op
   const requestId = ++weatherRequestId;
   const previousState = options.preserveOnError ? captureWeatherState() : null;
   weatherUpdatedForKey = weatherKey;
+  animateClass($("weatherCard"), "weather-card--loading");
   setWeatherLoading(`Checking weather near ${start.label || "your selected start point"}...`);
   try {
     const response = await fetch(weatherApiUrl(start, googleMapsBrowserKey));
@@ -1316,12 +1342,10 @@ async function answerQuestion(question, options = {}) {
     await waitForMinimumLoading(minLoadingReadyAt);
     cancelAnswerRender();
     hideAgentActions();
-    const errorMessage = "Looks like the AI quota hit rush hour. Please try again in a minute, or send a shorter question.";
-    const errorHtml = `
-      <strong>${escapeHtml(errorMessage)}</strong>
-      <br />Current API endpoint: <code>${escapeHtml(apiBaseLabel())}</code>
+    const errorMessage = formatAgentError(error);
+    $("agentAnswer").innerHTML = `
+      <div class="agent-answer-output agent-answer-output--error">${renderMarkdown(errorMessage)}</div>
     `;
-    $("agentAnswer").innerHTML = errorHtml;
     if (options.skipUserPush) {
       chatHistory.push({ role: "assistant", content: errorMessage });
       trimChatHistory();
@@ -1421,12 +1445,22 @@ async function readStreamingAnswer(response, options = {}) {
 
 function beginAnswerRender() {
   cancelAnswerRender();
+  const answerEl = $("agentAnswer");
+  if (answerEl) {
+    answerEl.classList.add("agent-answer--streaming");
+    answerEl.classList.remove("agent-answer--chunk");
+  }
   const state = {
     sessionId: ++answerRenderSessionId,
     queue: "",
     rendered: "",
     completed: false,
+    hasShownFirstChunk: false,
     timer: null,
+    frame: null,
+    lastFrameAt: 0,
+    charCarry: 0,
+    outputEl: null,
     resolve: null,
   };
   state.finished = new Promise((resolve) => {
@@ -1439,14 +1473,14 @@ function enqueueAnswerRender(state, delta) {
   if (!state || state.sessionId !== answerRenderSessionId || !delta) return;
   state.queue += delta;
   if (!state.timer) {
-    scheduleAnswerRenderStep(state, STREAM_RENDER_BASE_DELAY_MS);
+    scheduleAnswerRenderStep(state, STREAM_RENDER_FRAME_DELAY_MS);
   }
 }
 
 function closeAnswerRender(state) {
   if (!state || state.sessionId !== answerRenderSessionId) return;
   state.completed = true;
-  if (!state.timer && !state.queue) {
+  if (!state.timer && !state.frame && !state.queue) {
     state.resolve();
   }
 }
@@ -1456,36 +1490,77 @@ function waitForAnswerRender(state) {
   return state.finished;
 }
 
-function scheduleAnswerRenderStep(state, delayMs) {
+function scheduleAnswerRenderStep(state, delayMs = STREAM_RENDER_FRAME_DELAY_MS) {
   state.timer = window.setTimeout(() => {
     state.timer = null;
-    stepAnswerRender(state);
+    state.frame = window.requestAnimationFrame((now) => {
+      state.frame = null;
+      stepAnswerRender(state, now);
+    });
   }, delayMs);
 }
 
-function stepAnswerRender(state) {
+function stepAnswerRender(state, now = performance.now()) {
   if (!state || state.sessionId !== answerRenderSessionId) return;
 
   if (!state.queue) {
     if (state.completed) {
+      const answerEl = $("agentAnswer");
+      if (answerEl) {
+        answerEl.innerHTML = state.rendered
+          ? `<div class="agent-answer-output">${renderMarkdown(state.rendered)}</div>`
+          : "";
+        answerEl.classList.remove("agent-answer--streaming");
+        answerEl.classList.remove("agent-answer--chunk");
+      }
       state.resolve();
       return;
     }
-    scheduleAnswerRenderStep(state, STREAM_RENDER_BASE_DELAY_MS);
+    scheduleAnswerRenderStep(state);
     return;
   }
 
-  const chunk = state.queue.slice(0, STREAM_RENDER_CHUNK_SIZE);
+  const chunk = state.queue.slice(0, answerRenderChunkSize(state, now));
   state.queue = state.queue.slice(chunk.length);
   state.rendered += chunk;
-  $("agentAnswer").innerHTML = state.rendered ? renderMarkdown(state.rendered) : "";
+  const answerEl = $("agentAnswer");
+  if (answerEl) {
+    if (!state.outputEl || !answerEl.contains(state.outputEl)) {
+      const revealClass = state.hasShownFirstChunk ? "" : " agent-answer-output--reveal";
+      answerEl.innerHTML = `<div class="agent-answer-output agent-answer-output--live agent-answer-output--stream-text${revealClass}"></div>`;
+      state.outputEl = answerEl.querySelector(".agent-answer-output");
+    }
+    const piece = document.createElement("span");
+    piece.className = "agent-answer-fade-piece";
+    piece.textContent = chunk;
+    state.outputEl.appendChild(piece);
+    state.hasShownFirstChunk = true;
+  }
 
-  const punctuationDelay = /[。！？!?\n]$/.test(chunk) ? 72 : 0;
-  scheduleAnswerRenderStep(state, STREAM_RENDER_BASE_DELAY_MS + punctuationDelay);
+  const punctuationDelay = /[。！？!?\n]$/.test(chunk) ? 28 : 0;
+  scheduleAnswerRenderStep(state, STREAM_RENDER_FRAME_DELAY_MS + punctuationDelay);
+}
+
+function answerRenderChunkSize(state, now) {
+  const queueLength = state.queue.length;
+  const elapsedMs = state.lastFrameAt ? Math.min(80, Math.max(12, now - state.lastFrameAt)) : STREAM_RENDER_FRAME_DELAY_MS;
+  state.lastFrameAt = now;
+  const speedMultiplier = queueLength > 800 ? 2.7 : queueLength > 300 ? 2.05 : queueLength > 120 ? 1.45 : 1;
+  state.charCarry += (elapsedMs / 1000) * STREAM_RENDER_BASE_CPS * speedMultiplier;
+  const frameChars = Math.max(2, Math.floor(state.charCarry));
+  const cappedChars = Math.min(frameChars, STREAM_RENDER_MAX_FRAME_CHARS, queueLength);
+  state.charCarry = Math.max(0, state.charCarry - cappedChars);
+  return cappedChars;
 }
 
 function cancelAnswerRender() {
   answerRenderSessionId += 1;
+}
+
+function formatAgentError(error) {
+  const message = sanitizeModelOutput(error?.message || "").trim();
+  if (message) return message;
+  return "The agent could not finish that request. Please try again.";
 }
 
 async function waitForMinimumLoading(minLoadingReadyAt) {
@@ -1514,6 +1589,11 @@ function renderLoadingAnswer(message) {
   clearRoutePreview();
   hideAgentActions();
   const loadingSessionId = ++loadingRenderSessionId;
+  const answerEl = $("agentAnswer");
+  if (answerEl) {
+    answerEl.classList.remove("agent-answer--streaming");
+    answerEl.classList.remove("agent-answer--chunk");
+  }
   $("agentAnswer").innerHTML = `
     <div class="thinking-panel" role="status" aria-live="polite" data-loading-session="${loadingSessionId}">
       <div class="thinking-header">
@@ -1525,6 +1605,13 @@ function renderLoadingAnswer(message) {
     </div>
   `;
   return loadingSessionId;
+}
+
+function animateClass(element, className) {
+  if (!element) return;
+  element.classList.remove(className);
+  void element.offsetWidth;
+  element.classList.add(className);
 }
 
 function updateLoadingAnswer(loadingSessionId, message) {
@@ -1768,10 +1855,17 @@ function formatAgentTools(tools = []) {
 }
 
 function formatLoadingTools(tools = []) {
-  const label = formatAgentTools(tools);
-  if (label === "Pending") return "Generating results";
-  const suffix = [...new Set((tools || []).filter(Boolean))].length > 1 ? "tools" : "tool";
-  return `Using ${label} ${suffix}`;
+  const labels = {
+    navigate: "Navigation",
+    route_matrix: "Google Routes",
+    weather_current: "Weather",
+    web_search: "Web Search",
+    tfl_status: "TfL Status",
+  };
+  const normalized = [...new Set((tools || []).filter(Boolean))];
+  const latestTool = normalized[normalized.length - 1];
+  if (!latestTool) return "Generating results";
+  return `Using ${labels[latestTool] || latestTool} tool`;
 }
 
 function hasNavigationResult(result) {
@@ -1964,6 +2058,7 @@ function drawRoutePreview(data, recommended) {
   routePolylines = [];
   routeMarkers.forEach((marker) => marker.setMap(null));
   routeMarkers = [];
+  closeRouteStopInfo({ immediate: true });
   if (routeInfoWindow) routeInfoWindow.close();
 
   routePolylines = drawRoutePolylines(recommended, path);
@@ -2147,9 +2242,101 @@ function routeStopRoleLabel(role) {
 }
 
 function openRouteStopInfo(marker, stop) {
-  if (!routeInfoWindow) routeInfoWindow = new google.maps.InfoWindow();
-  routeInfoWindow.setContent(routeStopInfoHtml(stop));
-  routeInfoWindow.open({ anchor: marker, map: routeMap, shouldFocus: false });
+  if (!routeMap || !marker?.getPosition) return;
+  if (!routeStopOverlay) routeStopOverlay = createRouteStopOverlay();
+  routeStopOverlay.open(marker.getPosition(), routeStopInfoHtml(stop));
+}
+
+function closeRouteStopInfo(options = {}) {
+  if (routeStopOverlayCloseTimer) {
+    window.clearTimeout(routeStopOverlayCloseTimer);
+    routeStopOverlayCloseTimer = null;
+  }
+  if (!routeStopOverlay) return;
+  routeStopOverlay.close(Boolean(options.immediate));
+}
+
+function createRouteStopOverlay() {
+  const overlay = new google.maps.OverlayView();
+  overlay.position = null;
+  overlay.container = null;
+  overlay.isOpen = false;
+
+  overlay.onAdd = function onAdd() {
+    const container = document.createElement("div");
+    container.className = "route-stop-popup";
+    container.addEventListener("mousedown", (event) => event.stopPropagation());
+    container.addEventListener("click", (event) => {
+      const closeButton = event.target.closest(".route-stop-popup-close");
+      if (closeButton) {
+        event.preventDefault();
+        closeRouteStopInfo();
+      }
+      event.stopPropagation();
+    });
+    this.container = container;
+    this.getPanes().floatPane.appendChild(container);
+  };
+
+  overlay.draw = function draw() {
+    if (!this.container || !this.position) return;
+    const projection = this.getProjection();
+    if (!projection) return;
+    const point = projection.fromLatLngToDivPixel(this.position);
+    if (!point) return;
+    this.container.style.left = `${point.x}px`;
+    this.container.style.top = `${point.y}px`;
+  };
+
+  overlay.onRemove = function onRemove() {
+    if (this.container?.parentNode) this.container.parentNode.removeChild(this.container);
+    this.container = null;
+  };
+
+  overlay.open = function open(position, html) {
+    if (routeStopOverlayCloseTimer) {
+      window.clearTimeout(routeStopOverlayCloseTimer);
+      routeStopOverlayCloseTimer = null;
+    }
+    this.position = position;
+    this.isOpen = true;
+    if (!this.getMap()) this.setMap(routeMap);
+    if (this.container) {
+      this.container.innerHTML = routeStopPopupHtml(html);
+      this.container.classList.remove("route-stop-popup--closing");
+      this.container.classList.remove("route-stop-popup--open");
+      void this.container.offsetWidth;
+      this.container.classList.add("route-stop-popup--open");
+    }
+    this.draw();
+  };
+
+  overlay.close = function close(immediate = false) {
+    if (!this.getMap()) return;
+    if (immediate || !this.container) {
+      this.isOpen = false;
+      this.setMap(null);
+      return;
+    }
+    this.container.classList.remove("route-stop-popup--open");
+    this.container.classList.add("route-stop-popup--closing");
+    routeStopOverlayCloseTimer = window.setTimeout(() => {
+      routeStopOverlayCloseTimer = null;
+      this.isOpen = false;
+      this.setMap(null);
+    }, 190);
+  };
+
+  return overlay;
+}
+
+function routeStopPopupHtml(contentHtml) {
+  return `
+    <div class="route-stop-popup-bubble" role="dialog" aria-label="Station details">
+      <button class="route-stop-popup-close" type="button" aria-label="Close station details">×</button>
+      ${contentHtml}
+    </div>
+  `;
 }
 
 function routeStopInfoHtml(stop) {
@@ -2229,6 +2416,7 @@ function clearRoutePreview() {
   routePolylines = [];
   routeMarkers.forEach((marker) => marker.setMap(null));
   routeMarkers = [];
+  closeRouteStopInfo({ immediate: true });
   if (routeInfoWindow) routeInfoWindow.close();
 }
 
