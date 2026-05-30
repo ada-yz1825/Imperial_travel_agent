@@ -304,6 +304,408 @@ const API_BASE_STORAGE_KEY = "imperialNavigatorApiBase";
 const DEFAULT_REMOTE_API_BASE = "https://imperial-travel-agent-api.onrender.com";
 
 const $ = (id) => document.getElementById(id);
+const LANGUAGE_STORAGE_KEY = "imperialNavigatorLanguage";
+let currentLanguage = window.localStorage.getItem(LANGUAGE_STORAGE_KEY) === "zh" ? "zh" : "en";
+
+const I18N = {
+  en: {
+    languageToggle: "中文",
+    pageTitle: "Imperial Travel Agent",
+    heroTitle: "Start Planning your next journey",
+    heroText: "Choose your starting point, ask the agent anything, and get study-space recommendations or live route plans.",
+    llmLabel: "LLM",
+    apiKeys: "API Keys",
+    chooseStart: "Choose where to start",
+    startingLocation: "Starting location",
+    loadingGoogleMap: "Loading Google Map...",
+    selectCampus: "or select campus",
+    mapSelection: "Map selection",
+    useCurrentLocation: "Or use current location",
+    studySpaces: "Study & work spaces",
+    preference: "Preference",
+    quietSpace: "Quiet space",
+    groupWork: "Group work",
+    lateNightWork: "Late night work",
+    nearestSeat: "Nearest seat",
+    walkingComfortLimit: "Walking comfort limit",
+    updateRecommendations: "Update recommendations",
+    loadMoreStudySpaces: "Load more spaces",
+    collapseStudySpaces: "Collapse spaces",
+    travelAgent: "Travel agent",
+    summaryTitle: "Ask to plan, explore, or navigate for your next trip",
+    agentModeTools: "Agent mode or tools",
+    askAgent: "Ask the Agent",
+    questionPlaceholder: "Where are you going? Ask about routes, weather, or anything else.",
+    ask: "Ask",
+    thinking: "Thinking",
+    quickWhiteCity: "Go to White City",
+    quickLibrary: "Nearby library",
+    quickWeather: "Current weather",
+    quickTfl: "TfL status",
+    quickWhiteCityQuestion: "How do I get to White City Campus from my current selected start point?",
+    quickLibraryQuestion: "Which library is nearby from my selected starting point?",
+    quickWeatherQuestion: "What's the current weather at my selected start point right now?",
+    quickTflQuestion: "What's the current TfL status, and are any lines disrupted right now?",
+    agentPlaceholder: "Ready when you are. Ask the agent a question to get started.",
+    routeMap: "Route map",
+    start: "Start",
+    destination: "Destination",
+    transportMode: "Transport mode",
+    update: "Update",
+    fullScreen: "Full screen",
+    exitFullScreen: "Exit full screen",
+    openGoogleMaps: "Open Google Maps for route",
+    continueChat: "Continue in chat window",
+    expandIntro: "Expand introductions to the agent",
+    collapseIntro: "Collapse introductions to the agent",
+    howItWorks: "How it works?",
+    how1Title: "1. Ask with context",
+    how1Body: "Ask in natural language. Start by selecting a location on the map, using your current location, or choosing a campus preset, so the agent can understand where your journey begins.",
+    how2Title: "2. Choose the right workflow",
+    how2Body: "The agent decides whether your question needs tools, including navigation, route comparison, weather, transport status, and web search. Tools are called only when specific live information is needed.",
+    how3Title: "3. Get actionable results",
+    how3Body: "The model uses the route, weather, and other data it receives to give practical advice. For navigation requests, it shows an interactive route preview with station and line details when available.",
+    weather: "Weather",
+    atYour: "At your",
+    startPoint: "start point",
+    currentLocation: "current location",
+    updateWeatherAt: "Update weather data at",
+    destinationButton: "Destination",
+    today: "Today",
+    weatherNotLoaded: "Weather not loaded",
+    weatherHint: "Use your selected start point, current location, or navigation destination.",
+    aiSummary: "AI summary",
+    waitingWeather: "Waiting for weather data.",
+    feelsLike: "Feels like",
+    humidity: "Humidity",
+    wind: "Wind",
+    uv: "UV",
+    precipitation: "Precipitation %",
+    tflStatus: "TfL status",
+    londonLinesNow: "London lines right now",
+    refresh: "Refresh",
+    tflMeta: "Live status from Transport for London.",
+    conversation: "Conversation",
+    agentChat: "Agent chat",
+    close: "Close",
+    modalPlaceholder: "Continue the conversation...",
+    send: "Send",
+    externalConfirm: "You are about to leave this page and open a new tab. Continue?",
+    openNewTab: "Open in new tab",
+    cancel: "Cancel",
+    mapPoint: "Map point {lat}, {lng}",
+    mapPointSelected: "{label} selected",
+    mapGuidance: "Click the map, drag the marker, or use your current location.",
+    locationRequiresHttps: "Location requires HTTPS or localhost.",
+    locationUnavailable: "Could not read your current location.",
+    locationDenied: "Location permission was denied.",
+    locationUnavailableCurrent: "Current location is unavailable.",
+    locationTimedOut: "Location request timed out.",
+    locationUnsupported: "This browser does not support current location.",
+    locationBlockedSettings: "Location permission is blocked. Enable it in your browser site settings.",
+    locationPromptWaiting: "Waiting for browser location permission...",
+    locationReading: "Reading your current location...",
+    locationHighAccuracy: "High-accuracy location is slow; trying a faster approximate location...",
+    locationCached: "Trying the browser's cached location...",
+    locationUsingLastKnown: "Live location is slow; using your last known location.",
+    locationUsingCurrent: "Using your current location.",
+    locationUsingLastKnownShort: "Using your last known location.",
+    locationAccuracyAbout: "Accuracy about {meters} m.",
+    locationButtonLocating: "Locating...",
+    usefulLinks: "Useful links",
+    footerNote: "This is an independent project and is not an official Imperial College London service. Route times and distances are provided by Google Maps and may vary in real time.",
+    checking: "Checking",
+    pending: "Pending",
+    connected: "Connected",
+    offline: "Offline",
+    keysReady: "Keys Ready",
+    browserKeyReady: "Browser key ready",
+    browserKeyMissing: "Browser key missing",
+    routesKeyMissing: "Routes key missing",
+    localApiOffline: "Local API offline",
+    generatingResults: "Generating results",
+    distanceLabel: "Distance",
+    walkEstimateLabel: "Walk est.",
+    minuteUnitShort: "min",
+    usingTool: "Using {tool} tool",
+    understandingRequest: "Understanding your request",
+  },
+  zh: {
+    languageToggle: "English",
+    pageTitle: "Imperial 出行助手",
+    heroTitle: "使用 Agent 规划行程",
+    heroText: "首先选择你的位置，再向 Agent 提出需求，即可获取附近的工作学习空间推荐、实时路线规划、路线交互式地图、交通情况与天气辅助建议。",
+    llmLabel: "大语言模型",
+    apiKeys: "外部 API",
+    chooseStart: "选择出发地点",
+    startingLocation: "出发位置",
+    loadingGoogleMap: "正在加载 Google 地图...",
+    selectCampus: "或选择校区",
+    mapSelection: "地图选点",
+    useCurrentLocation: "使用当前位置",
+    studySpaces: "学习与办公空间",
+    preference: "偏好",
+    quietSpace: "安静学习",
+    groupWork: "小组讨论",
+    lateNightWork: "夜间学习",
+    nearestSeat: "就近找座",
+    walkingComfortLimit: "步行舒适上限",
+    updateRecommendations: "更新推荐",
+    loadMoreStudySpaces: "查看更多空间",
+    collapseStudySpaces: "收起更多空间",
+    travelAgent: "出行 Agent",
+    summaryTitle: "询问路线、天气、学习空间或出行建议",
+    agentModeTools: "Agent 使用的工具",
+    askAgent: "向助手提问",
+    questionPlaceholder: "想去哪？尝试询问路线、天气或其他出行问题。",
+    ask: "发送",
+    thinking: "思考中",
+    quickWhiteCity: "去白城校区",
+    quickLibrary: "附近图书馆",
+    quickWeather: "当前天气",
+    quickTfl: "伦敦地铁状态",
+    quickWhiteCityQuestion: "从我当前选择的出发点怎么去 White City Campus？",
+    quickLibraryQuestion: "从我当前选择的出发点附近有哪些图书馆？",
+    quickWeatherQuestion: "我当前选择的出发点现在天气怎么样？",
+    quickTflQuestion: "现在 TfL 线路状态如何？有没有线路延误或中断？",
+    agentPlaceholder: "准备好了。输入一个问题即可开始。",
+    routeMap: "路线地图",
+    start: "起点",
+    destination: "目的地",
+    transportMode: "交通方式",
+    update: "更新",
+    fullScreen: "全屏地图",
+    exitFullScreen: "退出全屏",
+    openGoogleMaps: "在 Google Maps 中打开路线",
+    continueChat: "在聊天窗口继续",
+    expandIntro: "展开助手说明书",
+    collapseIntro: "收起助手说明",
+    howItWorks: "它如何工作？",
+    how1Title: "1. 带着上下文提问",
+    how1Body: "你可以用自然语言提问。先在地图上选点、使用当前位置，或选择一个校区预设，让助手知道你的行程从哪里开始。",
+    how2Title: "2. 自动选择合适流程",
+    how2Body: "助手会判断你问题是否需要使用工具，包括导航、路线比较、天气、交通状况和网页搜索；工具在有特定需要实时时才会调用。",
+    how3Title: "3. 得到可执行建议",
+    how3Body: "模型会根据得到的路线、天气等数据提供相应的建议；在导航需求中会展示交互式路线预览，并可显示具体车站与线路信息。",
+    weather: "天气",
+    atYour: "天气位置：",
+    startPoint: "地图选择的出发点",
+    currentLocation: "当前位置",
+    updateWeatherAt: "更新天气位置",
+    destinationButton: "目的地",
+    today: "今天",
+    weatherNotLoaded: "天气尚未加载",
+    weatherHint: "可使用出发点、当前位置或导航目的地获取天气。",
+    aiSummary: "AI 简报",
+    waitingWeather: "等待天气数据。",
+    feelsLike: "体感温度",
+    humidity: "湿度",
+    wind: "风速",
+    uv: "紫外线",
+    precipitation: "降水概率",
+    tflStatus: "TFL 运营状况",
+    londonLinesNow: "伦敦线路实时状态",
+    refresh: "刷新",
+    tflMeta: "数据来自 Transport for London 实时状态。",
+    conversation: "对话",
+    agentChat: "Agent聊天",
+    close: "关闭",
+    modalPlaceholder: "继续对话...",
+    send: "发送",
+    externalConfirm: "即将离开当前页面并打开新标签页，是否继续？",
+    openNewTab: "打开新标签页",
+    cancel: "取消",
+    mapPoint: "地图点位 {lat}, {lng}",
+    mapPointSelected: "已选择 {label}",
+    mapGuidance: "点击地图、拖动标记，或使用当前位置。",
+    locationRequiresHttps: "定位需要 HTTPS 或 localhost 环境。",
+    locationUnavailable: "无法读取当前位置。",
+    locationDenied: "定位权限已被拒绝。",
+    locationUnavailableCurrent: "当前位置信息不可用。",
+    locationTimedOut: "定位请求超时。",
+    locationUnsupported: "当前浏览器不支持定位。",
+    locationBlockedSettings: "定位权限已被阻止，请在浏览器站点设置中启用。",
+    locationPromptWaiting: "正在等待浏览器定位权限...",
+    locationReading: "正在读取当前位置...",
+    locationHighAccuracy: "高精度定位较慢，正在尝试更快的近似定位...",
+    locationCached: "正在尝试浏览器缓存的定位...",
+    locationUsingLastKnown: "实时定位较慢，正在使用上次已知位置。",
+    locationUsingCurrent: "正在使用当前位置。",
+    locationUsingLastKnownShort: "正在使用上次已知位置。",
+    locationAccuracyAbout: "精度约 {meters} 米。",
+    locationButtonLocating: "定位中...",
+    usefulLinks: "相关链接",
+    pending: "暂未使用",
+    connected: "已连接",
+    offline: "离线",
+    keysReady: "服务已连接",
+    browserKeyReady: "浏览器已连接",
+    browserKeyMissing: "缺少浏览器密钥",
+    routesKeyMissing: "缺少路线密钥",
+    localApiOffline: "本地 API 离线",
+    generatingResults: "正在生成结果",
+    distanceLabel: "距离",
+    walkEstimateLabel: "步行预估",
+    minuteUnitShort: "分钟",
+    usingTool: "正在使用 {tool} 工具",
+    understandingRequest: "正在理解你的请求",
+  },
+};
+
+function t(key, replacements = {}) {
+  const template = I18N[currentLanguage]?.[key] ?? I18N.en[key] ?? key;
+  return Object.entries(replacements).reduce((text, [name, value]) => text.replaceAll(`{${name}}`, value), template);
+}
+
+function setLanguage(language) {
+  currentLanguage = language === "zh" ? "zh" : "en";
+  window.localStorage.setItem(LANGUAGE_STORAGE_KEY, currentLanguage);
+  applyLanguage();
+  render();
+  if (latestWeatherData && latestWeatherStart) {
+    renderWeatherData(latestWeatherData, latestWeatherStart);
+  }
+  if (latestTflStatusData) {
+    renderTflStatus(latestTflStatusData);
+  }
+  if (activeRoutePreview) renderRoutePreview(activeRoutePreview);
+}
+
+function applyLanguage() {
+  document.documentElement.lang = currentLanguage === "zh" ? "zh-CN" : "en";
+  document.title = t("pageTitle");
+  const languageToggle = $("languageToggle");
+  if (languageToggle) {
+    languageToggle.textContent = t("languageToggle");
+    languageToggle.setAttribute("aria-label", currentLanguage === "zh" ? "Switch to English" : "切换到中文");
+  }
+
+  const textMap = [
+    [".hero-panel .eyebrow", "pageTitle"],
+    [".hero-panel h1", "heroTitle"],
+    [".hero-text", "heroText"],
+    ["#llmSignalTile span", "llmLabel"],
+    ["#routesSignalTile span", "apiKeys"],
+    [".start-module .left-section-title", "chooseStart"],
+    ["label[for='startPoint']", "startingLocation"],
+    [".select-note", "selectCampus"],
+    ["#useCurrentLocation", "useCurrentLocation"],
+    [".recommendation-module .left-section-title", "studySpaces"],
+    ["label[for='scenario']", "preference"],
+    [".field-row span", "walkingComfortLimit"],
+    ["#updateRecommendations", "updateRecommendations"],
+    [".agent-module .left-section-title", "travelAgent"],
+    ["#summaryTitle", "summaryTitle"],
+    ["#agentToolsTile span", "agentModeTools"],
+    ["label[for='userQuestion']", "askAgent"],
+    ["#askButton", "ask"],
+    ["#routePreviewTitle", "routeMap"],
+    [".route-endpoints div:first-child span", "start"],
+    [".route-endpoints div:last-child span", "destination"],
+    ["label[for='routeModeSelect']", "transportMode"],
+    ["#routeUpdateButton", "update"],
+    ["#routeFullscreenButton", routeMapFullscreen ? "exitFullScreen" : "fullScreen"],
+    ["#googleMapsLink", "openGoogleMaps"],
+    ["#openChatButton", "continueChat"],
+    [".how-it-works .eyebrow", "howItWorks"],
+    [".how-grid div:nth-child(1) strong", "how1Title"],
+    [".how-grid div:nth-child(1) span", "how1Body"],
+    [".how-grid div:nth-child(2) strong", "how2Title"],
+    [".how-grid div:nth-child(2) span", "how2Body"],
+    [".how-grid div:nth-child(3) strong", "how3Title"],
+    [".how-grid div:nth-child(3) span", "how3Body"],
+    [".weather-module .eyebrow", "weather"],
+    [".weather-action-label", "updateWeatherAt"],
+    ["#updateWeatherCurrentButton", "currentLocation"],
+    ["#updateWeatherDestinationButton", "destinationButton"],
+    [".weather-summary-label", "aiSummary"],
+    [".weather-metric-card[data-weather-metric='feelsLike'] span", "feelsLike"],
+    [".weather-metric-card[data-weather-metric='humidity'] span", "humidity"],
+    [".weather-metric-card[data-weather-metric='wind'] span", "wind"],
+    [".weather-metric-card[data-weather-metric='uv'] span", "uv"],
+    [".weather-metric-card[data-weather-metric='precipitation'] span", "precipitation"],
+    [".tfl-module .eyebrow", "tflStatus"],
+    ["#refreshTflStatus", "refresh"],
+    [".chat-modal-header .eyebrow", "conversation"],
+    ["#chatModalTitle", "agentChat"],
+    ["#closeChatButton", "close"],
+    ["#modalAskButton", "send"],
+    ["#confirmOpenLink", "openNewTab"],
+    ["#cancelOpenLink", "cancel"],
+    ["#closeToolInfo", "close"],
+    [".footer-useful-links-title", "usefulLinks"],
+    [".sig-note", "footerNote"],
+  ];
+  textMap.forEach(([selector, key]) => setElementText(selector, t(key)));
+
+  setElementText("#weatherScopePrefix", t("atYour"));
+  const questionInput = $("userQuestion");
+  if (questionInput) questionInput.placeholder = t("questionPlaceholder");
+  const modalInput = $("modalUserQuestion");
+  if (modalInput) modalInput.placeholder = t("modalPlaceholder");
+
+  const startOptions = {
+    mapSelection: t("mapSelection"),
+    southKensington: "South Kensington",
+    whiteCity: "White City",
+    hammersmith: "Hammersmith",
+    stMarys: "St Mary's",
+  };
+  document.querySelectorAll("#startPoint option").forEach((option) => {
+    option.textContent = startOptions[option.value] || option.textContent;
+  });
+  const scenarioOptions = {
+    focus: t("quietSpace"),
+    group: t("groupWork"),
+    late: t("lateNightWork"),
+    nearest: t("nearestSeat"),
+  };
+  document.querySelectorAll("#scenario option").forEach((option) => {
+    option.textContent = scenarioOptions[option.value] || option.textContent;
+  });
+
+  const quickPrompts = [
+    ["quickWhiteCity", "quickWhiteCityQuestion"],
+    ["quickLibrary", "quickLibraryQuestion"],
+    ["quickWeather", "quickWeatherQuestion"],
+    ["quickTfl", "quickTflQuestion"],
+  ];
+  document.querySelectorAll(".quick-prompts button").forEach((button, index) => {
+    const config = quickPrompts[index];
+    if (!config) return;
+    button.textContent = t(config[0]);
+    button.dataset.question = t(config[1]);
+  });
+
+  const placeholder = document.querySelector(".agent-answer-placeholder-text");
+  if (placeholder) placeholder.textContent = t("agentPlaceholder");
+  if ($("weatherTemperature")?.textContent === "Weather not loaded" || $("weatherTemperature")?.textContent === "天气尚未加载") {
+    $("weatherTemperature").textContent = t("weatherNotLoaded");
+  }
+  if ($("weatherDay")?.textContent === "Today" || $("weatherDay")?.textContent === "今天") {
+    $("weatherDay").textContent = t("today");
+  }
+  if ($("weatherDescription")?.textContent) {
+    const current = $("weatherDescription").textContent;
+    if (current.includes("Use your selected") || current.includes("可使用")) $("weatherDescription").textContent = t("weatherHint");
+  }
+  if ($("weatherSummary")?.textContent.includes("Waiting") || $("weatherSummary")?.textContent.includes("等待")) {
+    $("weatherSummary").textContent = t("waitingWeather");
+  }
+  if ($("weatherMeta")?.textContent.includes("Waiting") || $("weatherMeta")?.textContent.includes("等待")) {
+    $("weatherMeta").textContent = t("waitingWeather");
+  }
+  updateHowItWorksToggle();
+  updateRecommendationLoadMoreButton();
+  updateOutputs();
+  setWeatherScope(lastWeatherScope, lastWeatherScopeLocation);
+  updateAgentModeSignal(integrationStatus.tools, false);
+}
+
+function setElementText(selector, text) {
+  const element = document.querySelector(selector);
+  if (element) element.textContent = text;
+}
 
 function normalizeApiBase(value) {
   return String(value || "").trim().replace(/\/+$/, "");
@@ -408,7 +810,12 @@ let weatherRequestId = 0;
 let weatherUpdatedForKey = "";
 let weatherSummaryRequestId = 0;
 let weatherSummaryUpdatedForKey = "";
+let lastWeatherScope = "start point";
+let lastWeatherScopeLocation = "";
+let latestWeatherData = null;
+let latestWeatherStart = null;
 let tflStatusRequestId = 0;
+let latestTflStatusData = null;
 let latestNavigationData = null;
 const chatHistory = [];
 let lastAnimatedChatMessageKey = "";
@@ -514,24 +921,24 @@ function scorePlace(place, context) {
 }
 
 function getRisk(place, transit, rainPenalty, walkingPenalty) {
-  if (rainPenalty > 10) return { label: "Weather risk", className: "warning" };
-  if (transit > 48) return { label: "Long journey", className: "caution" };
-  if (walkingPenalty > 0) return { label: "Over walk limit", className: "caution" };
-  if (place.budget < 62) return { label: "Cost trade-off", className: "caution" };
-  return { label: "Good fit", className: "ok" };
+  if (rainPenalty > 10) return { label: currentLanguage === "zh" ? "天气风险" : "Weather risk", className: "warning" };
+  if (transit > 48) return { label: currentLanguage === "zh" ? "路程较远" : "Long journey", className: "caution" };
+  if (walkingPenalty > 0) return { label: currentLanguage === "zh" ? "超过步行上限" : "Over walk limit", className: "caution" };
+  if (place.budget < 62) return { label: currentLanguage === "zh" ? "费用权衡" : "Cost trade-off", className: "caution" };
+  return { label: currentLanguage === "zh" ? "匹配度高" : "Good fit", className: "ok" };
 }
 
 function getDecision(place, context, transit, rainPenalty) {
   if (rainPenalty > 10 && place.tags.includes("outdoor")) {
-    return "Less ideal in wet weather.";
+    return currentLanguage === "zh" ? "雨天不太理想。" : "Less ideal in wet weather.";
   }
   if (transit < 26 && place.comfort > 80) {
-    return "Short trip, high comfort.";
+    return currentLanguage === "zh" ? "距离近，舒适度高。" : "Short trip, high comfort.";
   }
   if (transit < 20) {
-    return "A solid match with short travel.";
+    return currentLanguage === "zh" ? "路程短，整体匹配。" : "A solid match with short travel.";
   }
-  return "A solid match nearby.";
+  return currentLanguage === "zh" ? "附近较合适的选择。" : "A solid match nearby.";
 }
 
 function render() {
@@ -539,10 +946,10 @@ function render() {
 
   const context = getContext();
 
-  $("llmSignal").textContent = integrationStatus.llm;
-  $("routesSignal").textContent = integrationStatus.routes;
-  const mapsSig = $("mapsSignal"); if (mapsSig) mapsSig.textContent = integrationStatus.maps;
-  const mcpSig = $("mcpSignal"); if (mcpSig) mcpSig.textContent = integrationStatus.mcp;
+  $("llmSignal").textContent = translateStatusText(integrationStatus.llm);
+  $("routesSignal").textContent = translateStatusText(integrationStatus.routes);
+  const mapsSig = $("mapsSignal"); if (mapsSig) mapsSig.textContent = translateStatusText(integrationStatus.maps);
+  const mcpSig = $("mcpSignal"); if (mcpSig) mcpSig.textContent = translateStatusText(integrationStatus.mcp);
   updateAgentModeSignal(integrationStatus.tools, false);
   maybeShowStartupWaitModal();
 
@@ -559,12 +966,12 @@ function updateRecommendationLoadMoreButton() {
   const button = $("loadMoreStudySpaces");
   if (!button) return;
   if (recommendationDisplayLimit >= 6) {
-    button.textContent = "Collapse study spaces";
+    button.textContent = t("collapseStudySpaces");
     button.setAttribute("aria-expanded", "true");
     button.disabled = false;
     return;
   }
-  button.textContent = "Load more study spaces";
+  button.textContent = t("loadMoreStudySpaces");
   button.setAttribute("aria-expanded", "false");
   button.disabled = false;
 }
@@ -583,7 +990,7 @@ function updateHowItWorksToggle() {
   const button = $("expandHowItWorks");
   if (!section || !button) return;
   const isExpanded = !section.hidden;
-  button.textContent = isExpanded ? "Collapse introductions to the agent" : "Expand introductions to the agent";
+  button.textContent = isExpanded ? t("collapseIntro") : t("expandIntro");
   button.setAttribute("aria-expanded", String(isExpanded));
 }
 
@@ -608,8 +1015,9 @@ function setGoogleMapsStatus(browserReady, routesReady) {
   routesKeyConfigured = routesReady;
   integrationStatus.maps = browserReady ? "Browser key ready" : "Browser key missing";
   integrationStatus.routes = formatApiKeysStatus(browserReady, routesReady);
-  const routesEl = $("routesSignal"); if (routesEl) routesEl.textContent = integrationStatus.routes;
-  const mapsEl = $("mapsSignal"); if (mapsEl) mapsEl.textContent = integrationStatus.maps;
+  const routesEl = $("routesSignal");
+  if (routesEl) routesEl.textContent = translateStatusText(integrationStatus.routes);
+  const mapsEl = $("mapsSignal"); if (mapsEl) mapsEl.textContent = translateStatusText(integrationStatus.maps);
 }
 
 function formatApiKeysStatus(browserReady, routesReady) {
@@ -656,22 +1064,24 @@ function weatherIconEmoji(conditionType, isDaytime) {
 
 function weatherConditionLabel(conditionType, isDaytime) {
   const type = String(conditionType || "").toUpperCase();
-  if (type.includes("THUNDER")) return "Stormy";
-  if (type.includes("RAIN") || type.includes("DRIZZLE")) return "Rainy";
-  if (type.includes("SNOW") || type.includes("ICE")) return "Snowy";
-  if (type.includes("FOG") || type.includes("HAZE") || type.includes("MIST")) return "Foggy";
-  if (type.includes("CLOUD")) return "Cloudy";
-  return isDaytime === false ? "Night" : "Sunny";
+  const zh = currentLanguage === "zh";
+  if (type.includes("THUNDER")) return zh ? "雷暴" : "Stormy";
+  if (type.includes("RAIN") || type.includes("DRIZZLE")) return zh ? "有雨" : "Rainy";
+  if (type.includes("SNOW") || type.includes("ICE")) return zh ? "降雪" : "Snowy";
+  if (type.includes("FOG") || type.includes("HAZE") || type.includes("MIST")) return zh ? "低能见度" : "Foggy";
+  if (type.includes("CLOUD")) return zh ? "多云" : "Cloudy";
+  return isDaytime === false ? (zh ? "夜间" : "Night") : (zh ? "晴朗" : "Sunny");
 }
 
 function weatherConditionSummary(conditionType, isDaytime) {
   const type = String(conditionType || "").toUpperCase();
-  if (type.includes("THUNDER")) return "Stormy conditions";
-  if (type.includes("RAIN") || type.includes("DRIZZLE")) return "Rain expected";
-  if (type.includes("SNOW") || type.includes("ICE")) return "Snowy conditions";
-  if (type.includes("FOG") || type.includes("HAZE") || type.includes("MIST")) return "Low visibility";
-  if (type.includes("CLOUD")) return "Cloud cover";
-  return isDaytime === false ? "Night conditions" : "Sunny weather";
+  const zh = currentLanguage === "zh";
+  if (type.includes("THUNDER")) return zh ? "雷暴天气" : "Stormy conditions";
+  if (type.includes("RAIN") || type.includes("DRIZZLE")) return zh ? "可能有雨" : "Rain expected";
+  if (type.includes("SNOW") || type.includes("ICE")) return zh ? "降雪或结冰" : "Snowy conditions";
+  if (type.includes("FOG") || type.includes("HAZE") || type.includes("MIST")) return zh ? "能见度较低" : "Low visibility";
+  if (type.includes("CLOUD")) return zh ? "云量较多" : "Cloud cover";
+  return isDaytime === false ? (zh ? "夜间天气" : "Night conditions") : (zh ? "晴朗天气" : "Sunny weather");
 }
 
 function formatWeatherDay(currentTime) {
@@ -683,7 +1093,7 @@ function formatWeatherDay(currentTime) {
   }
 }
 
-function setWeatherLoading(message = "Loading weather data...") {
+function setWeatherLoading(message = currentLanguage === "zh" ? "正在加载天气数据..." : "Loading weather data...") {
   weatherSummaryRequestId += 1;
   [$("updateWeatherCurrentButton"), $("updateWeatherDestinationButton")].forEach((button) => {
     if (!button) return;
@@ -692,8 +1102,9 @@ function setWeatherLoading(message = "Loading weather data...") {
   $("weatherTemperature").textContent = "Loading...";
   $("weatherDescription").textContent = message;
   $("weatherDescription").hidden = false;
-  setWeatherSummary("Waiting for the LLM summary...");
-  $("weatherMeta").textContent = "Fetching current conditions from Google Weather API.";
+  $("weatherTemperature").textContent = currentLanguage === "zh" ? "加载中..." : "Loading...";
+  setWeatherSummary(currentLanguage === "zh" ? "正在等待 AI 简报..." : "Waiting for the LLM summary...");
+  $("weatherMeta").textContent = currentLanguage === "zh" ? "正在从 Google Weather API 获取当前天气。" : "Fetching current conditions from Google Weather API.";
 }
 
 function setWeatherButtonReady() {
@@ -701,25 +1112,28 @@ function setWeatherButtonReady() {
   const destinationButton = $("updateWeatherDestinationButton");
   if (currentButton) {
     currentButton.disabled = false;
-    currentButton.textContent = "Current location";
+    currentButton.textContent = t("currentLocation");
   }
   if (destinationButton) {
     destinationButton.disabled = false;
-    destinationButton.textContent = "Destination";
+    destinationButton.textContent = t("destinationButton");
   }
 }
 
 function setWeatherScope(scope = "start point", locationName = "") {
   const label = $("weatherScopeLabel");
   if (!label) return;
+  lastWeatherScope = scope;
+  lastWeatherScopeLocation = locationName;
   const isDestination = scope === "destination";
-  const isCurrentLocation = scope === "current location" || scope === "start point";
+  const isCurrentLocation = scope === "current location";
+  const isCurrentOrStart = isCurrentLocation || scope === "start point";
   const cleanLocationName = String(locationName || "").trim();
   label.textContent = isDestination && cleanLocationName
-    ? `destination: ${cleanLocationName}`
-    : (isDestination ? "destination" : (isCurrentLocation ? "current location" : "start point"));
+    ? `${t("destination").toLowerCase()}: ${cleanLocationName}`
+    : (isDestination ? t("destination").toLowerCase() : (isCurrentLocation ? t("currentLocation") : t("startPoint")));
   label.classList.toggle("destination", isDestination);
-  $("updateWeatherCurrentButton")?.classList.toggle("is-active", isCurrentLocation);
+  $("updateWeatherCurrentButton")?.classList.toggle("is-active", isCurrentOrStart);
   $("updateWeatherDestinationButton")?.classList.toggle("is-active", isDestination);
 }
 
@@ -766,6 +1180,8 @@ function restoreWeatherState(state) {
 }
 
 function renderWeatherData(data, start) {
+  latestWeatherData = data;
+  latestWeatherStart = start;
   setWeatherScope(start?.weatherScope === "destination" ? "destination" : "start point", start?.label);
   const weatherCard = $("weatherCard");
   if (weatherCard) {
@@ -783,9 +1199,11 @@ function renderWeatherData(data, start) {
   $("weatherWind").textContent = formatWind(data?.wind);
   $("weatherUv").textContent = Number.isFinite(data?.uvIndex) ? String(data.uvIndex) : "--";
   $("weatherPrecipitation").textContent = formatPrecipitationProbability(data);
-  const time = data?.currentTime ? new Date(data.currentTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "just now";
-  $("weatherMeta").textContent = `${start.label || "Selected start point"} · ${start.lat.toFixed(4)}, ${start.lng.toFixed(4)} · Updated ${time}`;
-  setWeatherSummaryLoading("Generating a short weather summary");
+  const time = data?.currentTime ? new Date(data.currentTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : (currentLanguage === "zh" ? "刚刚" : "just now");
+  $("weatherMeta").textContent = currentLanguage === "zh"
+    ? `${start.label || "已选出发点"} · ${start.lat.toFixed(4)}, ${start.lng.toFixed(4)} · 更新于 ${time}`
+    : `${start.label || "Selected start point"} · ${start.lat.toFixed(4)}, ${start.lng.toFixed(4)} · Updated ${time}`;
+  setWeatherSummaryLoading(currentLanguage === "zh" ? "正在生成天气简报" : "Generating a short weather summary");
   void refreshWeatherSummary(data, start);
 }
 
@@ -797,9 +1215,9 @@ function renderWeatherError(message) {
     animateClass(weatherCard, "weather-card--reveal");
   }
   const fallbackSummary = buildWeatherFallbackSummary(null, null, message);
-  $("weatherDay").textContent = "Today";
+  $("weatherDay").textContent = t("today");
   $("weatherIcon").textContent = "--";
-  $("weatherTemperature").textContent = "Weather unavailable";
+  $("weatherTemperature").textContent = currentLanguage === "zh" ? "天气不可用" : "Weather unavailable";
   $("weatherDescription").textContent = message;
   $("weatherDescription").hidden = false;
   $("weatherFeelsLike").textContent = "--";
@@ -808,30 +1226,31 @@ function renderWeatherError(message) {
   $("weatherUv").textContent = "--";
   $("weatherPrecipitation").textContent = "--";
   setWeatherSummary(fallbackSummary);
-  $("weatherMeta").textContent = "Check that Weather API is enabled for your Google Maps browser key.";
+  $("weatherMeta").textContent = currentLanguage === "zh" ? "请确认 Google Maps 浏览器密钥已启用 Weather API。" : "Check that Weather API is enabled for your Google Maps browser key.";
 }
 
 function buildWeatherFallbackSummary(data, start, errorMessage = "") {
-  if (errorMessage) return "Weather details are currently unavailable, but the app will try again shortly.";
+  const zh = currentLanguage === "zh";
+  if (errorMessage) return zh ? "当前天气详情暂不可用，应用会稍后再次尝试获取。" : "Weather details are currently unavailable, but the app will try again shortly.";
   const condition = String(data?.weatherCondition?.description?.text || "weather").toLowerCase();
   const temp = Number(data?.temperature?.degrees);
   const feelsLike = Number(data?.feelsLikeTemperature?.degrees);
   const windSpeed = Number(data?.wind?.speed?.value);
   const pieces = [];
 
-  if (condition.includes("rain") || condition.includes("drizzle")) pieces.push("Wet conditions");
-  else if (condition.includes("cloud")) pieces.push("Cloudy skies");
-  else if (condition.includes("sun") || condition.includes("clear")) pieces.push("Bright weather");
-  else if (condition.includes("snow")) pieces.push("Cold, wintry weather");
-  else if (condition.includes("fog") || condition.includes("mist") || condition.includes("haze")) pieces.push("Low visibility");
-  else pieces.push("Current conditions");
+  if (condition.includes("rain") || condition.includes("drizzle")) pieces.push(zh ? "有雨，路面可能湿滑" : "Wet conditions");
+  else if (condition.includes("cloud")) pieces.push(zh ? "云量较多" : "Cloudy skies");
+  else if (condition.includes("sun") || condition.includes("clear")) pieces.push(zh ? "天气明亮" : "Bright weather");
+  else if (condition.includes("snow")) pieces.push(zh ? "天气寒冷并可能有雪" : "Cold, wintry weather");
+  else if (condition.includes("fog") || condition.includes("mist") || condition.includes("haze")) pieces.push(zh ? "能见度偏低" : "Low visibility");
+  else pieces.push(zh ? "当前天气状况" : "Current conditions");
 
-  if (Number.isFinite(temp)) pieces.push(`around ${Math.round(temp)}°C`);
-  if (Number.isFinite(feelsLike) && Math.abs(feelsLike - temp) >= 2) pieces.push(`feels like ${Math.round(feelsLike)}°C`);
-  if (Number.isFinite(windSpeed)) pieces.push(`with a ${Math.round(windSpeed)} km/h breeze`);
+  if (Number.isFinite(temp)) pieces.push(zh ? `约 ${Math.round(temp)}°C` : `around ${Math.round(temp)}°C`);
+  if (Number.isFinite(feelsLike) && Math.abs(feelsLike - temp) >= 2) pieces.push(zh ? `体感 ${Math.round(feelsLike)}°C` : `feels like ${Math.round(feelsLike)}°C`);
+  if (Number.isFinite(windSpeed)) pieces.push(zh ? `风速约 ${Math.round(windSpeed)} km/h` : `with a ${Math.round(windSpeed)} km/h breeze`);
 
-  const location = start?.label ? ` near ${start.label}` : "";
-  return `${pieces.join(", ")}${location}.`;
+  const location = start?.label ? (zh ? `，位置在 ${start.label} 附近` : ` near ${start.label}`) : "";
+  return zh ? `${pieces.join("，")}${location}。` : `${pieces.join(", ")}${location}.`;
 }
 
 function normalizeWeatherSummary(value) {
@@ -899,7 +1318,7 @@ function compactWeatherContext(data, start) {
 }
 
 async function refreshWeatherSummary(data, start) {
-  const summaryKey = `${start?.lat?.toFixed?.(5) || ""},${start?.lng?.toFixed?.(5) || ""}:${data?.currentTime || ""}:${data?.weatherCondition?.description?.text || ""}`;
+  const summaryKey = `${currentLanguage}:${start?.lat?.toFixed?.(5) || ""},${start?.lng?.toFixed?.(5) || ""}:${data?.currentTime || ""}:${data?.weatherCondition?.description?.text || ""}`;
   if (summaryKey === weatherSummaryUpdatedForKey) return;
   weatherSummaryUpdatedForKey = summaryKey;
   const requestId = ++weatherSummaryRequestId;
@@ -911,9 +1330,12 @@ async function refreshWeatherSummary(data, start) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         stream: false,
-        question: "Write a short, natural weather summary for the weather card.",
+        question: currentLanguage === "zh"
+          ? "请用自然、简短的中文为天气卡片写 1-2 句话天气简报。不要使用 Markdown 标题。"
+          : "Write a short, natural weather summary for the weather card in 1-2 sentences. Do not use Markdown headings.",
         context: {
           task: "weather_summary",
+          language: currentLanguage === "zh" ? "Chinese" : "English",
           weather: compactWeatherContext(data, start),
         },
         history: [],
@@ -946,7 +1368,9 @@ async function refreshWeatherForStart(start = getStartPoint(), force = false, op
   const previousState = options.preserveOnError ? captureWeatherState() : null;
   weatherUpdatedForKey = weatherKey;
   animateClass($("weatherCard"), "weather-card--loading");
-  setWeatherLoading(`Checking weather near ${start.label || "your selected start point"}...`);
+  setWeatherLoading(currentLanguage === "zh"
+    ? `正在查询 ${start.label || "已选出发点"} 附近的天气...`
+    : `Checking weather near ${start.label || "your selected start point"}...`);
   try {
     const response = await fetch(weatherApiUrl(start, googleMapsBrowserKey));
     const data = await response.json();
@@ -1037,7 +1461,13 @@ function sortTflLines(lines) {
 }
 
 function formatTflMode(mode) {
-  const labels = {
+  const labels = currentLanguage === "zh" ? {
+    "elizabeth-line": "伊丽莎白线",
+    dlr: "DLR",
+    overground: "地上铁",
+    tram: "有轨电车",
+    tube: "地铁",
+  } : {
     "elizabeth-line": "Elizabeth line",
     dlr: "DLR",
     overground: "Overground",
@@ -1045,6 +1475,153 @@ function formatTflMode(mode) {
     tube: "Tube",
   };
   return labels[mode] || mode || "TfL";
+}
+
+function translateTflStatus(status) {
+  const text = String(status || "Unknown").trim();
+  if (currentLanguage !== "zh") return text;
+  const labels = {
+    "Good Service": "正常运营",
+    "Minor Delays": "轻微延误",
+    "Severe Delays": "严重延误",
+    "Part Closure": "部分关闭",
+    "Part Closed": "部分关闭",
+    "Planned Closure": "计划关闭",
+    "Suspended": "暂停运营",
+    "Part Suspended": "部分暂停",
+    "Service Closed": "服务关闭",
+    "Reduced Service": "班次减少",
+    "Special Service": "特殊运营",
+    "Bus Service": "巴士服务",
+    "No Step Free Access": "无无障碍通行",
+    "Information": "运营信息",
+    "Closure": "关闭",
+    "Unknown": "未知状态",
+  };
+  return labels[text] || text;
+}
+
+function translateTflReason(reason) {
+  const original = String(reason || "").trim();
+  if (!original || currentLanguage !== "zh") return original;
+  const exact = {
+    "Good service": "正常运营。",
+    "Good Service": "正常运营。",
+    "Part Closure": "部分关闭。",
+    "Part closure": "部分关闭。",
+    "Minor Delays": "轻微延误。",
+    "Severe Delays": "严重延误。",
+  };
+  if (exact[original]) return exact[original];
+  const structured = translateStructuredTflReason(original);
+  if (structured) return structured;
+  return original
+    .replace(/\bGood service\b/gi, "正常运营")
+    .replace(/\bPart Closure\b/gi, "部分关闭")
+    .replace(/\bPart closure\b/gi, "部分关闭")
+    .replace(/\bMinor Delays\b/gi, "轻微延误")
+    .replace(/\bSevere Delays\b/gi, "严重延误")
+    .replace(/\bSuspended\b/gi, "暂停运营")
+    .replace(/\bReduced Service\b/gi, "班次减少")
+    .replace(/\bNo service\b/gi, "无服务")
+    .replace(/\bPlanned closure\b/gi, "计划关闭")
+    .replace(/\ban earlier points failure\b/gi, "早前发生的道岔故障")
+    .replace(/\bpoints failure\b/gi, "道岔故障")
+    .replace(/\bearlier points failure\b/gi, "早前发生的道岔故障")
+    .replace(/\bplanned engineering works?\b/gi, "计划性工程维护")
+    .replace(/\bengineering works?\b/gi, "工程维护")
+    .replace(/\btrack fault\b/gi, "轨道故障")
+    .replace(/\bsignal failure\b/gi, "信号故障")
+    .replace(/\btrain cancellations?\b/gi, "列车取消")
+    .replace(/\bshortage of trains?\b/gi, "列车不足")
+    .replace(/\bshortage of train crew\b/gi, "列车工作人员不足")
+    .replace(/\bfaulty train\b/gi, "列车故障")
+    .replace(/\bcustomer incident\b/gi, "乘客事件")
+    .replace(/\bpassenger incident\b/gi, "乘客事件")
+    .replace(/\boperational restrictions?\b/gi, "运营限制")
+    .replace(/\bon the rest of the line\b/gi, "其余区段")
+    .replace(/\bbetween\b/gi, "在")
+    .replace(/\band\b/gi, "和")
+    .replace(/\bdue to\b/gi, "原因：")
+    .replace(/\bbecause of\b/gi, "原因：")
+    .replace(/\buntil\b/gi, "持续至");
+}
+
+function translateStructuredTflReason(reason) {
+  const statusPattern = "(Good service|Minor delays|Severe delays|Part closure|Part Closure|Planned closure|No service|Suspended|Part suspended|Reduced service)";
+  const betweenPattern = new RegExp(`^([^:]+Line):\\s*${statusPattern}\\s+between\\s+(.+?)\\s+and\\s+(.+?)(?:\\s+due to\\s+(.+?))?\\.?(?:\\s+(?:GOOD SERVICE|Good service)\\s+on\\s+the\\s+rest\\s+of\\s+the\\s+line\\.?)?$`, "i");
+  const betweenMatch = reason.match(betweenPattern);
+  if (betweenMatch) {
+    const [, lineName, status, from, to, cause] = betweenMatch;
+    const causeText = cause ? `，原因是${translateTflCause(cause)}` : "";
+    const restText = /good service\s+on\s+the\s+rest\s+of\s+the\s+line/i.test(reason) ? "。其余区段正常运营。" : "。";
+    return `${lineName}：${from} 至 ${to} 之间${translateTflInlineStatus(status)}${causeText}${restText}`;
+  }
+
+  const simplePattern = new RegExp(`^([^:]+Line):\\s*${statusPattern}\\.?$`, "i");
+  const simpleMatch = reason.match(simplePattern);
+  if (simpleMatch) {
+    const [, lineName, status] = simpleMatch;
+    return `${lineName}：${translateTflInlineStatus(status)}。`;
+  }
+
+  const causePattern = new RegExp(`^([^:]+Line):\\s*${statusPattern}\\s+due to\\s+(.+?)\\.?$`, "i");
+  const causeMatch = reason.match(causePattern);
+  if (causeMatch) {
+    const [, lineName, status, cause] = causeMatch;
+    return `${lineName}：${translateTflInlineStatus(status)}，原因是${translateTflCause(cause)}。`;
+  }
+
+  const restOnlyMatch = reason.match(/^(?:GOOD SERVICE|Good service)\s+on\s+the\s+rest\s+of\s+the\s+line\.?$/i);
+  if (restOnlyMatch) return "其余区段正常运营。";
+
+  return "";
+}
+
+function translateTflInlineStatus(status) {
+  const labels = {
+    "good service": "正常运营",
+    "minor delays": "轻微延误",
+    "severe delays": "严重延误",
+    "part closure": "部分关闭",
+    "planned closure": "计划关闭",
+    "no service": "无服务",
+    "suspended": "暂停运营",
+    "part suspended": "部分暂停",
+    "reduced service": "班次减少",
+  };
+  return labels[String(status || "").trim().toLowerCase()] || translateTflStatus(status);
+}
+
+function translateTflCause(cause) {
+  let text = String(cause || "").trim().replace(/\.$/, "");
+  const atMatch = text.match(/^(?:an?\s+)?(?:earlier\s+)?(.+?)\s+at\s+(.+)$/i);
+  if (atMatch) {
+    const [, event, place] = atMatch;
+    return `${place} ${translateTflCauseEvent(event, true)}`;
+  }
+  return translateTflCauseEvent(text, false);
+}
+
+function translateTflCauseEvent(event, withOccurred = false) {
+  const clean = String(event || "").trim().toLowerCase();
+  const labels = [
+    [/^points failure$/, "道岔故障"],
+    [/^track fault$/, "轨道故障"],
+    [/^signal failure$/, "信号故障"],
+    [/^faulty train$/, "列车故障"],
+    [/^customer incident$/, "乘客事件"],
+    [/^passenger incident$/, "乘客事件"],
+    [/^planned engineering works?$/, "计划性工程维护"],
+    [/^engineering works?$/, "工程维护"],
+    [/^train cancellations?$/, "列车取消"],
+    [/^shortage of trains?$/, "列车不足"],
+    [/^shortage of train crew$/, "列车工作人员不足"],
+    [/^operational restrictions?$/, "运营限制"],
+  ];
+  const match = labels.find(([pattern]) => pattern.test(clean));
+  const translated = match ? match[1] : String(event || "").trim();
+  return withOccurred ? `发生${translated}` : translated;
 }
 
 function displayTflLineName(line) {
@@ -1056,35 +1633,39 @@ function displayTflLineName(line) {
 }
 
 function setTflStatusLoading() {
-  $("tflStatusTitle").textContent = "London lines right now: loading status...";
+  $("tflStatusTitle").textContent = currentLanguage === "zh" ? "伦敦线路实时状态：正在加载..." : "London lines right now: loading status...";
   hideTflTooltip();
   $("tflLines").innerHTML = "";
-  $("tflStatusMeta").textContent = "Live status from Transport for London.";
+  $("tflStatusMeta").textContent = t("tflMeta");
   const button = $("refreshTflStatus");
   if (button) button.disabled = true;
 }
 
 function renderTflStatusError(message) {
-  $("tflStatusTitle").textContent = "London lines right now: status unavailable";
+  $("tflStatusTitle").textContent = currentLanguage === "zh" ? "伦敦线路实时状态：暂不可用" : "London lines right now: status unavailable";
   $("tflLines").innerHTML = "";
-  $("tflStatusMeta").textContent = message || "Try refreshing in a moment.";
+  $("tflStatusMeta").textContent = message || (currentLanguage === "zh" ? "请稍后刷新重试。" : "Try refreshing in a moment.");
 }
 
 function renderTflStatus(data) {
+  latestTflStatusData = data;
   const lines = sortTflLines(Array.isArray(data?.lines) ? data.lines : []);
   const summary = data?.summary || {};
   const disrupted = Number(summary.disrupted || 0);
   const total = Number(summary.total || lines.length || 0);
   const statusText = disrupted
-    ? `${disrupted} of ${total} TfL lines reporting disruption.`
-    : `${total} TfL lines reporting good service.`;
-  $("tflStatusTitle").textContent = `London lines right now: ${statusText}`;
+    ? (currentLanguage === "zh" ? `${total} 条 TfL 线路中有 ${disrupted} 条报告了非正常运营` : `${disrupted} of ${total} TfL lines reporting disruption.`)
+    : (currentLanguage === "zh" ? `${total} 条 TfL 线路均显示正常服务。` : `${total} TfL lines reporting good service.`);
+  $("tflStatusTitle").textContent = currentLanguage === "zh"
+    ? `${t("londonLinesNow")}：${statusText}`
+    : `${t("londonLinesNow")}: ${statusText}`;
 
   $("tflLines").innerHTML = lines.map((line, index) => {
-    const reason = line.reason || "";
+    const reason = translateTflReason(line.reason || "");
+    const status = translateTflStatus(line.status);
     const color = tflLineColor(line.id);
     const reasonAttributes = reason
-      ? ` data-reason="${escapeHtml(reason)}" aria-label="${escapeHtml(`${line.status || "Status"}: ${reason}`)}"`
+      ? ` data-reason="${escapeHtml(reason)}" aria-label="${escapeHtml(`${status}: ${reason}`)}"`
       : "";
     return `
       <div class="tfl-line ${tflStatusClass(line.severity)}" style="--line-color: ${escapeHtml(color)}; --line-index: ${index}">
@@ -1092,7 +1673,7 @@ function renderTflStatus(data) {
           <div class="tfl-line-name" title="${escapeHtml(line.name || "Unknown line")}">${escapeHtml(displayTflLineName(line))}</div>
           <span class="tfl-line-mode">${escapeHtml(formatTflMode(line.mode))}</span>
         </div>
-        <span class="tfl-line-status"${reasonAttributes} tabindex="${reason ? "0" : "-1"}">${escapeHtml(line.status || "Unknown")}</span>
+        <span class="tfl-line-status"${reasonAttributes} tabindex="${reason ? "0" : "-1"}">${escapeHtml(status)}</span>
       </div>
     `;
   }).join("");
@@ -1100,8 +1681,10 @@ function renderTflStatus(data) {
   const updated = data?.updatedAt ? new Date(data.updatedAt) : null;
   const updatedText = updated && !Number.isNaN(updated.getTime())
     ? updated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-    : "just now";
-  $("tflStatusMeta").textContent = `Live status from Transport for London · Updated ${updatedText}`;
+    : (currentLanguage === "zh" ? "刚刚" : "just now");
+  $("tflStatusMeta").textContent = currentLanguage === "zh"
+    ? `数据来自 Transport for London · 更新于 ${updatedText}`
+    : `Live status from Transport for London · Updated ${updatedText}`;
 }
 
 function ensureTflTooltip() {
@@ -1231,8 +1814,8 @@ function renderCard(place, index) {
         <p class="decision"><span class="score-badge">${place.total}</span>${place.decision}</p>
         <div class="tags">${badges}</div>
         <div class="metrics">
-          <div class="metric"><span>Distance</span><strong>${place.adjustedDistance} km</strong></div>
-          <div class="metric"><span>Walk est.</span><strong>${place.estimatedWalkMinutes} min</strong></div>
+          <div class="metric"><span>${t("distanceLabel")}</span><strong>${place.adjustedDistance} km</strong></div>
+          <div class="metric"><span>${t("walkEstimateLabel")}</span><strong>${place.estimatedWalkMinutes} ${t("minuteUnitShort")}</strong></div>
         </div>
       </div>
     </article>
@@ -1240,7 +1823,25 @@ function renderCard(place, index) {
 }
 
 function tagLabel(tag) {
-  const labels = {
+  const labels = currentLanguage === "zh" ? {
+    quiet: "安静",
+    wifi: "Wi-Fi",
+    indoor: "室内",
+    view: "景观",
+    "low-cost": "免费开放",
+    "24h": "24 小时",
+    science: "理工资源",
+    central: "主图书馆",
+    campus: "帝国理工",
+    "study-space": "学习空间",
+    group: "小组学习",
+    services: "服务设施",
+    food: "附近餐饮",
+    transit: "交通便利",
+    outdoor: "户外",
+    green: "绿地环境",
+    calm: "安静舒适",
+  } : {
     quiet: "Quiet",
     wifi: "Wi-Fi",
     indoor: "Indoor",
@@ -1269,21 +1870,23 @@ function openPlaceWebsiteFromCard(card) {
 }
 
 function updateOutputs() {
-  $("walkOutput").textContent = `${controls.walkTolerance.value} min`;
+  $("walkOutput").textContent = currentLanguage === "zh" ? `${controls.walkTolerance.value} 分钟` : `${controls.walkTolerance.value} min`;
 }
 
 async function answerQuestion(question, options = {}) {
   const cleaned = question.trim();
   if (!cleaned) {
-    $("agentAnswer").textContent = "Ask something like: from South Kensington to Hammersmith Campus by transit.";
+    $("agentAnswer").textContent = currentLanguage === "zh"
+      ? "可以这样问：从 South Kensington 坐公共交通去 Hammersmith Campus。"
+      : "Ask something like: from South Kensington to Hammersmith Campus by transit.";
     return;
   }
 
   setAgentMode("Pending");
-  renderLoadingAnswer("Understanding your request");
+  renderLoadingAnswer(t("understandingRequest"));
   const minLoadingReadyAt = Date.now() + MIN_LOADING_MS;
   setAsking(true);
-  const loadingSessionId = renderLoadingAnswer("Generating results");
+  const loadingSessionId = renderLoadingAnswer(t("generatingResults"));
 
   clearRoutePreview();
   applyQuestionIntent(cleaned);
@@ -1870,7 +2473,7 @@ function toModelPlace(place) {
 
 function setAsking(isAsking) {
   $("askButton").disabled = isAsking;
-  $("askButton").textContent = isAsking ? "Thinking" : "Ask";
+  $("askButton").textContent = isAsking ? t("thinking") : t("ask");
 }
 
 function setAgentMode(mode) {
@@ -1881,40 +2484,60 @@ function setAgentMode(mode) {
 
 function formatAgentTools(tools = []) {
   const labels = {
-    navigate: "Navigation",
-    route_matrix: "Google Routes",
-    weather_current: "Weather",
-    web_search: "Web Search",
-    tfl_status: "TfL Status",
+    navigate: currentLanguage === "zh" ? "导航" : "Navigation",
+    route_matrix: currentLanguage === "zh" ? "Google 路线" : "Google Routes",
+    weather_current: currentLanguage === "zh" ? "天气" : "Weather",
+    web_search: currentLanguage === "zh" ? "联网搜索" : "Web Search",
+    tfl_status: currentLanguage === "zh" ? "TfL 状态" : "TfL Status",
   };
   const normalized = [...new Set((tools || []).filter(Boolean))];
-  if (!normalized.length) return "Pending";
+  if (!normalized.length) return t("pending");
   return normalized.map((tool) => labels[tool] || tool).join(" + ");
 }
 
 function formatLoadingTools(tools = []) {
   const labels = {
-    navigate: "Navigation",
-    route_matrix: "Google Routes",
-    weather_current: "Weather",
-    web_search: "Web Search",
-    tfl_status: "TfL Status",
+    navigate: currentLanguage === "zh" ? "导航" : "Navigation",
+    route_matrix: currentLanguage === "zh" ? "Google 路线" : "Google Routes",
+    weather_current: currentLanguage === "zh" ? "天气" : "Weather",
+    web_search: currentLanguage === "zh" ? "联网搜索" : "Web Search",
+    tfl_status: currentLanguage === "zh" ? "TfL 状态" : "TfL Status",
   };
   const normalized = [...new Set((tools || []).filter(Boolean))];
   const latestTool = normalized[normalized.length - 1];
-  if (!latestTool) return "Generating results";
-  return `Using ${labels[latestTool] || latestTool} tool`;
+  if (!latestTool) return t("generatingResults");
+  return t("usingTool", { tool: labels[latestTool] || latestTool });
 }
 
 function hasNavigationResult(result) {
   return Boolean(result?.recommended || result?.mapRoute || result?.navigation?.recommended || result?.navigation?.mapRoute);
 }
 
+function translateStatusText(value) {
+  const text = String(value || "");
+  const exact = {
+    Checking: t("checking"),
+    Pending: t("pending"),
+    Connected: t("connected"),
+    Offline: t("offline"),
+    "Keys Ready": t("keysReady"),
+    "Browser key ready": t("browserKeyReady"),
+    "Browser key missing": t("browserKeyMissing"),
+    "Routes key missing": t("routesKeyMissing"),
+    "Local API offline": t("localApiOffline"),
+  };
+  if (exact[text]) return exact[text];
+  return text
+    .replaceAll("Browser key missing", t("browserKeyMissing"))
+    .replaceAll("Routes key missing", t("routesKeyMissing"));
+}
+
 function updateAgentModeSignal(mode, animate = true) {
   const signal = $("airSignal");
   if (!signal) return;
-  const changed = signal.textContent !== mode;
-  signal.textContent = mode;
+  const displayMode = translateStatusText(mode);
+  const changed = signal.textContent !== displayMode;
+  signal.textContent = displayMode;
   signal.dataset.mode = mode.toLowerCase().replace(/\s+/g, "-");
   if (!animate || !changed) return;
   signal.classList.remove("mode-changed");
@@ -2001,11 +2624,30 @@ function renderRouteModeOptions(routes, selectedMode) {
   select.innerHTML = routes
     .map((route) => {
       // Only show transport mode in the select (no duration/distance)
-      const label = `${route.modeLabel || route.mode}`;
+      const label = routeModeDisplayLabel(route);
       return `<option value="${route.mode}" ${route.mode === selectedMode ? "selected" : ""}>${escapeHtml(label)}</option>`;
     })
     .join("");
   $("routeUpdateButton").disabled = routes.length < 2;
+}
+
+function routeModeDisplayLabel(route) {
+  const raw = String(route?.modeLabel || route?.mode || "");
+  if (currentLanguage !== "zh") return raw;
+  const mode = String(route?.mode || "").toUpperCase();
+  const labels = {
+    TRANSIT: "公共交通",
+    WALK: "步行",
+    BICYCLE: "骑行",
+    TWO_WHEELER: "骑行",
+    DRIVE: "驾车",
+    DRIVING: "驾车",
+  };
+  return labels[mode] || raw
+    .replace(/public transport/i, "公共交通")
+    .replace(/walking/i, "步行")
+    .replace(/cycling/i, "骑行")
+    .replace(/driving/i, "驾车");
 }
 
 function drawSelectedRoutePreview() {
@@ -2034,8 +2676,8 @@ function setRouteMapFullscreen(enabled) {
   }
   shell.classList.toggle("is-fullscreen", routeMapFullscreen);
   document.body.classList.toggle("route-map-fullscreen-open", routeMapFullscreen);
-  button.textContent = routeMapFullscreen ? "Exit full screen" : "Full screen";
-  button.setAttribute("aria-label", routeMapFullscreen ? "Exit route map full screen" : "Open route map full screen");
+  button.textContent = routeMapFullscreen ? t("exitFullScreen") : t("fullScreen");
+  button.setAttribute("aria-label", routeMapFullscreen ? t("exitFullScreen") : t("fullScreen"));
   if (mapElement) {
     mapElement.style.height = routeMapFullscreen ? "100%" : "360px";
     mapElement.style.minHeight = routeMapFullscreen ? "100%" : "360px";
@@ -2070,7 +2712,7 @@ function drawRoutePreview(data, recommended) {
   preview.classList.remove("route-preview--pop");
   void preview.offsetWidth;
   preview.classList.add("route-preview--pop");
-  $("routePreviewTitle").textContent = `Route map: ${recommended.modeLabel || recommended.mode || "route"}`;
+  $("routePreviewTitle").textContent = `${t("routeMap")}: ${routeModeDisplayLabel(recommended) || (currentLanguage === "zh" ? "路线" : "route")}`;
   const distance = Number.isFinite(recommended.distanceKm) ? `, ${recommended.distanceKm} km` : "";
   $("routePreviewMeta").textContent = `${recommended.durationMinutes} min${distance}`;
   $("routeOriginLabel").textContent = data.origin || "Origin";
@@ -2661,28 +3303,28 @@ function selectCampusStart(key) {
 function updateStartMapStatus(statusMessage = "") {
   const start = getStartPoint();
   const label = controls.startPoint.value === "mapSelection"
-    ? `Map point ${start.lat.toFixed(5)}, ${start.lng.toFixed(5)}`
-    : `${start.label} selected`;
-  const guidance = statusMessage || "Click the map, drag the marker, or use your current location.";
+    ? t("mapPoint", { lat: start.lat.toFixed(5), lng: start.lng.toFixed(5) })
+    : t("mapPointSelected", { label: start.label });
+  const guidance = statusMessage || t("mapGuidance");
   $("startMapStatus").textContent = `${label}. ${guidance}`;
 }
 
 function geolocationErrorMessage(error) {
   if (!window.isSecureContext) {
-    return "Location requires HTTPS or localhost.";
+    return t("locationRequiresHttps");
   }
-  if (!error) return "Could not read your current location.";
-  if (error.code === error.PERMISSION_DENIED) return "Location permission was denied.";
-  if (error.code === error.POSITION_UNAVAILABLE) return "Current location is unavailable.";
-  if (error.code === error.TIMEOUT) return "Location request timed out.";
-  return error.message || "Could not read your current location.";
+  if (!error) return t("locationUnavailable");
+  if (error.code === error.PERMISSION_DENIED) return t("locationDenied");
+  if (error.code === error.POSITION_UNAVAILABLE) return t("locationUnavailableCurrent");
+  if (error.code === error.TIMEOUT) return t("locationTimedOut");
+  return error.message || t("locationUnavailable");
 }
 
 function setLocationButtonLoading(isLoading) {
   const button = $("useCurrentLocation");
   if (!button) return;
   button.disabled = isLoading;
-  button.textContent = isLoading ? "Locating..." : "Or use current location";
+  button.textContent = isLoading ? t("locationButtonLocating") : t("useCurrentLocation");
 }
 
 function getCurrentPositionWithTimeout(options, timeoutMs) {
@@ -2768,17 +3410,17 @@ function readCachedCurrentPosition(maxAgeMs = 24 * 60 * 60 * 1000) {
 async function resolveCurrentPosition(statusCallback = () => {}) {
   const attempts = [
     {
-      message: "Reading your current location...",
+      message: t("locationReading"),
       options: { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 },
       timeoutMs: 14000,
     },
     {
-      message: "High-accuracy location is slow; trying a faster approximate location...",
+      message: t("locationHighAccuracy"),
       options: { enableHighAccuracy: false, timeout: 12000, maximumAge: 600000 },
       timeoutMs: 14000,
     },
     {
-      message: "Trying the browser's cached location...",
+      message: t("locationCached"),
       options: { enableHighAccuracy: false, timeout: 5000, maximumAge: 24 * 60 * 60 * 1000 },
       timeoutMs: 6000,
     },
@@ -2802,38 +3444,38 @@ async function resolveCurrentPosition(statusCallback = () => {}) {
 
   const cached = readCachedCurrentPosition();
   if (cached) {
-    statusCallback("Live location is slow; using your last known location.");
+    statusCallback(t("locationUsingLastKnown"));
     return cached;
   }
 
-  throw lastError || new Error("Could not read your current location.");
+  throw lastError || new Error(t("locationUnavailable"));
 }
 
 async function requestCurrentLocation() {
   if (!navigator.geolocation) {
-    $("startMapStatus").textContent = "This browser does not support current location.";
+    $("startMapStatus").textContent = t("locationUnsupported");
     return;
   }
 
   setLocationButtonLoading(true);
   const permissionState = await readGeolocationPermissionState();
   if (permissionState === "denied") {
-    $("startMapStatus").textContent = "Location permission is blocked. Enable it in your browser site settings.";
+    $("startMapStatus").textContent = t("locationBlockedSettings");
     setLocationButtonLoading(false);
     return;
   }
 
   $("startMapStatus").textContent = permissionState === "prompt"
-    ? "Waiting for browser location permission..."
-    : "Reading your current location...";
+    ? t("locationPromptWaiting")
+    : t("locationReading");
 
   try {
     const position = await resolveCurrentPosition((message) => {
       $("startMapStatus").textContent = message;
     });
     const { latitude, longitude, accuracy } = position.coords;
-    const accuracyText = Number.isFinite(accuracy) ? ` Accuracy about ${Math.round(accuracy)} m.` : "";
-    const sourceText = position.source === "last known" ? "Using your last known location." : "Using your current location.";
+    const accuracyText = Number.isFinite(accuracy) ? ` ${t("locationAccuracyAbout", { meters: Math.round(accuracy) })}` : "";
+    const sourceText = position.source === "last known" ? t("locationUsingLastKnownShort") : t("locationUsingCurrent");
     setMapStartCoordinates(latitude, longitude, `${sourceText}${accuracyText}`);
   } catch (error) {
     $("startMapStatus").textContent = geolocationErrorMessage(error);
@@ -2945,7 +3587,7 @@ async function updateWeatherAtCurrentLocation() {
     const { latitude, longitude } = position.coords;
     await refreshWeatherForStart(
       {
-        label: "Current location",
+        label: t("currentLocation"),
         lat: latitude,
         lng: longitude,
         weatherScope: "current location",
@@ -3145,26 +3787,41 @@ const WEATHER_METRIC_INFO = {
     title: "Feels like temperature",
     body: "This combines air temperature with factors such as wind and humidity to estimate thermal comfort. It is usually more useful than raw temperature when deciding clothing, walking comfort, and whether a route may feel exposed.",
     note: "Use it as the practical comfort reading for your journey.",
+    zhTitle: "体感温度",
+    zhBody: "体感温度会综合气温、湿度、风等因素，估计人体实际感受到的冷热程度。相比单纯气温，它更适合用来判断穿衣、步行舒适度和路线是否暴露。",
+    zhNote: "出行时可把它作为实际舒适度的主要参考。",
   },
   humidity: {
     title: "Relative humidity",
     body: "Relative humidity measures how close the air is to saturation at the current temperature. Higher values reduce evaporative cooling, so warm weather can feel heavier and indoor spaces may feel less comfortable.",
     note: "Around 40-60% is typically comfortable for most indoor activity.",
+    zhTitle: "相对湿度",
+    zhBody: "相对湿度表示当前温度下空气接近饱和的程度。湿度较高时，人体散热效率下降，暖天会更闷，室内空间也可能更不舒适。",
+    zhNote: "一般来说，40-60% 对多数室内活动较为舒适。",
   },
   wind: {
     title: "Wind speed",
     body: "Wind speed indicates how strongly air is moving near the surface. Stronger wind increases heat loss in cool weather, can make cycling less efficient, and may make open walking routes feel more exposed.",
     note: "For route planning, wind matters most on bridges, open roads, and cycling segments.",
+    zhTitle: "风速",
+    zhBody: "风速表示近地面空气流动的强弱。风较大时，冷天体感会更低，骑行更费力，开放路段步行也会更受影响。",
+    zhNote: "规划路线时，桥梁、开阔道路和骑行路段尤其需要关注风速。",
   },
   uv: {
     title: "UV index",
     body: "The UV index estimates the intensity of sunburn-producing ultraviolet radiation. It is not a temperature measure: UV can be high even when the air feels mild.",
     note: "At 3 or above, consider sunscreen or shade for longer outdoor journeys.",
+    zhTitle: "紫外线指数",
+    zhBody: "紫外线指数衡量可能导致晒伤的紫外线强度。它不是温度指标，即使气温不高，紫外线也可能较强。",
+    zhNote: "指数达到 3 或以上时，较长户外行程建议考虑防晒或选择阴凉路线。",
   },
   precipitation: {
     title: "Precipitation probability",
     body: "This is the estimated chance of measurable rain or other precipitation during the forecast period. It describes likelihood, not intensity, so a high value does not necessarily mean heavy rain.",
     note: "For commuting, combine this with sky condition and wind before choosing walking or cycling.",
+    zhTitle: "降水概率",
+    zhBody: "降水概率表示预报时段内出现可测量降雨或其他降水的可能性。它描述的是概率，不代表雨量大小，因此高概率不一定等于大雨。",
+    zhNote: "通勤时建议结合天空状况和风速，再决定是否步行或骑行。",
   },
 };
 
@@ -3196,7 +3853,7 @@ function showExternalConfirm(href) {
   externalConfirmModalEl.classList.remove("closing");
   externalConfirmModalEl.classList.add("visible");
   const txt = $("externalConfirmText");
-  if (txt) txt.textContent = "You are about to leave this page and open a new tab. Continue?";
+  if (txt) txt.textContent = t("externalConfirm");
 }
 
 function hideExternalConfirm() {
@@ -3213,7 +3870,7 @@ function hideExternalConfirm() {
 
 function showToolInfo(kind, overrideContent = "") {
   if (!toolInfoModalEl || !toolInfoTextEl) return;
-  const content = String(overrideContent || TOOL_INFO_COPY[kind] || TOOL_INFO_COPY.llm);
+  const content = String(overrideContent || toolInfoCopy(kind));
   toolInfoTextEl.innerHTML = kind === "agent"
     ? renderAgentToolInfo()
     : WEATHER_METRIC_INFO[kind]
@@ -3225,12 +3882,39 @@ function showToolInfo(kind, overrideContent = "") {
   toolInfoModalEl.classList.add("visible");
 }
 
+function toolInfoCopy(kind) {
+  if (currentLanguage === "zh") {
+    const zhCopy = {
+      routes: "API 密钥支撑应用中的实时数据能力。\n\nGoogle Maps 浏览器密钥用于加载地图、地理编码地点和天气查询。Google Routes 密钥用于在导航模式下提供实时出行时间、距离和路线几何，并支持公共交通、步行、骑行和驾车之间的比较。\n\nWeather API 返回所选出发点或导航目的地的当前天气；TfL Status API 返回伦敦线路实时运营状态。当密钥和服务均可用时，这里会显示“服务已连接”。",
+      llm: "LLM 负责对话、理解意图和学习空间推荐。需要路线规划时，它会使用 Google Routes 数据，而不是凭空猜测出行时间。",
+      agent: "模型会在回答时自行选择工具。顶部状态会显示当前使用的工具；不需要工具时显示待命。",
+      weatherLocation: "当前位置天气需要浏览器位置权限。",
+      weatherDestination: "请先让助手生成一条导航路线，然后再更新目的地天气。",
+    };
+    return zhCopy[kind] || zhCopy.llm;
+  }
+  return TOOL_INFO_COPY[kind] || TOOL_INFO_COPY.llm;
+}
+
 function renderAgentToolInfo() {
+  if (currentLanguage === "zh") {
+    return `
+      <p>模型会在回答时自行选择工具；如果当前不需要工具，这里会显示待命。</p>
+      <div class="tool-info-list">
+        <div class="tool-info-item"><strong>导航</strong> 使用 Google Routes 获取实时出行时间、距离和路线形状。</div>
+        <div class="tool-info-item"><strong>Google 路线</strong> 用于比较不同目的地或交通方式的出行估计。</div>
+        <div class="tool-info-item"><strong>天气</strong> 使用 Google Weather API 获取出发点或目的地的当前天气。</div>
+        <div class="tool-info-item"><strong>TfL 状态</strong> 查询路线涉及的伦敦线路是否有延误或中断。</div>
+        <div class="tool-info-item"><strong>联网搜索</strong> 用于百科类和公共事实类问题，并提供来源链接。</div>
+      </div>
+      <p>模型开始调用工具时，这个状态会立即更新。</p>
+    `;
+  }
   return `
     <p>The model chooses tools itself while answering. If no tool is needed, the signal stays Pending.</p>
     <div class="tool-info-list">
       <div class="tool-info-item"><strong>Navigation</strong> uses Google Routes for live travel time, distance, and route geometry.</div>
-      <div class="tool-info-item"><strong>Google Routes</strong> compares travel estimates to study-space candidates.</div>
+      <div class="tool-info-item"><strong>Google Routes</strong> compares travel estimates to destinations based on candidates.</div>
       <div class="tool-info-item"><strong>Weather</strong> uses Google Weather API for current conditions at a start point or destination.</div>
       <div class="tool-info-item"><strong>TfL Status</strong> checks live disruption status for London lines used by a route.</div>
       <div class="tool-info-item"><strong>Web Search</strong> looks up encyclopedia-style and public factual questions with source links.</div>
@@ -3242,11 +3926,14 @@ function renderAgentToolInfo() {
 function renderWeatherMetricInfo(kind) {
   const info = WEATHER_METRIC_INFO[kind];
   if (!info) return "";
+  const title = currentLanguage === "zh" ? info.zhTitle : info.title;
+  const body = currentLanguage === "zh" ? info.zhBody : info.body;
+  const note = currentLanguage === "zh" ? info.zhNote : info.note;
   return `
     <section class="weather-metric-info">
-      <h3>${escapeHtml(info.title)}</h3>
-      <p>${escapeHtml(info.body)}</p>
-      <p><strong>Planning note:</strong> ${escapeHtml(info.note)}</p>
+      <h3>${escapeHtml(title)}</h3>
+      <p>${escapeHtml(body)}</p>
+      <p><strong>${currentLanguage === "zh" ? "出行提示：" : "Planning note:"}</strong> ${escapeHtml(note)}</p>
     </section>
   `;
 }
@@ -3350,6 +4037,10 @@ if (toolInfoModalEl) {
     if (event.target === toolInfoModalEl) hideToolInfo();
   });
 }
+const languageToggleBtn = $("languageToggle");
+if (languageToggleBtn) {
+  languageToggleBtn.addEventListener("click", () => setLanguage(currentLanguage === "zh" ? "en" : "zh"));
+}
 
 $("modalChatForm").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -3369,6 +4060,7 @@ $("modalChatForm").addEventListener("submit", async (event) => {
   }
 });
 
+applyLanguage();
 render();
 refreshIntegrationStatus();
 refreshTflStatus();

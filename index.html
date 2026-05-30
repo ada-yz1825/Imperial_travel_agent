@@ -4,9 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Imperial Travel Agent</title>
-    <link rel="stylesheet" href="./styles.css?v=agent-error-en-1" />
+    <link rel="stylesheet" href="./styles.css?v=i18n-polish-6" />
   </head>
   <body>
+    <button id="languageToggle" class="language-toggle" type="button" aria-label="Switch language">中文</button>
     <main class="app-shell">
       <section class="hero-panel" aria-label="Imperial study space planner">
         <div class="hero-copy">
@@ -172,7 +173,7 @@
             <div class="weather-header">
               <div>
                 <p class="eyebrow">Weather</p>
-                <h3>At your <span id="weatherScopeLabel" class="weather-scope-label">start point</span></h3>
+                <h3><span id="weatherScopePrefix">At your</span> <span id="weatherScopeLabel" class="weather-scope-label">start point</span></h3>
               </div>
               <div class="weather-action-group">
                 <span class="weather-action-label">Update Weather data at</span>
@@ -314,6 +315,6 @@
       </div>
     </footer>
 
-    <script src="./app.js?v=agent-error-en-1"></script>
+    <script src="./app.js?v=i18n-polish-6"></script>
   </body>
 </html>
