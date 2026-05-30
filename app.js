@@ -1525,15 +1525,21 @@ function stepAnswerRender(state, now = performance.now()) {
   state.rendered += chunk;
   const answerEl = $("agentAnswer");
   if (answerEl) {
-    if (!state.outputEl || !answerEl.contains(state.outputEl)) {
+    if (shouldRenderStreamingMarkdown(state.rendered)) {
       const revealClass = state.hasShownFirstChunk ? "" : " agent-answer-output--reveal";
-      answerEl.innerHTML = `<div class="agent-answer-output agent-answer-output--live agent-answer-output--stream-text${revealClass}"></div>`;
-      state.outputEl = answerEl.querySelector(".agent-answer-output");
+      answerEl.innerHTML = `<div class="agent-answer-output agent-answer-output--live${revealClass}">${renderMarkdown(state.rendered)}</div>`;
+      state.outputEl = null;
+    } else {
+      if (!state.outputEl || !answerEl.contains(state.outputEl)) {
+        const revealClass = state.hasShownFirstChunk ? "" : " agent-answer-output--reveal";
+        answerEl.innerHTML = `<div class="agent-answer-output agent-answer-output--live agent-answer-output--stream-text${revealClass}"></div>`;
+        state.outputEl = answerEl.querySelector(".agent-answer-output");
+      }
+      const piece = document.createElement("span");
+      piece.className = "agent-answer-fade-piece";
+      piece.textContent = chunk;
+      state.outputEl.appendChild(piece);
     }
-    const piece = document.createElement("span");
-    piece.className = "agent-answer-fade-piece";
-    piece.textContent = chunk;
-    state.outputEl.appendChild(piece);
     state.hasShownFirstChunk = true;
   }
 
@@ -1553,14 +1559,46 @@ function answerRenderChunkSize(state, now) {
   return cappedChars;
 }
 
+function shouldRenderStreamingMarkdown(value) {
+  const lines = String(value || "").replace(/\r\n/g, "\n").split("\n");
+  for (let index = 0; index < lines.length - 1; index += 1) {
+    const current = lines[index].trim();
+    const next = lines[index + 1].trim();
+    const currentLooksTable = current.includes("|") && !/^[\s|:-]+$/.test(current);
+    const nextLooksSeparator = /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*:?-{3,}:?\s*\|?\s*$/.test(next);
+    if (currentLooksTable && nextLooksSeparator) return true;
+  }
+  return false;
+}
+
 function cancelAnswerRender() {
   answerRenderSessionId += 1;
 }
 
 function formatAgentError(error) {
   const message = sanitizeModelOutput(error?.message || "").trim();
-  if (message) return message;
+  const normalized = message.toLowerCase();
+  if (/(429|rate limit|too many requests|quota|usage limit|resource exhausted|billing|overloaded)/i.test(message)) {
+    return "The AI service is currently rate-limited or out of quota. Please try again in a minute.";
+  }
+  if (/(timeout|timed out|deadline|abort)/i.test(message)) {
+    return "The AI service took too long to respond. Please try again.";
+  }
+  if (/(network|failed to fetch|connection|offline)/i.test(message)) {
+    return "The AI service could not be reached. Please check the connection and try again.";
+  }
+  if (/(500|502|503|504|server error|bad gateway|service unavailable|gateway timeout)/i.test(message)) {
+    return "The AI service is temporarily unavailable. Please try again shortly.";
+  }
+  if (containsCjkText(message)) {
+    return "The agent could not finish that request. Please try again.";
+  }
+  if (normalized) return message;
   return "The agent could not finish that request. Please try again.";
+}
+
+function containsCjkText(value) {
+  return /[\u3400-\u9fff\uf900-\ufaff]/.test(String(value || ""));
 }
 
 async function waitForMinimumLoading(minLoadingReadyAt) {
