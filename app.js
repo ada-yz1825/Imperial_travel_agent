@@ -305,7 +305,12 @@ const DEFAULT_REMOTE_API_BASE = "https://imperial-travel-agent-api.onrender.com"
 
 const $ = (id) => document.getElementById(id);
 const LANGUAGE_STORAGE_KEY = "imperialNavigatorLanguage";
-let currentLanguage = window.localStorage.getItem(LANGUAGE_STORAGE_KEY) === "zh" ? "zh" : "en";
+try {
+  window.localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+} catch (error) {
+  // Ignore storage errors so the app can still boot in private browsing modes.
+}
+let currentLanguage = "en";
 
 const I18N = {
   en: {
@@ -563,7 +568,6 @@ function t(key, replacements = {}) {
 
 function setLanguage(language) {
   currentLanguage = language === "zh" ? "zh" : "en";
-  window.localStorage.setItem(LANGUAGE_STORAGE_KEY, currentLanguage);
   applyLanguage();
   render();
   if (latestWeatherData && latestWeatherStart) {
