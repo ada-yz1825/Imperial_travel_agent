@@ -1419,22 +1419,35 @@ body.route-map-fullscreen-open {
 
 .chat-modal-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
+  gap: 16px;
   border-bottom: 1px solid var(--line);
-  padding: 10px;
+  padding: 16px 20px 14px;
+}
+
+.chat-modal-header > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.chat-modal-header .eyebrow {
+  margin: 0;
+  line-height: 1.05;
 }
 
 .chat-modal-header h2 {
-  margin-bottom: 0;
-  font-size: 1.2rem;
+  margin: 0;
+  font-size: clamp(1.35rem, 2vw, 1.7rem);
+  line-height: 1.12;
 }
 
 .chat-modal-header button {
   width: auto;
-  min-height: 36px;
-  padding: 0 12px;
+  min-height: 42px;
+  padding: 0 16px;
+  align-self: center;
 }
 
 .chat-modal-history {
