@@ -1,4 +1,7 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700;800;900&display=swap");
+
 :root {
+  --zh-title-font: "Noto Serif SC", "Songti SC", "STSong", serif;
   color-scheme: light;
   --ink: #18202a;
   --muted: #667080;
@@ -154,14 +157,24 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    linear-gradient(rgba(10, 24, 44, 0.56), rgba(10, 24, 44, 0.22)),
-    url("./image.jpg") center / cover fixed;
+  background: #0a182c;
   color: var(--ink);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     "Noto Sans SC", sans-serif;
   animation: page-fade 520ms var(--ease-out) both;
+  isolation: isolate;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(rgba(10, 24, 44, 0.56), rgba(10, 24, 44, 0.22)),
+    url("./image_files/image.jpg?v=image-1") center center / cover no-repeat;
+  pointer-events: none;
 }
 
 button,
@@ -200,6 +213,37 @@ input {
   width: min(1272px, calc(100% - 32px));
   margin: 0 auto;
   padding: 28px 0 36px;
+}
+
+.app-shell.language-switch-reveal .hero-panel,
+.app-shell.language-switch-reveal .start-module,
+.app-shell.language-switch-reveal .agent-module,
+.app-shell.language-switch-reveal .weather-module,
+.app-shell.language-switch-reveal .tfl-module,
+.app-shell.language-switch-reveal .recommendation-module,
+.app-shell.language-switch-reveal .page-signature {
+  animation: language-module-reveal 520ms var(--ease-out) both;
+}
+
+.app-shell.language-switch-reveal .start-module {
+  animation-delay: 60ms;
+}
+
+.app-shell.language-switch-reveal .agent-module {
+  animation-delay: 110ms;
+}
+
+.app-shell.language-switch-reveal .weather-module {
+  animation-delay: 160ms;
+}
+
+.app-shell.language-switch-reveal .tfl-module {
+  animation-delay: 205ms;
+}
+
+.app-shell.language-switch-reveal .recommendation-module,
+.app-shell.language-switch-reveal .page-signature {
+  animation-delay: 245ms;
 }
 
 .hero-panel {
@@ -242,22 +286,20 @@ p {
 
 h1 {
   max-width: 760px;
-  margin-bottom: 14px;
+  margin-top: 5px;
+  margin-bottom: 22px;
   font-size: clamp(2.7rem, 5vw, 5.7rem);
   line-height: 0.98;
   letter-spacing: 0;
 }
 
-html[lang="zh-CN"] body {
-  font-weight: 520;
-}
-
 html[lang="zh-CN"] h1 {
   max-width: 980px;
-  margin-bottom: 22px;
+  margin-top: 0;
+  margin-bottom: 30px;
   font-size: clamp(2.45rem, 4.4vw, 4.95rem);
   line-height: 1.08;
-  font-weight: 950;
+  font-family: var(--zh-title-font);
   letter-spacing: 0;
   white-space: nowrap;
 }
@@ -271,14 +313,13 @@ html[lang="zh-CN"] .hero-panel {
 html[lang="zh-CN"] .hero-text {
   font-size: 1.04rem;
   line-height: 1.82;
-  font-weight: 650;
 }
 
 html[lang="zh-CN"] .eyebrow,
 html[lang="zh-CN"] .left-section-title,
 html[lang="zh-CN"] h2,
 html[lang="zh-CN"] h3 {
-  font-weight: 950;
+  font-family: var(--zh-title-font);
   letter-spacing: 0;
 }
 
@@ -642,6 +683,11 @@ button:hover {
   font-size: 1.08rem;
 }
 
+html[lang="zh-CN"] .agent-tools strong {
+  font-family: var(--zh-title-font);
+  letter-spacing: 0;
+}
+
 .agent-tools strong[data-mode="pending"] {
   color: var(--yellow);
 }
@@ -770,18 +816,41 @@ button:hover {
 html[lang="zh-CN"] .left-section-title {
   font-size: 1.28rem;
   line-height: 1.35;
-  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-  font-weight: 650;
-  -webkit-text-stroke: 0.2px rgba(39, 103, 168, 0.22);
+  font-family: var(--zh-title-font);
 }
 
 html[lang="zh-CN"] .agent-brief h2 {
-  font-weight: 900;
+  font-family: var(--zh-title-font);
+}
+
+html[lang="zh-CN"] .weather-header .eyebrow,
+html[lang="zh-CN"] .weather-header h3,
+html[lang="zh-CN"] .tfl-header .eyebrow,
+html[lang="zh-CN"] .tfl-header h3 {
+  font-family: var(--zh-title-font);
+}
+
+html[lang="zh-CN"] .weather-header .eyebrow,
+html[lang="zh-CN"] .tfl-header .eyebrow {
+  font-size: 1.3rem;
+}
+
+html[lang="zh-CN"] .weather-header h3,
+html[lang="zh-CN"] .tfl-header h3 {
+  font-size: 1.16rem;
 }
 
 html[lang="zh-CN"] .agent-brand {
   width: auto;
   flex: 0 0 auto;
+}
+
+#summaryTitle {
+  margin: 12px 0 1px;
+  font-size: clamp(1.02rem, 1.55vw, 1.42rem);
+  line-height: 1.34;
+  letter-spacing: 0;
+  white-space: nowrap;
 }
 
 html[lang="zh-CN"] #summaryTitle {
@@ -801,7 +870,6 @@ html[lang="zh-CN"] #summaryTitle {
 .left-section-title.compact {
   margin: 2px 0 10px;
   font-size: 1.18rem;
-  font-weight: 650;
 }
 
 .route-preview {
@@ -1647,6 +1715,12 @@ body.route-map-fullscreen-open {
 
 .how-it-works .eyebrow {
   color: var(--blue);
+  margin: 0 0 8px;
+}
+
+html[lang="zh-CN"] .how-it-works .eyebrow {
+  font-size: 1.08rem;
+  line-height: 1.28;
 }
 
 .how-grid {
@@ -1659,6 +1733,18 @@ body.route-map-fullscreen-open {
   border-radius: 8px;
   background: var(--surface);
   padding: 11px 12px;
+}
+
+.how-note {
+  margin: 8px 2px 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+html[lang="zh-CN"] .how-note {
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
 
 .weather-module {
@@ -1749,6 +1835,10 @@ body.route-map-fullscreen-open {
   color: var(--blue);
 }
 
+html[lang="zh-CN"] .weather-header .weather-choice-button {
+  min-width: 84px;
+}
+
 .weather-card {
   display: grid;
   gap: 14px;
@@ -1777,11 +1867,14 @@ body.route-map-fullscreen-open {
   display: grid;
   gap: 8px;
   align-content: center;
+  justify-items: center;
   min-height: 100%;
+  text-align: center;
 }
 
 .weather-current-row {
   display: flex;
+  justify-content: center;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
@@ -1796,12 +1889,12 @@ body.route-map-fullscreen-open {
 .weather-icon {
   display: inline-grid;
   place-items: center;
-  min-width: 44px;
-  min-height: 44px;
-  border-radius: 12px;
+  min-width: 60px;
+  min-height: 60px;
+  border-radius: 20px;
   background: rgba(39, 103, 168, 0.1);
   color: var(--blue);
-  font-size: 1.4rem;
+  font-size: 2.55rem;
   line-height: 1;
   font-weight: 900;
 }
@@ -2030,8 +2123,8 @@ body.route-map-fullscreen-open {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  /* limit visible rows to ~3 (was 260px for ~4 rows) */
-  max-height: 195px;
+  /* show roughly four rows before scrolling */
+  max-height: 260px;
   overflow: auto;
   padding-right: 2px;
 }
@@ -2261,6 +2354,10 @@ body.route-map-fullscreen-open {
   .weather-actions {
     width: 100%;
     justify-content: stretch;
+  }
+
+  html[lang="zh-CN"] .weather-header .weather-choice-button {
+    min-width: 0;
   }
 
   .weather-header .weather-choice-button {
@@ -2936,6 +3033,23 @@ select:focus {
   }
 }
 
+@keyframes language-module-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.992);
+    filter: blur(2px);
+  }
+  60% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
 @keyframes soft-reveal {
   from {
     opacity: 0;
@@ -3064,6 +3178,33 @@ select:focus {
     min-height: 150px;
   }
 
+  .confirm-modal-body p,
+  .tool-info-text {
+    font-size: 0.92rem;
+  }
+
+  .tool-info-text {
+    gap: 12px;
+  }
+
+  .tool-info-item {
+    padding: 8px 10px;
+    font-size: 0.88rem;
+  }
+
+  .weather-metric-info {
+    gap: 10px;
+  }
+
+  .weather-metric-info h3 {
+    font-size: 1.02rem;
+  }
+
+  .weather-metric-info p {
+    font-size: 0.86rem;
+    line-height: 1.45;
+  }
+
 }
 
 @media (max-width: 560px) {
@@ -3087,7 +3228,8 @@ select:focus {
 
   html[lang="zh-CN"] h1 {
     max-width: 100%;
-    margin-bottom: 18px;
+    margin-top: 0;
+    margin-bottom: 24px;
     font-size: clamp(1.82rem, 7.2vw, 2.45rem);
     line-height: 1.16;
     white-space: nowrap;
@@ -3193,6 +3335,10 @@ select:focus {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
+  }
+
+  html[lang="zh-CN"] .weather-header .weather-choice-button {
+    min-width: 0;
   }
 
   .weather-header .weather-choice-button {

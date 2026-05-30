@@ -348,6 +348,8 @@ const I18N = {
     quickTflQuestion: "What's the current TfL status, and are any lines disrupted right now?",
     agentPlaceholder: "Ready when you are. Ask the agent a question to get started.",
     routeMap: "Route map",
+    routeMapButton: "Close to view route map",
+    weatherDestinationRequired: "Please ask the agent for a navigation route first, then update weather at the parsed destination.",
     start: "Start",
     destination: "Destination",
     transportMode: "Transport mode",
@@ -365,6 +367,7 @@ const I18N = {
     how2Body: "The agent decides whether your question needs tools, including navigation, route comparison, weather, transport status, and web search. Tools are called only when specific live information is needed.",
     how3Title: "3. Get actionable results",
     how3Body: "The model uses the route, weather, and other data it receives to give practical advice. For navigation requests, it shows an interactive route preview with station and line details when available.",
+    howNote: "* This agent performs best in London. Due to data limitations, weather and traffic may be inaccurate in other regions.",
     weather: "Weather",
     atYour: "At your",
     startPoint: "start point",
@@ -423,7 +426,6 @@ const I18N = {
     browserKeyMissing: "Browser key missing",
     routesKeyMissing: "Routes key missing",
     localApiOffline: "Local API offline",
-    generatingResults: "Generating results",
     distanceLabel: "Distance",
     walkEstimateLabel: "Walk est.",
     minuteUnitShort: "min",
@@ -456,20 +458,22 @@ const I18N = {
     travelAgent: "出行 Agent",
     summaryTitle: "询问路线、天气、学习空间或出行建议",
     agentModeTools: "Agent 使用的工具",
-    askAgent: "向助手提问",
+    askAgent: "向 Agent 提问",
     questionPlaceholder: "想去哪？可以尝试询问路线、天气或其他出行问题",
     ask: "发送",
     thinking: "思考中",
     quickWhiteCity: "去白城校区",
     quickLibrary: "附近图书馆",
     quickWeather: "当前天气",
-    quickTfl: "伦敦地铁状态",
+    quickTfl: "伦敦地铁实时状态",
     quickWhiteCityQuestion: "从我当前选择的出发点怎么去 White City Campus？",
     quickLibraryQuestion: "从我当前选择的出发点附近有哪些图书馆？",
     quickWeatherQuestion: "我当前选择的出发点现在天气怎么样？",
     quickTflQuestion: "现在 TfL 线路状态如何？有没有线路延误或中断？",
-    agentPlaceholder: "一切就绪，向 Agent 提问即可开始。",
+    agentPlaceholder: "一切就绪，向 Agent 提问后答案会在此处显示。",
     routeMap: "路线地图",
+    routeMapButton: "关闭以查看路线图",
+    weatherDestinationRequired: "请先向 Agent 提问以生成一条导航路线，然后再更新目的地天气。",
     start: "起点",
     destination: "目的地",
     transportMode: "交通方式",
@@ -480,15 +484,16 @@ const I18N = {
     continueChat: "在聊天窗口继续",
     expandIntro: "展开助手说明书",
     collapseIntro: "收起助手说明",
-    howItWorks: "它如何工作？",
-    how1Title: "1. 带着上下文提问",
+    howItWorks: "Agent 是如何工作的？",
+    how1Title: "1. 自然语言提问",
     how1Body: "你可以用自然语言提问。先在地图上选点、使用当前位置，或选择一个校区预设，让助手知道你的行程从哪里开始。",
-    how2Title: "2. 自动选择合适流程",
+    how2Title: "2. 自动选择合适工具调用",
     how2Body: "助手会判断你问题是否需要使用工具，包括导航、路线比较、天气、交通状况和网页搜索；工具在有特定需要实时时才会调用。",
     how3Title: "3. 得到可执行建议",
     how3Body: "模型会根据得到的路线、天气等数据提供相应的建议；在导航需求中会展示交互式路线预览，并可显示具体车站与线路信息。",
+    howNote: "* 由于使用的数据来源限制，此 agent 在伦敦地区能达到最佳效果。在其他地区使用时天气和交通状态可能不准确。",
     weather: "天气",
-    atYour: "天气位置：",
+    atYour: "目前显示的天气位置为",
     startPoint: "地图选择的出发点",
     currentLocation: "当前位置",
     updateWeatherAt: "更新天气位置",
@@ -508,7 +513,7 @@ const I18N = {
     refresh: "刷新",
     tflMeta: "数据来自 Transport for London 实时状态。",
     conversation: "对话",
-    agentChat: "Agent 聊天",
+    agentChat: "Agent",
     close: "关闭",
     modalPlaceholder: "继续对话...",
     send: "发送",
@@ -543,12 +548,11 @@ const I18N = {
     browserKeyMissing: "缺少浏览器密钥",
     routesKeyMissing: "缺少路线密钥",
     localApiOffline: "本地 API 离线",
-    generatingResults: "正在生成结果",
     distanceLabel: "距离",
     walkEstimateLabel: "步行预估",
     minuteUnitShort: "分钟",
     usingTool: "正在使用 {tool} 工具",
-    understandingRequest: "正在理解你的请求",
+    understandingRequest: "正在理解您的请求",
   },
 };
 
@@ -569,6 +573,11 @@ function setLanguage(language) {
     renderTflStatus(latestTflStatusData);
   }
   if (activeRoutePreview) renderRoutePreview(activeRoutePreview);
+  playLanguageSwitchAnimation();
+}
+
+function playLanguageSwitchAnimation() {
+  animateClass(document.querySelector(".app-shell"), "language-switch-reveal");
 }
 
 function applyLanguage() {
@@ -614,6 +623,7 @@ function applyLanguage() {
     [".how-grid div:nth-child(2) span", "how2Body"],
     [".how-grid div:nth-child(3) strong", "how3Title"],
     [".how-grid div:nth-child(3) span", "how3Body"],
+    [".how-note", "howNote"],
     [".weather-module .eyebrow", "weather"],
     [".weather-action-label", "updateWeatherAt"],
     ["#updateWeatherCurrentButton", "currentLocation"],
@@ -1515,7 +1525,13 @@ function translateTflReason(reason) {
   if (exact[original]) return exact[original];
   const structured = translateStructuredTflReason(original);
   if (structured) return structured;
-  return original
+  return translateTflGeneralReason(original)
+    .replace(/\s+([，。：；,.])/g, "$1")
+    .replace(/([，。：；])\s+/g, "$1");
+}
+
+function translateTflGeneralReason(reason) {
+  return String(reason || "")
     .replace(/\bGood service\b/gi, "正常运营")
     .replace(/\bPart Closure\b/gi, "部分关闭")
     .replace(/\bPart closure\b/gi, "部分关闭")
@@ -1523,8 +1539,15 @@ function translateTflReason(reason) {
     .replace(/\bSevere Delays\b/gi, "严重延误")
     .replace(/\bSuspended\b/gi, "暂停运营")
     .replace(/\bReduced Service\b/gi, "班次减少")
+    .replace(/\bservice operates\b/gi, "服务运行时间为")
+    .replace(/\bservices? operate(?:s)?\b/gi, "服务运行")
+    .replace(/\bThere is no service\b/gi, "没有服务")
+    .replace(/\bThere will be no service\b/gi, "将没有服务")
+    .replace(/\bThere will also be no\b/gi, "也将没有")
     .replace(/\bNo service\b/gi, "无服务")
     .replace(/\bPlanned closure\b/gi, "计划关闭")
+    .replace(/\bThere is\b/gi, "有")
+    .replace(/\bThere are\b/gi, "有")
     .replace(/\ban earlier points failure\b/gi, "早前发生的道岔故障")
     .replace(/\bpoints failure\b/gi, "道岔故障")
     .replace(/\bearlier points failure\b/gi, "早前发生的道岔故障")
@@ -1532,6 +1555,7 @@ function translateTflReason(reason) {
     .replace(/\bengineering works?\b/gi, "工程维护")
     .replace(/\btrack fault\b/gi, "轨道故障")
     .replace(/\bsignal failure\b/gi, "信号故障")
+    .replace(/\bsignal system failure\b/gi, "信号系统故障")
     .replace(/\btrain cancellations?\b/gi, "列车取消")
     .replace(/\bshortage of trains?\b/gi, "列车不足")
     .replace(/\bshortage of train crew\b/gi, "列车工作人员不足")
@@ -1539,7 +1563,36 @@ function translateTflReason(reason) {
     .replace(/\bcustomer incident\b/gi, "乘客事件")
     .replace(/\bpassenger incident\b/gi, "乘客事件")
     .replace(/\boperational restrictions?\b/gi, "运营限制")
+    .replace(/\bemergency services deal with a casualty on the track\b/gi, "应急服务正在处理轨道上的伤亡事件")
+    .replace(/\ba casualty on the track\b/gi, "轨道上的伤亡事件")
     .replace(/\bon the rest of the line\b/gi, "其余区段")
+    .replace(/\bMonday to Friday only\b/gi, "仅限周一至周五")
+    .replace(/\bMonday to Thursday\b/gi, "周一至周四")
+    .replace(/\bMonday to Friday\b/gi, "周一至周五")
+    .replace(/\bSaturday and Sunday\b/gi, "周六和周日")
+    .replace(/\bSaturdays and Sundays\b/gi, "周六和周日")
+    .replace(/\bSaturdays\b/gi, "周六")
+    .replace(/\bSundays\b/gi, "周日")
+    .replace(/\bbank\/public holidays\b/gi, "银行假日和公共假日")
+    .replace(/\bbank holidays\b/gi, "银行假日")
+    .replace(/\bpublic holidays\b/gi, "公共假日")
+    .replace(/\bweekdays\b/gi, "工作日")
+    .replace(/\bweekends\b/gi, "周末")
+    .replace(/\bservices instead\b/gi, "服务")
+    .replace(/\bservices\b/gi, "服务")
+    .replace(/\bservice\b/gi, "服务")
+    .replace(/\bcontinue to serve\b/gi, "继续服务")
+    .replace(/\bwill continue\b/gi, "将继续")
+    .replace(/\bPlease use\b/gi, "请改用")
+    .replace(/\bUse local bus routes\b/gi, "请改用当地公交线路")
+    .replace(/\bwhile\b/gi, "期间")
+    .replace(/\bwith be\b/gi, "将在")
+    .replace(/\bwill be\b/gi, "将在")
+    .replace(/\bnext southbound train\b/gi, "下一班南行列车")
+    .replace(/\bdeparture\b/gi, "发车")
+    .replace(/\bfrom\b/gi, "从")
+    .replace(/\bto\b/gi, "至")
+    .replace(/\bon\b/gi, "在")
     .replace(/\bbetween\b/gi, "在")
     .replace(/\band\b/gi, "和")
     .replace(/\bdue to\b/gi, "原因：")
@@ -1549,6 +1602,42 @@ function translateTflReason(reason) {
 
 function translateStructuredTflReason(reason) {
   const statusPattern = "(Good service|Minor delays|Severe delays|Part closure|Part Closure|Planned closure|No service|Suspended|Part suspended|Reduced service)";
+  const serviceHoursMatch = reason.match(/^([^:]+Line):\s*service operates\s+(.+?)\s+(?:to|until)\s+(.+?),\s*(Monday to Friday only)\.\s*There is no service on\s+(.+?)\.$/i);
+  if (serviceHoursMatch) {
+    const [, lineName, fromTime, toTime, days, noServiceDays] = serviceHoursMatch;
+    return `${lineName}：服务运行时间为 ${fromTime} 至 ${toTime}，${translateTflGeneralReason(days)}。${translateTflDayList(noServiceDays)}没有服务。`;
+  }
+
+  const datedClosureMatch = reason.match(/^([^:]+):\s*(.+?),\s*no service between\s+(.+?)\s+and\s+(.+?)\.\s*(.*)$/i);
+  if (datedClosureMatch) {
+    const [, lineName, dateText, from, to, rest] = datedClosureMatch;
+    const parts = [`${lineName}：${translateTflDateText(dateText)}，${from} 至 ${to} 之间无服务。`];
+    const translatedRest = translateTflServiceSentences(rest);
+    if (translatedRest) parts.push(translatedRest);
+    return parts.join("");
+  }
+
+  const multipleMinorMatch = reason.match(/^([^:]+Line):\s*Minor delays between\s+(.+?)\s+and\s+(.+?)\s+and\s+MINOR DELAYS between\s+(.+?)\s+and\s+(.+?)\s+due to\s+(.+?)\.\s*(?:GOOD SERVICE on the rest of the line\.?)?$/i);
+  if (multipleMinorMatch) {
+    const [, lineName, fromA, toA, fromB, toB, cause] = multipleMinorMatch;
+    const restText = /good service\s+on\s+the\s+rest\s+of\s+the\s+line/i.test(reason) ? "其余区段正常运营。" : "";
+    return `${lineName}：${fromA} 至 ${toA} 之间轻微延误，${fromB} 至 ${toB} 之间也有轻微延误，原因是${translateTflCause(cause)}。${restText}`;
+  }
+
+  const noServiceWhileMatch = reason.match(/^([^:]+Line):\s*No service between\s+(.+?)\s+and\s+(.+?)\s+while\s+(.+?)\.\s*(.*)$/i);
+  if (noServiceWhileMatch) {
+    const [, lineName, from, to, cause, rest] = noServiceWhileMatch;
+    const translatedRest = translateTflServiceSentences(rest);
+    return `${lineName}：${from} 至 ${to} 之间无服务，原因是${translateTflGeneralReason(cause)}。${translatedRest}`;
+  }
+
+  const trainGapMatch = reason.match(/^([^:]+Line):\s*Minor delays between\s+(.+?)\s+and\s+(.+?)\s+due to train cancellations\.\s*After the\s+(.+?)\s+departure from\s+(.+?)\s+the next southbound train (?:with be|will be) at\s+(.+?)\.?\s*(?:GOOD SERVICE on the rest of the line\.?)?$/i);
+  if (trainGapMatch) {
+    const [, lineName, from, to, departureTime, departureStation, nextTime] = trainGapMatch;
+    const restText = /good service\s+on\s+the\s+rest\s+of\s+the\s+line/i.test(reason) ? "其余区段正常运营。" : "";
+    return `${lineName}：${from} 至 ${to} 之间轻微延误，原因是列车取消。${departureTime} 从 ${departureStation} 发车后，下一班南行列车将在 ${nextTime} 发车。${restText}`;
+  }
+
   const betweenPattern = new RegExp(`^([^:]+Line):\\s*${statusPattern}\\s+between\\s+(.+?)\\s+and\\s+(.+?)(?:\\s+due to\\s+(.+?))?\\.?(?:\\s+(?:GOOD SERVICE|Good service)\\s+on\\s+the\\s+rest\\s+of\\s+the\\s+line\\.?)?$`, "i");
   const betweenMatch = reason.match(betweenPattern);
   if (betweenMatch) {
@@ -1578,6 +1667,84 @@ function translateStructuredTflReason(reason) {
   return "";
 }
 
+function translateTflServiceSentences(text) {
+  const sentences = String(text || "")
+    .split(/(?<=\.)\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return sentences.map(translateTflServiceSentence).filter(Boolean).join("");
+}
+
+function translateTflServiceSentence(sentence) {
+  const clean = String(sentence || "").trim().replace(/\.$/, "");
+  if (!clean) return "";
+
+  if (/^(?:GOOD SERVICE|Good service)\s+on\s+the\s+rest\s+of\s+the\s+line$/i.test(clean)) {
+    return "其余区段正常运营。";
+  }
+
+  let match = clean.match(/^There will also be no\s+(.+?)\s+service between\s+(.+?)\s+and\s+(.+)$/i);
+  if (match) {
+    const [, lineName, from, to] = match;
+    return `${lineName} 在 ${from} 至 ${to} 之间也将没有服务。`;
+  }
+
+  match = clean.match(/^There will be no\s+(.+?)\s+service between\s+(.+?)\s+and\s+(.+)$/i);
+  if (match) {
+    const [, lineName, from, to] = match;
+    return `${lineName} 在 ${from} 至 ${to} 之间将没有服务。`;
+  }
+
+  match = clean.match(/^A very limited\s+(.+?)\s+service will continue to serve\s+(.+)$/i);
+  if (match) {
+    const [, operator, place] = match;
+    const cleanPlace = place.replace(/\s+early\s+a$/i, "");
+    return `${operator} 将继续提供非常有限的服务，停靠 ${cleanPlace}${/[a-z]\s+a$/i.test(clean) ? "（原始信息不完整）" : ""}。`;
+  }
+
+  match = clean.match(/^Use local bus routes$/i);
+  if (match) return "请改用当地公交线路。";
+
+  match = clean.match(/^Please use\s+(.+?)\s+services instead$/i);
+  if (match) return `请改用 ${match[1]} 服务。`;
+
+  match = clean.match(/^Tickets are being accepted on\s+(.+)$/i);
+  if (match) return `可使用相关车票乘坐 ${match[1]}。`;
+
+  match = clean.match(/^After the\s+(.+?)\s+departure from\s+(.+?)\s+the next southbound train (?:with be|will be) at\s+(.+)$/i);
+  if (match) {
+    const [, time, from, nextTime] = match;
+    return `${time} 从 ${from} 发车后，下一班南行列车将在 ${nextTime} 发车。`;
+  }
+
+  return `${translateTflGeneralReason(clean)}。`;
+}
+
+function translateTflDateText(value) {
+  return String(value || "")
+    .replace(/\bMonday\b/gi, "周一")
+    .replace(/\bTuesday\b/gi, "周二")
+    .replace(/\bWednesday\b/gi, "周三")
+    .replace(/\bThursday\b/gi, "周四")
+    .replace(/\bFriday\b/gi, "周五")
+    .replace(/\bSaturday\b/gi, "周六")
+    .replace(/\bSunday\b/gi, "周日")
+    .replace(/\bJanuary\b/gi, "1月")
+    .replace(/\bFebruary\b/gi, "2月")
+    .replace(/\bMarch\b/gi, "3月")
+    .replace(/\bApril\b/gi, "4月")
+    .replace(/\bMay\b/gi, "5月")
+    .replace(/\bJune\b/gi, "6月")
+    .replace(/\bJuly\b/gi, "7月")
+    .replace(/\bAugust\b/gi, "8月")
+    .replace(/\bSeptember\b/gi, "9月")
+    .replace(/\bOctober\b/gi, "10月")
+    .replace(/\bNovember\b/gi, "11月")
+    .replace(/\bDecember\b/gi, "12月")
+    .replace(/\band\b/gi, "和")
+    .replace(/,\s*/g, "、");
+}
+
 function translateTflInlineStatus(status) {
   const labels = {
     "good service": "正常运营",
@@ -1593,6 +1760,15 @@ function translateTflInlineStatus(status) {
   return labels[String(status || "").trim().toLowerCase()] || translateTflStatus(status);
 }
 
+function translateTflDayList(value) {
+  return translateTflGeneralReason(value)
+    .replace(/,\s*/g, "、")
+    .replace(/\s*和\s*在\s*/g, "和")
+    .replace(/\s*和\s*/g, "和")
+    .replace(/^在\s*/, "")
+    .trim();
+}
+
 function translateTflCause(cause) {
   let text = String(cause || "").trim().replace(/\.$/, "");
   const atMatch = text.match(/^(?:an?\s+)?(?:earlier\s+)?(.+?)\s+at\s+(.+)$/i);
@@ -1606,8 +1782,10 @@ function translateTflCause(cause) {
 function translateTflCauseEvent(event, withOccurred = false) {
   const clean = String(event || "").trim().toLowerCase();
   const labels = [
+    [/^train cancellations? and an earlier signal system failure$/, "列车取消和早前发生的信号系统故障"],
     [/^points failure$/, "道岔故障"],
     [/^track fault$/, "轨道故障"],
+    [/^signal system failure$/, "信号系统故障"],
     [/^signal failure$/, "信号故障"],
     [/^faulty train$/, "列车故障"],
     [/^customer incident$/, "乘客事件"],
@@ -1886,7 +2064,7 @@ async function answerQuestion(question, options = {}) {
   renderLoadingAnswer(t("understandingRequest"));
   const minLoadingReadyAt = Date.now() + MIN_LOADING_MS;
   setAsking(true);
-  const loadingSessionId = renderLoadingAnswer(t("generatingResults"));
+  const loadingSessionId = renderLoadingAnswer(t("understandingRequest"));
 
   clearRoutePreview();
   applyQuestionIntent(cleaned);
@@ -3188,7 +3366,7 @@ function shouldShowRouteMapButton(item, index) {
 }
 
 function routeMapButtonHtml() {
-  return `<button class="chat-route-map-button" type="button" data-chat-route-map="true">Close to view route map</button>`;
+  return `<button class="chat-route-map-button" type="button" data-chat-route-map="true">${t("routeMapButton")}</button>`;
 }
 
 function renderChatModalHistory(isLoading = false) {
@@ -3525,7 +3703,7 @@ function browserGeocodePlaceText(placeText) {
 
 async function resolveWeatherDestination() {
   if (!latestNavigationData?.destination) {
-    throw new Error("Please ask the agent for a navigation route first, then update weather at the parsed destination.");
+    throw new Error(t("weatherDestinationRequired"));
   }
 
   if (isLatLngPlace(latestNavigationData.destinationPlace)) {
@@ -3566,7 +3744,7 @@ async function updateWeatherAtDestination() {
       { preserveOnError: true, throwOnError: true },
     );
   } catch (error) {
-    showWeatherDestinationAlert(error.message || "Weather data at the destination could not be updated.");
+    showWeatherDestinationAlert(error.message || t("weatherDestinationRequired"));
   }
 }
 
@@ -3899,13 +4077,13 @@ function toolInfoCopy(kind) {
 function renderAgentToolInfo() {
   if (currentLanguage === "zh") {
     return `
-      <p>模型会在回答时自行选择工具；如果当前不需要工具，这里会显示待命。</p>
+      <p>模型会在回答时自行选择工具；以下是目前支持的工具列表：</p>
       <div class="tool-info-list">
-        <div class="tool-info-item"><strong>导航</strong> 使用 Google Routes 获取实时出行时间、距离和路线形状。</div>
-        <div class="tool-info-item"><strong>Google 路线</strong> 用于比较不同目的地或交通方式的出行估计。</div>
-        <div class="tool-info-item"><strong>天气</strong> 使用 Google Weather API 获取出发点或目的地的当前天气。</div>
-        <div class="tool-info-item"><strong>TfL 状态</strong> 查询路线涉及的伦敦线路是否有延误或中断。</div>
-        <div class="tool-info-item"><strong>联网搜索</strong> 用于百科类和公共事实类问题，并提供来源链接。</div>
+        <div class="tool-info-item"><strong>导航</strong>：使用谷歌地图路线 API 获取实时出行时间、距离和路线。</div>
+        <div class="tool-info-item"><strong>Google 路线</strong>： 用于比较不同目的地或交通方式的出行估计。</div>
+        <div class="tool-info-item"><strong>天气</strong>：使用谷歌天气 API 获取出发点或目的地的当前天气。</div>
+        <div class="tool-info-item"><strong>TfL 状态</strong>： 查询路线涉及的伦敦线路是否有延误或中断。</div>
+        <div class="tool-info-item"><strong>联网搜索</strong>： 用于百科类和公共事实类问题，并提供来源链接。</div>
       </div>
       <p>模型开始调用工具时，这个状态会立即更新。</p>
     `;

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="sky" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2767a8"/>
+      <stop offset="1" stop-color="#12365c"/>
+    </linearGradient>
+    <linearGradient id="route" x1="13" y1="46" x2="49" y2="16" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dff5e9"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#sky)"/>
+  <path d="M9 49h46" stroke="#2d7a5e" stroke-width="10" stroke-linecap="round"/>
+  <path d="M15 45c7-9 13-12 21-14 7-2 11-6 14-13" fill="none" stroke="url(#route)" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="15" cy="45" r="4" fill="#ffffff"/>
+  <path d="M48 10c-6 0-11 5-11 11 0 8 11 20 11 20s11-12 11-20c0-6-5-11-11-11z" fill="#ffffff"/>
+  <circle cx="48" cy="21" r="4" fill="#2767a8"/>
+  <path d="M22 19h12v28H22z" fill="#ffffff"/>
+  <path d="M19 47h18" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>
+  <path d="M25 14h6v5h-6zM26 24h4M26 30h4M26 36h4" stroke="#2767a8" stroke-width="2" stroke-linecap="round"/>
+</svg>
