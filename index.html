@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Imperial Travel Agent</title>
-    <link rel="stylesheet" href="./styles.css?v=stop-popup-1" />
+    <link rel="stylesheet" href="./styles.css?v=weather-metric-info-1" />
   </head>
   <body>
     <main class="app-shell">
@@ -140,7 +140,7 @@
                 </div>
               </div>
               <div class="agent-actions" id="agentActions" hidden>
-                <a id="googleMapsLink" class="cta" href="https://www.google.com/maps/search/?api=1&query=Imperial%20College%20London" target="_blank" rel="noreferrer">Open Google maps for Route</a>
+                <a id="googleMapsLink" class="cta" href="https://www.google.com/maps/search/?api=1&query=Imperial%20College%20London" target="_blank" rel="noreferrer">Open Google maps for mode routes</a>
                 <button id="openChatButton" class="cta chat-cta" type="button">Continue in chat window</button>
               </div>
             </form>
@@ -198,23 +198,23 @@
                 </div>
               </div>
               <div class="weather-metrics">
-                <div>
+                <div class="weather-metric-card" role="button" tabindex="0" data-weather-metric="feelsLike" aria-label="About feels like temperature">
                   <span>Feels like</span>
                   <strong id="weatherFeelsLike">--</strong>
                 </div>
-                <div>
+                <div class="weather-metric-card" role="button" tabindex="0" data-weather-metric="humidity" aria-label="About relative humidity">
                   <span>Humidity</span>
                   <strong id="weatherHumidity">--</strong>
                 </div>
-                <div>
+                <div class="weather-metric-card" role="button" tabindex="0" data-weather-metric="wind" aria-label="About wind speed">
                   <span>Wind</span>
                   <strong id="weatherWind">--</strong>
                 </div>
-                <div>
+                <div class="weather-metric-card" role="button" tabindex="0" data-weather-metric="uv" aria-label="About UV index">
                   <span>UV</span>
                   <strong id="weatherUv">--</strong>
                 </div>
-                <div>
+                <div class="weather-metric-card" role="button" tabindex="0" data-weather-metric="precipitation" aria-label="About precipitation probability">
                   <span>Precipitation %</span>
                   <strong id="weatherPrecipitation">--</strong>
                 </div>
@@ -314,6 +314,6 @@
       </div>
     </footer>
 
-    <script src="./app.js?v=stop-popup-1"></script>
+    <script src="./app.js?v=weather-metric-info-1"></script>
   </body>
 </html>

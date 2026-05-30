@@ -3087,6 +3087,34 @@ const TOOL_INFO_COPY = {
   weatherDestination: "Please ask the agent for a navigation route first, then update weather at the parsed destination.",
 };
 
+const WEATHER_METRIC_INFO = {
+  feelsLike: {
+    title: "Feels like temperature",
+    body: "This combines air temperature with factors such as wind and humidity to estimate thermal comfort. It is usually more useful than raw temperature when deciding clothing, walking comfort, and whether a route may feel exposed.",
+    note: "Use it as the practical comfort reading for your journey.",
+  },
+  humidity: {
+    title: "Relative humidity",
+    body: "Relative humidity measures how close the air is to saturation at the current temperature. Higher values reduce evaporative cooling, so warm weather can feel heavier and indoor spaces may feel less comfortable.",
+    note: "Around 40-60% is typically comfortable for most indoor activity.",
+  },
+  wind: {
+    title: "Wind speed",
+    body: "Wind speed indicates how strongly air is moving near the surface. Stronger wind increases heat loss in cool weather, can make cycling less efficient, and may make open walking routes feel more exposed.",
+    note: "For route planning, wind matters most on bridges, open roads, and cycling segments.",
+  },
+  uv: {
+    title: "UV index",
+    body: "The UV index estimates the intensity of sunburn-producing ultraviolet radiation. It is not a temperature measure: UV can be high even when the air feels mild.",
+    note: "At 3 or above, consider sunscreen or shade for longer outdoor journeys.",
+  },
+  precipitation: {
+    title: "Precipitation probability",
+    body: "This is the estimated chance of measurable rain or other precipitation during the forecast period. It describes likelihood, not intensity, so a high value does not necessarily mean heavy rain.",
+    note: "For commuting, combine this with sky condition and wind before choosing walking or cycling.",
+  },
+};
+
 const googleLinkEl = $("googleMapsLink");
 if (googleLinkEl) {
   googleLinkEl.addEventListener("click", (e) => {
@@ -3135,7 +3163,9 @@ function showToolInfo(kind, overrideContent = "") {
   const content = String(overrideContent || TOOL_INFO_COPY[kind] || TOOL_INFO_COPY.llm);
   toolInfoTextEl.innerHTML = kind === "agent"
     ? renderAgentToolInfo()
-    : escapeHtml(content).replace(/\n/g, "<br />");
+    : WEATHER_METRIC_INFO[kind]
+      ? renderWeatherMetricInfo(kind)
+      : escapeHtml(content).replace(/\n/g, "<br />");
   toolInfoModalEl.hidden = false;
   void toolInfoModalEl.offsetWidth;
   toolInfoModalEl.classList.remove("closing");
@@ -3153,6 +3183,18 @@ function renderAgentToolInfo() {
       <div class="tool-info-item"><strong>Web Search</strong> looks up encyclopedia-style and public factual questions with source links.</div>
     </div>
     <p>The signal updates as soon as the model starts a tool call.</p>
+  `;
+}
+
+function renderWeatherMetricInfo(kind) {
+  const info = WEATHER_METRIC_INFO[kind];
+  if (!info) return "";
+  return `
+    <section class="weather-metric-info">
+      <h3>${escapeHtml(info.title)}</h3>
+      <p>${escapeHtml(info.body)}</p>
+      <p><strong>Planning note:</strong> ${escapeHtml(info.note)}</p>
+    </section>
   `;
 }
 
@@ -3211,6 +3253,16 @@ if (cancelOpenLinkBtn) {
 bindSignalTileInfo(llmSignalTile, "llm");
 bindSignalTileInfo(routesSignalTile, "routes");
 bindSignalTileInfo(agentToolsTile, "agent");
+
+document.querySelectorAll(".weather-metric-card[data-weather-metric]").forEach((card) => {
+  const metric = card.dataset.weatherMetric;
+  card.addEventListener("click", () => showToolInfo(metric));
+  card.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    showToolInfo(metric);
+  });
+});
 
 // Fallback delegated handlers in case tiles are re-rendered or late-mounted.
 document.addEventListener("click", (event) => {

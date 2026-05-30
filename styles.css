@@ -1255,6 +1255,31 @@ body.route-map-fullscreen-open {
   gap: 16px;
   white-space: normal;
 }
+
+.weather-metric-info {
+  display: grid;
+  gap: 12px;
+}
+
+.weather-metric-info h3 {
+  margin: 0;
+  color: #1f4268;
+  font-size: 1.28rem;
+  line-height: 1.2;
+}
+
+.weather-metric-info p {
+  margin: 0;
+  color: #263544;
+  font-size: 0.98rem;
+  font-weight: 650;
+  line-height: 1.55;
+}
+
+.weather-metric-info strong {
+  color: #18202a;
+}
+
 .tool-info-text p {
   margin: 0;
 }
@@ -1776,6 +1801,28 @@ body.route-map-fullscreen-open {
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.7);
   padding: 10px;
+}
+
+.weather-metric-card {
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    box-shadow 200ms ease,
+    transform 200ms ease,
+    background 180ms ease;
+}
+
+.weather-metric-card:hover,
+.weather-metric-card:focus-visible {
+  border-color: rgba(39, 103, 168, 0.34);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 12px 26px rgba(24, 32, 42, 0.12);
+  transform: translateY(-3px);
+  outline: none;
+}
+
+.weather-metric-card:active {
+  transform: translateY(-1px);
 }
 
 .weather-metrics span,
