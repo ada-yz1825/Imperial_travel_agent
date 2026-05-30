@@ -337,7 +337,7 @@ const I18N = {
     loadMoreStudySpaces: "Load more spaces",
     collapseStudySpaces: "Collapse spaces",
     travelAgent: "Travel agent",
-    summaryTitle: "Ask to plan, explore, or navigate for your next trip",
+    summaryTitle: "Ask to plan, explore, or navigate",
     agentModeTools: "Agent mode or tools",
     askAgent: "Ask the Agent",
     questionPlaceholder: "Where are you going? Ask about routes, weather, or anything else.",
@@ -460,8 +460,8 @@ const I18N = {
     updateRecommendations: "更新推荐",
     loadMoreStudySpaces: "查看更多空间",
     collapseStudySpaces: "收起更多空间",
-    travelAgent: "出行 Agent",
-    summaryTitle: "询问路线、天气、学习空间或出行建议",
+    travelAgent: "出行智能体",
+    summaryTitle: "获取路线、天气、或出行建议",
     agentModeTools: "Agent 使用的工具",
     askAgent: "向 Agent 提问",
     questionPlaceholder: "想去哪？可以尝试询问路线、天气或其他出行问题",
@@ -794,7 +794,7 @@ const preferenceWeights = {
 };
 
 let latestRanked = [];
-let recommendationDisplayLimit = 3;
+let recommendationDisplayLimit = 2;
 let routeRequestId = 0;
 let routeStatus = "Routes on demand";
 let routeUpdatedAt = "Estimate";
@@ -979,7 +979,7 @@ function render() {
 function updateRecommendationLoadMoreButton() {
   const button = $("loadMoreStudySpaces");
   if (!button) return;
-  if (recommendationDisplayLimit >= 6) {
+  if (recommendationDisplayLimit >= 5) {
     button.textContent = t("collapseStudySpaces");
     button.setAttribute("aria-expanded", "true");
     button.disabled = false;
@@ -2088,7 +2088,7 @@ async function answerQuestion(question, options = {}) {
         question: cleaned,
         contextStart: currentStartContext(),
         context: buildAgentContext(context),
-        ranked: latestRanked.slice(0, 2).map(toModelPlace),
+        ranked: shouldExposeStudyRecommendations(cleaned) ? latestRanked.slice(0, 2).map(toModelPlace) : [],
         history: chatHistory.slice(-6),
       }),
     });
@@ -2139,6 +2139,34 @@ async function answerQuestion(question, options = {}) {
   } finally {
     setAsking(false);
   }
+}
+
+function shouldExposeStudyRecommendations(question) {
+  const text = String(question || "").toLowerCase();
+  return [
+    "study",
+    "studying",
+    "library",
+    "libraries",
+    "workspace",
+    "work space",
+    "study space",
+    "seat",
+    "quiet",
+    "focus",
+    "revise",
+    "revision",
+    "gostudy",
+    "abdus salam",
+    "学习",
+    "自习",
+    "复习",
+    "图书馆",
+    "座位",
+    "安静",
+    "学习空间",
+    "学习地点",
+  ].some((term) => text.includes(term));
 }
 
 function currentStartContext() {
@@ -2667,7 +2695,7 @@ function setAgentMode(mode) {
 function formatAgentTools(tools = []) {
   const labels = {
     navigate: currentLanguage === "zh" ? "导航" : "Navigation",
-    route_matrix: currentLanguage === "zh" ? "Google 路线" : "Google Routes",
+    route_matrix: currentLanguage === "zh" ? "路线对比" : "Route Comparison",
     weather_current: currentLanguage === "zh" ? "天气" : "Weather",
     web_search: currentLanguage === "zh" ? "联网搜索" : "Web Search",
     tfl_status: currentLanguage === "zh" ? "TfL 状态" : "TfL Status",
@@ -2680,7 +2708,7 @@ function formatAgentTools(tools = []) {
 function formatLoadingTools(tools = []) {
   const labels = {
     navigate: currentLanguage === "zh" ? "导航" : "Navigation",
-    route_matrix: currentLanguage === "zh" ? "Google 路线" : "Google Routes",
+    route_matrix: currentLanguage === "zh" ? "路线对比" : "Route Comparison",
     weather_current: currentLanguage === "zh" ? "天气" : "Weather",
     web_search: currentLanguage === "zh" ? "联网搜索" : "Web Search",
     tfl_status: currentLanguage === "zh" ? "TfL 状态" : "TfL Status",
@@ -3882,7 +3910,7 @@ $("updateRecommendations").addEventListener("click", () => {
   if (controls.scenario.value === "nearest") refreshRoutes();
 });
 $("loadMoreStudySpaces").addEventListener("click", () => {
-  recommendationDisplayLimit = recommendationDisplayLimit >= 6 ? 3 : 6;
+  recommendationDisplayLimit = recommendationDisplayLimit >= 5 ? 2 : 5;
   render();
 });
 $("expandHowItWorks").addEventListener("click", toggleHowItWorks);
@@ -4084,7 +4112,7 @@ function renderAgentToolInfo() {
       <p>模型会在回答时自行选择工具；以下是目前支持的工具列表：</p>
       <div class="tool-info-list">
         <div class="tool-info-item"><strong>导航</strong>：使用谷歌地图路线 API 获取实时出行时间、距离和路线。</div>
-        <div class="tool-info-item"><strong>Google 路线</strong>： 用于比较不同目的地或交通方式的出行估计。</div>
+        <div class="tool-info-item"><strong>路线对比</strong>： 用于比较不同目的地或交通方式的出行估计。</div>
         <div class="tool-info-item"><strong>天气</strong>：使用谷歌天气 API 获取出发点或目的地的当前天气。</div>
         <div class="tool-info-item"><strong>TfL 状态</strong>： 查询路线涉及的伦敦线路是否有延误或中断。</div>
         <div class="tool-info-item"><strong>联网搜索</strong>： 用于百科类和公共事实类问题，并提供来源链接。</div>
@@ -4096,7 +4124,7 @@ function renderAgentToolInfo() {
     <p>The model chooses tools itself while answering. If no tool is needed, the signal stays Pending.</p>
     <div class="tool-info-list">
       <div class="tool-info-item"><strong>Navigation</strong> uses Google Routes for live travel time, distance, and route geometry.</div>
-      <div class="tool-info-item"><strong>Google Routes</strong> compares travel estimates to destinations based on candidates.</div>
+      <div class="tool-info-item"><strong>Route Comparison</strong> compares travel estimates to destinations based on candidates.</div>
       <div class="tool-info-item"><strong>Weather</strong> uses Google Weather API for current conditions at a start point or destination.</div>
       <div class="tool-info-item"><strong>TfL Status</strong> checks live disruption status for London lines used by a route.</div>
       <div class="tool-info-item"><strong>Web Search</strong> looks up encyclopedia-style and public factual questions with source links.</div>

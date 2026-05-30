@@ -271,6 +271,8 @@ def agent_system_prompt():
         "Only mention specific line names, stops, and statuses that tools provide. "
         "If navigate does not provide transitLines, say the route tool did not provide specific line details instead of guessing. "
         "When using web_search, ground the answer in the returned sources and include a concise Markdown source link when useful. "
+        "Only discuss candidate study-space recommendations, libraries, comfort scores, or ranked places when the current user question explicitly asks for study spaces, libraries, places to work, quiet places, or similar study planning. "
+        "For greetings or ordinary chat, do not proactively recommend libraries or study spaces even if location context is available. "
         "If no tool is needed, answer directly. Match the user's language. Use at most one blank line between "
         "distinct paragraphs or before and after lists, and avoid consecutive blank lines. For short answers, prefer "
         "no blank lines unless a section break is genuinely helpful. When comparing multiple transport modes, prefer "
@@ -283,11 +285,12 @@ def agent_system_prompt():
 
 
 def agent_user_prompt(payload):
+    question = payload.get("question", "")
     safe_payload = {
-        "question": payload.get("question", ""),
+        "question": question,
         "contextStart": payload.get("contextStart"),
         "context": payload.get("context"),
-        "ranked": payload.get("ranked", []),
+        "ranked": payload.get("ranked", []) if is_study_recommendation_request(question) else [],
         "history": payload.get("history", [])[-6:],
     }
     return (
@@ -296,6 +299,35 @@ def agent_user_prompt(payload):
         "destinationPlace from the route result.\n"
         f"{compact_json(safe_payload, limit=6500)}"
     )
+
+
+def is_study_recommendation_request(question):
+    text = str(question or "").lower()
+    study_terms = [
+        "study",
+        "studying",
+        "library",
+        "libraries",
+        "workspace",
+        "work space",
+        "study space",
+        "seat",
+        "quiet",
+        "focus",
+        "revise",
+        "revision",
+        "gostudy",
+        "abdus salam",
+        "学习",
+        "自习",
+        "复习",
+        "图书馆",
+        "座位",
+        "安静",
+        "学习空间",
+        "学习地点",
+    ]
+    return any(term in text for term in study_terms)
 
 
 def call_tool_choice_model(messages, tools):
