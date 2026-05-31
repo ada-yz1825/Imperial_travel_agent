@@ -305,12 +305,13 @@ const DEFAULT_REMOTE_API_BASE = "https://imperial-travel-agent-api.onrender.com"
 
 const $ = (id) => document.getElementById(id);
 const LANGUAGE_STORAGE_KEY = "imperialNavigatorLanguage";
+let currentLanguage = "en";
 try {
-  window.localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+  const storedLanguage = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+  if (storedLanguage === "zh") currentLanguage = "zh";
 } catch (error) {
   // Ignore storage errors so the app can still boot in private browsing modes.
 }
-let currentLanguage = "en";
 
 const I18N = {
   en: {
@@ -568,6 +569,11 @@ function t(key, replacements = {}) {
 
 function setLanguage(language) {
   currentLanguage = language === "zh" ? "zh" : "en";
+  try {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, currentLanguage);
+  } catch (error) {
+    // Ignore storage errors so language switching still works in restricted modes.
+  }
   applyLanguage();
   render();
   if (latestWeatherData && latestWeatherStart) {
@@ -911,16 +917,18 @@ function scorePlace(place, context) {
   const matchScore = matchedTags.length * 12 - missingTags * 10;
   const weights = getPreferenceWeights(profile);
 
-  const speedScore = 100 - normalise(adjustedTransit, 10, 62);
-  const calmScore = place.tags.includes("quiet") ? 100 : 72;
-  const comfortScore = place.comfort - rainPenalty - walkingPenalty + matchScore;
-  const budgetScore = place.budget;
+  const speedScore = 96 - normalise(adjustedTransit, 10, 62) * 0.78;
+  const calmScore = place.tags.includes("quiet") ? 90 : 66;
+  const comfortScore = Math.max(34, Math.min(94, place.comfort - rainPenalty - walkingPenalty + matchScore));
+  const budgetScore = Math.max(50, Math.min(85, 60 + (place.budget - 45) * 0.4));
 
-  const total =
+  const weightedTotal =
     speedScore * weights.speed +
     calmScore * weights.calm +
     comfortScore * weights.comfort +
     budgetScore * weights.budget;
+  const normalisedTotal = Math.max(0, Math.min(100, weightedTotal));
+  const total = 100 * Math.pow(normalisedTotal / 100, 1.25);
 
   return {
     ...place,
