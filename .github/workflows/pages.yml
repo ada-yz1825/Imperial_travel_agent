@@ -28,8 +28,10 @@ jobs:
         run: |
           rm -rf site
           mkdir -p site
+          mkdir -p site/image_files
           cp index.html app.js styles.css favicon.svg site/
-          cp -R assets image_files site/
+          cp image_files/image.jpg site/image_files/
+          cp -R assets site/
           touch site/.nojekyll
 
       - name: Upload static site

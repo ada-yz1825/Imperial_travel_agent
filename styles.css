@@ -21,9 +21,30 @@
 }
 
 /* Page signature (subtle, centred, non-intrusive) */
+.footer-fade-band {
+  position: relative;
+  margin-top: -4px;
+  padding: 54px 20px 20px;
+  isolation: isolate;
+}
+
+.footer-fade-band::before {
+  content: "";
+  position: absolute;
+  inset: 0 calc(50% - 50vw) 0;
+  z-index: -1;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.24) 32%,
+    rgba(0, 0, 0, 0.58) 72%,
+    rgba(0, 0, 0, 0.76) 100%
+  );
+  pointer-events: none;
+}
+
 .page-signature {
-  /* move slightly closer to content above and increase bottom breathing room */
-  margin: 6px 0 40px;
+  margin: 0 0 26px;
   padding-top: 4px;
   border-top: 1px solid rgba(16,24,32,0.06);
   text-align: center;
@@ -33,6 +54,7 @@
 .page-signature-inner {
   display: inline-block;
   max-width: 920px;
+  margin-top: 14px;
   padding: 4px 10px;
   background: rgba(0,0,0,0.36);
   border-radius: 8px;
@@ -68,14 +90,10 @@
 }
 
 .footer-useful-links {
-  margin: 10px auto 0;
+  margin: 2px auto 0;
   max-width: 920px;
   padding: 0 10px;
   text-align: center;
-}
-
-.page-signature-inner {
-  margin-top: 20px;
 }
 
 .footer-useful-links-title {
@@ -124,6 +142,66 @@
   transform: translateY(-1px);
 }
 
+.footer-reveal.footer-reveal--pending {
+  opacity: 0;
+  transform: translateY(28px) scale(0.985);
+  filter: blur(4px);
+}
+
+.footer-reveal.footer-reveal--visible {
+  animation: footer-reveal-in 720ms var(--ease-out) both;
+}
+
+.footer-reveal.footer-reveal--visible .footer-useful-link {
+  animation: footer-link-reveal 520ms var(--ease-out) both;
+}
+
+.footer-reveal.footer-reveal--visible .footer-useful-links-list li:nth-child(2) .footer-useful-link {
+  animation-delay: 60ms;
+}
+
+.footer-reveal.footer-reveal--visible .footer-useful-links-list li:nth-child(3) .footer-useful-link {
+  animation-delay: 100ms;
+}
+
+.footer-reveal.footer-reveal--visible .footer-useful-links-list li:nth-child(4) .footer-useful-link {
+  animation-delay: 140ms;
+}
+
+.footer-reveal.footer-reveal--visible .footer-useful-links-list li:nth-child(5) .footer-useful-link {
+  animation-delay: 180ms;
+}
+
+.footer-reveal.footer-reveal--visible .footer-useful-links-list li:nth-child(6) .footer-useful-link {
+  animation-delay: 220ms;
+}
+
+.scroll-reveal {
+  will-change: transform, opacity;
+}
+
+.scroll-reveal.scroll-reveal--pending {
+  opacity: 0;
+  transform: translateY(24px) scale(0.988);
+  filter: blur(2px);
+}
+
+.scroll-reveal.scroll-reveal--visible {
+  animation: scroll-card-reveal 640ms var(--ease-out) both;
+}
+
+.scroll-reveal.scroll-reveal--visible:nth-child(2) {
+  animation-delay: 45ms;
+}
+
+.scroll-reveal.scroll-reveal--visible:nth-child(3) {
+  animation-delay: 90ms;
+}
+
+.scroll-reveal.scroll-reveal--visible:nth-child(4) {
+  animation-delay: 135ms;
+}
+
 @media (max-width: 720px) {
   .page-signature { font-size: 0.88rem; }
   .page-signature .sig-degree { font-size: 0.82rem; }
@@ -131,12 +209,16 @@
   .page-signature .sig-note { font-size: 0.62rem; }
 
   .footer-useful-links {
-    margin-top: 8px;
+    margin-top: 2px;
     padding: 0 6px;
   }
 
+  .footer-fade-band {
+    padding-top: 56px;
+  }
+
   .page-signature-inner {
-    margin-top: 16px;
+    margin-top: 10px;
   }
 
   .footer-useful-links-title {
@@ -2124,7 +2206,7 @@ html[lang="zh-CN"] .weather-header .weather-choice-button {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   /* show roughly four rows before scrolling */
-  max-height: 260px;
+  max-height: 236px;
   overflow: auto;
   padding-right: 2px;
 }
@@ -2142,6 +2224,9 @@ html[lang="zh-CN"] .weather-header .weather-choice-button {
     rgba(255, 255, 255, 0.84);
   padding: 9px 10px;
   min-width: 0;
+}
+
+.tfl-line:not(.scroll-reveal) {
   animation: tfl-line-enter 0.36s var(--ease-out) both;
   animation-delay: calc(min(var(--line-index, 0), 12) * 28ms);
 }
@@ -2241,7 +2326,7 @@ html[lang="zh-CN"] .weather-header .weather-choice-button {
 }
 
 .tfl-meta {
-  margin: 10px 0 0;
+  margin: 16px 0 0;
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 750;
@@ -2373,7 +2458,19 @@ html[lang="zh-CN"] .weather-header .weather-choice-button {
   }
 
   .weather-metrics {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .weather-metrics > .weather-metric-card {
+    min-width: 0;
+  }
+
+  .weather-metrics > .weather-metric-card:nth-child(-n + 3) {
+    grid-column: span 2;
+  }
+
+  .weather-metrics > .weather-metric-card:nth-child(n + 4) {
+    grid-column: span 3;
   }
 
   .tfl-header {
@@ -2502,7 +2599,20 @@ html[lang="zh-CN"] .weather-header .weather-choice-button {
 }
 @media (max-width: 420px) {
   .weather-metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .weather-metrics div {
+    padding: 9px;
+  }
+
+  .weather-metrics span,
+  .weather-meta {
+    font-size: 0.74rem;
+  }
+
+  .weather-metrics strong {
+    font-size: 0.92rem;
   }
 
   .tfl-line-status {
@@ -2864,9 +2974,13 @@ html[lang="zh-CN"] .weather-header .weather-choice-button {
   background: rgba(255, 255, 255, 0.23);
 }
 
+.control-module:not(.scroll-reveal),
+.decision-module:not(.scroll-reveal) {
+  animation: panel-in 560ms var(--ease-out) both;
+}
+
 .control-module,
 .decision-module {
-  animation: panel-in 560ms var(--ease-out) both;
   transition: border-color 180ms ease, box-shadow 220ms ease, transform 220ms ease;
 }
 
@@ -2929,8 +3043,11 @@ select:focus {
   animation: soft-reveal 300ms var(--ease-out) both;
 }
 
-.route-preview {
+.route-preview:not(.scroll-reveal) {
   animation: expand-in 320ms var(--ease-out) both;
+}
+
+.route-preview {
   transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
 
@@ -2960,20 +3077,23 @@ select:focus {
   border-color: rgba(39, 103, 168, 0.28);
 }
 
-.place-card {
+.place-card:not(.scroll-reveal) {
   animation: card-in 420ms var(--ease-out) both;
+}
+
+.place-card {
   transition: border-color 180ms ease, box-shadow 200ms ease, transform 200ms ease;
 }
 
-.place-card:nth-child(2) {
+.place-card:not(.scroll-reveal):nth-child(2) {
   animation-delay: 60ms;
 }
 
-.place-card:nth-child(3) {
+.place-card:not(.scroll-reveal):nth-child(3) {
   animation-delay: 120ms;
 }
 
-.place-card:nth-child(4) {
+.place-card:not(.scroll-reveal):nth-child(4) {
   animation-delay: 120ms;
 }
 
@@ -3037,6 +3157,51 @@ select:focus {
   from {
     opacity: 0;
     transform: translateY(14px) scale(0.992);
+    filter: blur(2px);
+  }
+  60% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes footer-reveal-in {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.985);
+    filter: blur(4px);
+  }
+  60% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes footer-link-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes scroll-card-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.988);
     filter: blur(2px);
   }
   60% {
@@ -3208,6 +3373,15 @@ select:focus {
 }
 
 @media (max-width: 560px) {
+  .language-toggle {
+    top: 18px;
+    right: 20px;
+    min-height: 38px;
+    padding: 5px 14px;
+    font-size: 0.88rem;
+    box-shadow: 0 8px 22px rgba(14, 24, 38, 0.16);
+  }
+
   .app-shell {
     width: min(100% - 22px, 1180px);
     padding-top: 14px;
@@ -3355,8 +3529,31 @@ select:focus {
     grid-template-columns: 1fr;
   }
 
-  .agent-actions,
   .chat-modal-form {
     grid-template-columns: 1fr;
+  }
+
+  .agent-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .agent-actions a.cta,
+  .agent-actions button.cta {
+    width: 100%;
+    min-width: 0;
+    min-height: 46px;
+    padding: 9px 10px;
+    font-size: clamp(0.73rem, 3.15vw, 0.88rem);
+    line-height: 1.16;
+  }
+
+  .agent-actions button.chat-cta {
+    margin-left: 0;
+    min-width: 0;
+    padding-left: 10px;
+    padding-right: 10px;
   }
 }

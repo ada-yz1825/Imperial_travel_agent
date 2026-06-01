@@ -81,7 +81,6 @@ For public transport routes, the map can show:
 ├── navigator_core.py         # Shared LLM, routing, weather, and parsing logic
 ├── assets/                   # Study-space/library images
 ├── image_files/image.jpg     # High-resolution page background image
-├── image_files/              # Additional static frontend assets
 └── .github/workflows/        # GitHub Pages deployment workflow
 ```
 
@@ -188,7 +187,7 @@ app.js
 styles.css
 favicon.svg
 assets/
-image_files/
+image_files/image.jpg
 ```
 
 Important notes:

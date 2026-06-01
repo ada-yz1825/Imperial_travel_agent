@@ -322,7 +322,7 @@ const I18N = {
     llmLabel: "LLM",
     apiKeys: "API Keys",
     chooseStart: "Choose where to start",
-    startingLocation: "Starting location",
+    startingLocation: "Click on map or use your current location",
     loadingGoogleMap: "Loading Google Map...",
     selectCampus: "or select campus",
     mapSelection: "Map selection",
@@ -446,7 +446,7 @@ const I18N = {
     llmLabel: "大语言模型",
     apiKeys: "外部 API",
     chooseStart: "选择出发地点",
-    startingLocation: "出发位置",
+    startingLocation: "点击地图、拖动标记，或使用当前位置。",
     loadingGoogleMap: "正在加载 Google 地图...",
     selectCampus: "或选择校区",
     mapSelection: "地图选点",
@@ -486,7 +486,7 @@ const I18N = {
     update: "更新",
     fullScreen: "全屏地图",
     exitFullScreen: "退出全屏",
-    openGoogleMaps: "在 Google Maps 中打开路线",
+    openGoogleMaps: "在 Google Maps 中查看更多路线",
     continueChat: "在聊天窗口继续",
     expandIntro: "展开助手说明书",
     collapseIntro: "收起助手说明",
@@ -500,7 +500,7 @@ const I18N = {
     howNote: "* 由于使用的数据来源限制，此 agent 在伦敦地区能达到最佳效果。在其他地区使用时天气和交通状态可能不准确。",
     weather: "天气",
     atYour: "目前显示的天气位置为",
-    startPoint: "地图选择的出发点",
+    startPoint: "「 图选位置 」",
     currentLocation: "当前位置",
     updateWeatherAt: "更新天气位置",
     destinationButton: "目的地",
@@ -557,7 +557,7 @@ const I18N = {
     distanceLabel: "距离",
     walkEstimateLabel: "步行预估",
     minuteUnitShort: "分钟",
-    usingTool: "正在使用 {tool} 工具",
+    usingTool: "正在使用{tool}工具",
     understandingRequest: "正在理解您的请求",
   },
 };
@@ -743,7 +743,12 @@ function getConfiguredApiBase() {
     return explicitApiBase;
   }
 
-  if (isLocalPage()) return "";
+  if (isLocalPage()) {
+    if (window.location.port && window.location.port !== "8001") {
+      return "http://localhost:8001";
+    }
+    return "";
+  }
 
   const storedApiBase = normalizeApiBase(window.localStorage.getItem(API_BASE_STORAGE_KEY));
   if (storedApiBase) return storedApiBase;
@@ -759,10 +764,6 @@ function apiUrl(path) {
 
 function apiFetch(path, options) {
   return fetch(apiUrl(path), options);
-}
-
-function apiBaseLabel() {
-  return apiBase || window.location.origin;
 }
 
 function formatModelDisplayName(value) {
@@ -816,7 +817,6 @@ let startMarker = null;
 let routeMap = null;
 let routePolylines = [];
 let routeMarkers = [];
-let routeInfoWindow = null;
 let routeStopOverlay = null;
 let routeStopOverlayCloseTimer = null;
 let pendingRoutePreview = null;
@@ -1093,26 +1093,6 @@ function weatherConditionLabel(conditionType, isDaytime) {
   if (type.includes("FOG") || type.includes("HAZE") || type.includes("MIST")) return zh ? "低能见度" : "Foggy";
   if (type.includes("CLOUD")) return zh ? "多云" : "Cloudy";
   return isDaytime === false ? (zh ? "夜间" : "Night") : (zh ? "晴朗" : "Sunny");
-}
-
-function weatherConditionSummary(conditionType, isDaytime) {
-  const type = String(conditionType || "").toUpperCase();
-  const zh = currentLanguage === "zh";
-  if (type.includes("THUNDER")) return zh ? "雷暴天气" : "Stormy conditions";
-  if (type.includes("RAIN") || type.includes("DRIZZLE")) return zh ? "可能有雨" : "Rain expected";
-  if (type.includes("SNOW") || type.includes("ICE")) return zh ? "降雪或结冰" : "Snowy conditions";
-  if (type.includes("FOG") || type.includes("HAZE") || type.includes("MIST")) return zh ? "能见度较低" : "Low visibility";
-  if (type.includes("CLOUD")) return zh ? "云量较多" : "Cloud cover";
-  return isDaytime === false ? (zh ? "夜间天气" : "Night conditions") : (zh ? "晴朗天气" : "Sunny weather");
-}
-
-function formatWeatherDay(currentTime) {
-  if (!currentTime) return "Today";
-  try {
-    return new Date(currentTime).toLocaleDateString([], { weekday: "long" });
-  } catch (error) {
-    return "Today";
-  }
 }
 
 function setWeatherLoading(message = currentLanguage === "zh" ? "正在加载天气数据..." : "Loading weather data...") {
@@ -2959,7 +2939,6 @@ function drawRoutePreview(data, recommended) {
   routeMarkers.forEach((marker) => marker.setMap(null));
   routeMarkers = [];
   closeRouteStopInfo({ immediate: true });
-  if (routeInfoWindow) routeInfoWindow.close();
 
   routePolylines = drawRoutePolylines(recommended, path);
 
@@ -3162,6 +3141,7 @@ function createRouteStopOverlay() {
   overlay.container = null;
   overlay.contentHtml = "";
   overlay.isOpen = false;
+  overlay.panRequestId = 0;
 
   overlay.onAdd = function onAdd() {
     const container = document.createElement("div");
@@ -3213,6 +3193,7 @@ function createRouteStopOverlay() {
       this.renderContent(true);
     }
     this.draw();
+    this.schedulePanIntoView();
   };
 
   overlay.renderContent = function renderContent(animate = false) {
@@ -3224,8 +3205,51 @@ function createRouteStopOverlay() {
     this.container.classList.add("route-stop-popup--open");
   };
 
+  overlay.schedulePanIntoView = function schedulePanIntoView() {
+    const requestId = ++this.panRequestId;
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        if (requestId !== this.panRequestId || !this.isOpen || !this.container || !routeMap) return;
+        this.panIntoView();
+      });
+    });
+  };
+
+  overlay.panIntoView = function panIntoView() {
+    const mapDiv = routeMap?.getDiv?.();
+    if (!mapDiv || !this.container) return;
+    const popupRect = this.container.getBoundingClientRect();
+    const mapRect = mapDiv.getBoundingClientRect();
+    if (!popupRect.width || !popupRect.height || !mapRect.width || !mapRect.height) return;
+
+    const padding = routeMapFullscreen ? 24 : 18;
+    let panX = 0;
+    let panY = 0;
+    const minLeft = mapRect.left + padding;
+    const maxRight = mapRect.right - padding;
+    const minTop = mapRect.top + padding;
+    const maxBottom = mapRect.bottom - padding;
+
+    if (popupRect.left < minLeft) {
+      panX = popupRect.left - minLeft;
+    } else if (popupRect.right > maxRight) {
+      panX = popupRect.right - maxRight;
+    }
+
+    if (popupRect.top < minTop) {
+      panY = popupRect.top - minTop;
+    } else if (popupRect.bottom > maxBottom) {
+      panY = popupRect.bottom - maxBottom;
+    }
+
+    if (Math.abs(panX) > 1 || Math.abs(panY) > 1) {
+      routeMap.panBy(Math.round(panX), Math.round(panY));
+    }
+  };
+
   overlay.close = function close(immediate = false) {
     if (!this.getMap()) return;
+    this.panRequestId += 1;
     if (immediate || !this.container) {
       this.isOpen = false;
       this.setMap(null);
@@ -3330,7 +3354,6 @@ function clearRoutePreview() {
   routeMarkers.forEach((marker) => marker.setMap(null));
   routeMarkers = [];
   closeRouteStopInfo({ immediate: true });
-  if (routeInfoWindow) routeInfoWindow.close();
 }
 
 function renderAgentActions(data = null, route = data?.recommended) {
@@ -3519,12 +3542,7 @@ function selectCampusStart(key) {
 }
 
 function updateStartMapStatus(statusMessage = "") {
-  const start = getStartPoint();
-  const label = controls.startPoint.value === "mapSelection"
-    ? t("mapPoint", { lat: start.lat.toFixed(5), lng: start.lng.toFixed(5) })
-    : t("mapPointSelected", { label: start.label });
-  const guidance = statusMessage || t("mapGuidance");
-  $("startMapStatus").textContent = `${label}. ${guidance}`;
+  $("startMapStatus").textContent = statusMessage;
 }
 
 function geolocationErrorMessage(error) {
@@ -3847,7 +3865,7 @@ async function refreshIntegrationStatus() {
       mcp: "Local API offline",
       tools: integrationStatus.tools || "Pending",
     };
-    $("startMapStatus").innerHTML = `Local API not connected. Run <code>PORT=8001 python3 server.py</code>, or open this page with <code>?api=http://localhost:8002</code> if you use another port.`;
+    $("startMapStatus").innerHTML = `Local API not connected. Run <code>PORT=8001 python3 server.py</code>, or open this page with <code>?api=http://localhost:8001</code> if you use another port.`;
     renderWeatherError("Local API is not connected, so the browser key is not available.");
   }
   render();
@@ -4260,6 +4278,101 @@ if (languageToggleBtn) {
   languageToggleBtn.addEventListener("click", () => setLanguage(currentLanguage === "zh" ? "en" : "zh"));
 }
 
+function initFooterReveal() {
+  const footer = document.querySelector(".footer-reveal");
+  if (!footer) return;
+
+  const reveal = () => {
+    footer.classList.remove("footer-reveal--pending");
+    footer.classList.add("footer-reveal--visible");
+  };
+
+  if (!("IntersectionObserver" in window)) {
+    reveal();
+    return;
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    if (!entries.some((entry) => entry.isIntersecting)) return;
+    reveal();
+    observer.disconnect();
+  }, {
+    threshold: 0.12,
+    rootMargin: "0px 0px -8% 0px",
+  });
+
+  observer.observe(footer);
+}
+
+const SCROLL_REVEAL_SELECTOR = [
+  ".signal-tile",
+  ".agent-tools",
+  ".quick-prompts button",
+  ".weather-metric-card",
+  ".tfl-line",
+  ".place-card",
+  ".how-grid > div",
+].join(", ");
+
+let scrollRevealObserver = null;
+
+function revealScrollElement(element) {
+  element.classList.remove("scroll-reveal--pending");
+  element.classList.add("scroll-reveal--visible");
+}
+
+function observeScrollRevealElement(element) {
+  if (!(element instanceof HTMLElement)) return;
+  if (element.dataset.scrollRevealRegistered === "true") return;
+  element.dataset.scrollRevealRegistered = "true";
+  element.classList.add("scroll-reveal");
+  if (!element.classList.contains("scroll-reveal--visible")) {
+    element.classList.add("scroll-reveal--pending");
+  }
+  if (!scrollRevealObserver) {
+    revealScrollElement(element);
+    return;
+  }
+  scrollRevealObserver.observe(element);
+}
+
+function registerScrollRevealElements(root = document) {
+  if (root instanceof HTMLElement && root.matches(SCROLL_REVEAL_SELECTOR)) {
+    observeScrollRevealElement(root);
+  }
+  root.querySelectorAll?.(SCROLL_REVEAL_SELECTOR).forEach(observeScrollRevealElement);
+}
+
+function initScrollReveal() {
+  if (!("IntersectionObserver" in window)) {
+    document.querySelectorAll(".scroll-reveal--pending").forEach(revealScrollElement);
+    registerScrollRevealElements();
+    return;
+  }
+
+  scrollRevealObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      revealScrollElement(entry.target);
+      scrollRevealObserver.unobserve(entry.target);
+    });
+  }, {
+    threshold: 0.14,
+    rootMargin: "0px 0px -7% 0px",
+  });
+
+  registerScrollRevealElements();
+
+  const mutationObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (node instanceof HTMLElement) registerScrollRevealElements(node);
+      });
+    });
+  });
+  mutationObserver.observe(document.body, { childList: true, subtree: true });
+}
+
 $("modalChatForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const input = $("modalUserQuestion");
@@ -4280,5 +4393,7 @@ $("modalChatForm").addEventListener("submit", async (event) => {
 
 applyLanguage();
 render();
+initScrollReveal();
+initFooterReveal();
 refreshIntegrationStatus();
 refreshTflStatus();
