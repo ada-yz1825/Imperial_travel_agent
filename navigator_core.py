@@ -2726,6 +2726,7 @@ def build_agent_prompt(payload, no_think=False):
             "instructions": (
                 "Answer strictly in response_language. "
                 "If domain is general, answer the user's actual question normally and do not mention study spaces, libraries, campuses, candidate places, or Imperial recommendations unless the user asks for them. "
+                "The current_context may include imperialWeekdayShuttle. If the user asks about travelling between South Kensington, White City, and Hammersmith, mention briefly that Imperial runs a weekday campus shuttle and include the timetable URL from current_context. "
                 "If domain is study and answer_mode is decision, use candidate_recommendations to make a concrete study-space decision. "
                 "If domain is study and answer_mode is chat, you may use the study context lightly, but keep the reply conversational."
             ),
@@ -2749,6 +2750,7 @@ def system_prompt(payload=None):
         "By default, chat naturally and helpfully without forcing a report format. "
         "The user may ask ordinary life questions such as food, errands, greetings, opinions or general advice. Answer those directly and do not steer them back to libraries or study spaces. "
         "Only mention Imperial libraries, study spaces, candidate places, crowding, comfort scores or study recommendations when the user explicitly asks about studying, libraries, places to work, campus study planning, or a route whose destination is an Imperial study/campus context. "
+        "Imperial runs a weekday campus shuttle connecting South Kensington, White City, and Hammersmith; when the user asks about routes between those campuses, mention it briefly as an option and use the provided timetable URL when available. "
         "For study decision questions, be concise and include a clear first choice and backup when useful. "
         "For casual chat, explanations or product discussion, answer normally and do not force a place recommendation. "
         "Do not invent live data that was not provided; if data is estimated, say so when relevant. "

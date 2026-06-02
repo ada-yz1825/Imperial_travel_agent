@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Imperial Travel Agent</title>
     <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=3" />
-    <link rel="stylesheet" href="./styles.css?v=scroll-reveal-1" />
+    <link rel="stylesheet" href="./styles.css?v=footer-gap-1" />
   </head>
   <body>
     <button id="languageToggle" class="language-toggle" type="button" aria-label="Switch language">中文</button>
@@ -52,23 +52,62 @@
             </div>
           </div>
 
-          <div class="control-module recommendation-module">
-            <h3 class="left-section-title">Study & work spaces</h3>
-            <div class="field-group">
-              <label for="scenario">Preference</label>
-              <select id="scenario">
-                <option value="focus">Quiet space</option>
-                <option value="group">Group work</option>
-                <option value="late">Late night work</option>
-                <option value="nearest">Nearest seat</option>
-              </select>
+          <div class="control-module shuttle-module" aria-label="Imperial shuttle bus lookup">
+            <h3 class="left-section-title compact">Campus shuttle</h3>
+            <div class="shuttle-fields">
+              <div class="shuttle-field">
+                <label for="shuttleFrom">From campus</label>
+                <select id="shuttleFrom">
+                  <option value="southKensington">South Kensington</option>
+                  <option value="whiteCity">White City</option>
+                  <option value="hammersmith">Hammersmith</option>
+                </select>
+              </div>
+              <div class="shuttle-field">
+                <label for="shuttleTo">To campus</label>
+                <select id="shuttleTo">
+                  <option value="whiteCity">White City</option>
+                  <option value="southKensington">South Kensington</option>
+                  <option value="hammersmith">Hammersmith</option>
+                </select>
+              </div>
             </div>
+            <div class="shuttle-result" id="shuttleResult" aria-live="polite">
+              <span>Next shuttle</span>
+              <strong id="shuttleNextTime">Checking timetable...</strong>
+              <p id="shuttleDetail">Weekday service between South Kensington, White City and Hammersmith.</p>
+            </div>
+            <a class="shuttle-source" id="shuttleSource" href="https://www.imperial.ac.uk/admin-services/property/travel/shuttle-bus/" target="_blank" rel="noreferrer">Timetable from Imperial College London.</a>
+          </div>
 
-            <div class="field-row">
-              <span>Walking comfort limit</span>
-              <output id="walkOutput">15 min</output>
+          <div class="control-module recommendation-module scroll-reveal scroll-reveal--pending">
+            <h3 class="left-section-title">Study & work spaces</h3>
+            <div class="recommendation-controls">
+              <div class="field-group recommendation-control">
+                <label for="scenario">Preference</label>
+                <select id="scenario">
+                  <option value="focus">Quiet space</option>
+                  <option value="group">Group work</option>
+                  <option value="late">Late night work</option>
+                  <option value="nearest">Nearest seat</option>
+                </select>
+              </div>
+
+              <div class="field-group recommendation-control walk-stepper-control">
+                <div class="field-row">
+                  <span>Walking comfort limit</span>
+                </div>
+                <input id="walkTolerance" type="hidden" value="15" />
+                <div class="walk-stepper" role="group" aria-label="Walking comfort limit">
+                  <button id="walkDecrease" class="walk-stepper-button" type="button" aria-label="Decrease walking comfort limit">−</button>
+                  <div class="walk-stepper-value" aria-hidden="true">
+                    <strong id="walkStepperValue">15</strong>
+                    <span id="walkStepperUnit">min</span>
+                  </div>
+                  <button id="walkIncrease" class="walk-stepper-button" type="button" aria-label="Increase walking comfort limit">+</button>
+                </div>
+              </div>
             </div>
-            <input id="walkTolerance" type="range" min="5" max="35" value="15" step="5" />
             <button id="updateRecommendations" class="secondary-action" type="button">Update recommendations</button>
 
             <div class="recommendation-grid" id="recommendations"></div>
@@ -148,8 +187,8 @@
             </form>
 
             <div class="how-it-works-shell">
-              <button id="expandHowItWorks" class="secondary-action expandable-action how-toggle" type="button" aria-expanded="false">Expand introductions to the agent</button>
-              <section class="how-it-works" id="howItWorks" aria-label="How it works" hidden>
+              <button id="expandHowItWorks" class="secondary-action expandable-action how-toggle" type="button" aria-expanded="true">Collapse introductions to the agent</button>
+              <section class="how-it-works how-it-works--pop" id="howItWorks" aria-label="How it works">
                 <p class="eyebrow">How it works?</p>
                 <div class="how-grid">
                   <div>
@@ -164,22 +203,22 @@
                     <strong>3. Get actionable results</strong>
                     <span>The model uses the route, weather, and other data it receives to give practical advice. For navigation requests, it shows an interactive route preview with station and line details when available.</span>
                   </div>
-                  <p class="how-note"></p>
                 </div>
               </section>
             </div>
           </div>
 
-          <section class="decision-module weather-module" aria-label="Weather information">
+          <section class="decision-module weather-module scroll-reveal scroll-reveal--pending" aria-label="Weather information">
             <div class="weather-header">
               <div>
                 <p class="eyebrow">Weather</p>
-                <h3><span id="weatherScopePrefix">At your</span> <span id="weatherScopeLabel" class="weather-scope-label">start point</span></h3>
+                <h3><span id="weatherScopePrefix">At your</span> <span id="weatherScopeLabel" class="weather-scope-label">current location</span></h3>
               </div>
               <div class="weather-action-group">
                 <span class="weather-action-label">Update Weather data at</span>
                 <div class="weather-actions" aria-label="Weather update options">
-                  <button id="updateWeatherCurrentButton" class="secondary-action weather-choice-button" type="button">Current location</button>
+                  <button id="updateWeatherCurrentButton" class="secondary-action weather-choice-button is-active" type="button">Current location</button>
+                  <button id="updateWeatherMapButton" class="secondary-action weather-choice-button" type="button">Map selection</button>
                   <button id="updateWeatherDestinationButton" class="secondary-action weather-choice-button" type="button">Destination</button>
                 </div>
               </div>
@@ -225,7 +264,7 @@
             </div>
           </section>
 
-          <section class="decision-module tfl-module" aria-label="TfL line status">
+          <section class="decision-module tfl-module scroll-reveal scroll-reveal--pending" aria-label="TfL line status">
             <div class="tfl-header">
               <div>
                 <p class="eyebrow">TfL status</p>
@@ -313,11 +352,11 @@
           <span class="sig-name">Created by Yiqi Zhu</span>
           <span class="sig-degree">MSc Environmental Data Science and Machine Learning at Imperial College London</span>
           <span class="sig-blankline" aria-hidden="true"> </span>
-          <span class="sig-note">This is an independent project and is not an official Imperial College London service. Route times and distances are provided by Google Maps and may vary in real time.</span>
+          <span class="sig-note">This is an independent project and is not an official Imperial College London service. This agent performs best in London. Due to data limitations, weather and traffic may be inaccurate in other regions.</span>
         </div>
       </footer>
     </div>
 
-    <script src="./app.js?v=scroll-reveal-1"></script>
+    <script src="./app.js?v=recommendation-controls-2"></script>
   </body>
 </html>

@@ -54,7 +54,7 @@
 .page-signature-inner {
   display: inline-block;
   max-width: 920px;
-  margin-top: 14px;
+  margin-top: 30px;
   padding: 4px 10px;
   background: rgba(0,0,0,0.36);
   border-radius: 8px;
@@ -90,7 +90,7 @@
 }
 
 .footer-useful-links {
-  margin: 2px auto 0;
+  margin: 18px auto 0;
   max-width: 920px;
   padding: 0 10px;
   text-align: center;
@@ -190,6 +190,18 @@
   animation: scroll-card-reveal 640ms var(--ease-out) both;
 }
 
+.control-module.scroll-reveal.scroll-reveal--pending,
+.decision-module.scroll-reveal.scroll-reveal--pending {
+  opacity: 0;
+  transform: translateY(18px) scale(0.992);
+  filter: none;
+}
+
+.control-module.scroll-reveal.scroll-reveal--visible,
+.decision-module.scroll-reveal.scroll-reveal--visible {
+  animation: module-card-reveal 520ms var(--ease-out) both;
+}
+
 .scroll-reveal.scroll-reveal--visible:nth-child(2) {
   animation-delay: 45ms;
 }
@@ -209,7 +221,7 @@
   .page-signature .sig-note { font-size: 0.62rem; }
 
   .footer-useful-links {
-    margin-top: 2px;
+    margin-top: 18px;
     padding: 0 6px;
   }
 
@@ -218,7 +230,7 @@
   }
 
   .page-signature-inner {
-    margin-top: 10px;
+    margin-top: 24px;
   }
 
   .footer-useful-links-title {
@@ -472,18 +484,18 @@ html[lang="zh-CN"] h3 {
 
 .decision-area {
   display: grid;
-  gap: 18px;
+  gap: 22px;
 }
 
 .control-panel {
   display: grid;
-  gap: 18px;
+  gap: 22px;
 }
 
 .control-module {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.94);
+  background: rgba(255, 255, 255, 0.95);
   box-shadow: var(--shadow);
   padding: 18px;
 }
@@ -493,11 +505,167 @@ html[lang="zh-CN"] h3 {
 }
 
 .recommendation-module .left-section-title {
-  margin-bottom: 10px;
+  margin-bottom: 16px;
 }
 
 .recommendation-module .field-group {
   margin-bottom: 12px;
+}
+
+.recommendation-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 1px;
+}
+
+.recommendation-control {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.recommendation-module #updateRecommendations {
+  margin-top: 4px;
+}
+
+.walk-stepper-control .field-row {
+  margin-bottom: 8px;
+}
+
+.walk-stepper {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.walk-stepper-button {
+  min-height: 44px;
+  border: 1px solid #cbd7e2;
+  border-radius: 6px;
+  background: #eef3f7;
+  color: #263544;
+  font-size: 1.15rem;
+  font-weight: 900;
+}
+
+.walk-stepper-button:hover,
+.walk-stepper-button:focus-visible {
+  background: #dfe9f1;
+}
+
+.walk-stepper-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.walk-stepper-value {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  min-height: 44px;
+  border: 1px solid #d8e2ea;
+  border-radius: 6px;
+  background: #fff;
+  color: #263544;
+}
+
+.walk-stepper-value strong {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.walk-stepper-value span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.shuttle-module {
+  display: grid;
+  gap: 9px;
+}
+
+.shuttle-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+.shuttle-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.shuttle-field label {
+  margin: 0;
+}
+
+.shuttle-fields select {
+  min-width: 0;
+}
+
+.shuttle-result {
+  border: 1px solid rgba(39, 103, 168, 0.14);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(39, 103, 168, 0.1), rgba(255, 255, 255, 0.8) 58%),
+    #fff;
+  padding: 12px;
+}
+
+.shuttle-result--reveal {
+  animation: shuttle-result-reveal 300ms var(--ease-out) both;
+}
+
+.shuttle-result span {
+  color: var(--muted);
+  font-size: 1.16rem;
+  font-weight: 800;
+}
+
+.shuttle-result strong {
+  display: block;
+  margin-top: 5px;
+  color: #1f2d3a;
+  font-size: 1.18rem;
+  font-weight: 950;
+}
+
+.shuttle-result strong.is-time {
+  font-size: 2.1rem;
+}
+
+.shuttle-result p,
+.shuttle-source {
+  margin: 8px 0 0;
+  line-height: 1.4;
+}
+
+.shuttle-result p {
+  font-size: 0.9rem;
+}
+
+.shuttle-source {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.shuttle-source:hover,
+.shuttle-source:focus-visible {
+  color: var(--blue);
+  text-decoration: underline;
+  outline: none;
 }
 
 .load-more-study-spaces {
@@ -681,7 +849,7 @@ button:hover {
 .decision-module {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.94);
+  background: rgba(255, 255, 255, 0.89);
   box-shadow: var(--shadow);
   padding: 20px;
 }
@@ -1817,18 +1985,6 @@ html[lang="zh-CN"] .how-it-works .eyebrow {
   padding: 11px 12px;
 }
 
-.how-note {
-  margin: 8px 2px 0;
-  color: var(--muted);
-  font-size: 0.82rem;
-  line-height: 1.45;
-}
-
-html[lang="zh-CN"] .how-note {
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-
 .weather-module {
   padding: 18px 20px;
 }
@@ -1869,6 +2025,7 @@ html[lang="zh-CN"] .how-note {
   display: grid;
   justify-items: center;
   gap: 5px;
+  text-align: center;
 }
 
 .weather-action-label {
@@ -2517,6 +2674,24 @@ html[lang="zh-CN"] .weather-header .weather-choice-button {
   }
 }
 
+@keyframes shuttle-result-reveal {
+  0% {
+    opacity: 0.68;
+    transform: translateY(7px) scale(0.986);
+    filter: blur(1px);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-1px) scale(1.004);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
 @keyframes weather-content-pulse {
   0%, 100% { opacity: 0.72; }
   50% { opacity: 1; }
@@ -2611,6 +2786,10 @@ html[lang="zh-CN"] .weather-header .weather-choice-button {
     font-size: 0.74rem;
   }
 
+  .shuttle-source {
+    font-size: 0.74rem;
+  }
+
   .weather-metrics strong {
     font-size: 0.92rem;
   }
@@ -2638,6 +2817,14 @@ html[lang="zh-CN"] .weather-header .weather-choice-button {
   margin-bottom: 4px;
   color: #263544;
   font-size: 0.9rem;
+}
+
+.how-grid strong.how-inline-emphasis {
+  display: inline;
+  margin-bottom: 0;
+  color: inherit;
+  font-size: inherit;
+  font-weight: 900;
 }
 
 .how-grid span {
@@ -2993,7 +3180,7 @@ html[lang="zh-CN"] .weather-header .weather-choice-button {
 }
 
 .control-module:hover {
-  background: rgba(255, 255, 255, 0.965);
+  background: rgba(255, 255, 255, 0.915);
   box-shadow: var(--shadow-hover);
 }
 
@@ -3215,6 +3402,20 @@ select:focus {
   }
 }
 
+@keyframes module-card-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.992);
+  }
+  65% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes soft-reveal {
   from {
     opacity: 0;
@@ -3322,6 +3523,10 @@ select:focus {
 }
 
 @media (max-width: 560px) {
+  .recommendation-controls {
+    grid-template-columns: 1fr;
+  }
+
   .start-choice-row {
     grid-template-columns: 1fr;
   }
@@ -3427,6 +3632,7 @@ select:focus {
   .workspace {
     display: flex;
     flex-direction: column;
+    gap: 22px;
   }
 
   .control-panel,
@@ -3438,23 +3644,28 @@ select:focus {
     order: 1;
   }
 
-  .agent-module {
+  .shuttle-module {
     order: 2;
   }
 
-  .weather-module {
+  .agent-module {
     order: 3;
   }
 
-  .tfl-module {
+  .weather-module {
     order: 4;
   }
 
-  .recommendation-module {
+  .tfl-module {
     order: 5;
   }
 
+  .recommendation-module {
+    order: 6;
+  }
+
   .start-module,
+  .shuttle-module,
   .agent-module,
   .weather-module,
   .tfl-module,
@@ -3507,7 +3718,7 @@ select:focus {
 
   .weather-actions {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     width: 100%;
   }
 
@@ -3518,6 +3729,9 @@ select:focus {
   .weather-header .weather-choice-button {
     width: 100%;
     justify-content: center;
+    min-height: 40px;
+    padding-inline: 6px;
+    font-size: 0.76rem;
   }
 
   .imperial-logo {

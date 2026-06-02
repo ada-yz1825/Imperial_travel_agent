@@ -38,6 +38,7 @@ from navigator_core import (
     get_openai_model,
     get_together_api_key,
     get_together_model,
+    imperial_shuttle_context,
     mode_label,
     navigation_mode_candidates,
     parse_navigation_query,
@@ -105,6 +106,7 @@ def agent_observation_payload(name, result):
             "destinationPlace": result.get("destinationPlace"),
             "recommended": summarize_route_option(result.get("recommended")),
             "alternatives": [summarize_route_option(route) for route in result.get("alternatives", [])],
+            "imperial_weekday_shuttle": result.get("imperial_weekday_shuttle"),
             "provider": result.get("provider"),
         }
         if result.get("details"):
@@ -268,6 +270,9 @@ def agent_system_prompt():
         "You may call multiple tools in sequence, observe the result, then decide whether another tool is needed. "
         "If navigate returns transitLines and the user asks for route advice, delay impact, or whether it is a good time to travel, "
         "call tfl_status with the provided statusQuery values, or the shortName for bus routes, before the final answer. "
+        "Imperial runs a weekday campus shuttle connecting South Kensington, White City, and Hammersmith. "
+        "When a route request is between those campuses, mention the shuttle briefly as an option and include this Markdown link: "
+        "[Imperial shuttle](https://www.imperial.ac.uk/admin-services/property/travel/shuttle-bus/). "
         "Only mention specific line names, stops, and statuses that tools provide. "
         "If navigate does not provide transitLines, say the route tool did not provide specific line details instead of guessing. "
         "When using web_search, ground the answer in the returned sources and include a concise Markdown source link when useful. "
@@ -1423,6 +1428,7 @@ def mcp_tool_navigate(arguments):
                 "destinationPlace": public_place_payload(route_request["destination"]),
                 "recommended": None,
                 "alternatives": [],
+                "imperial_weekday_shuttle": imperial_shuttle_context(route_request),
                 "provider": "google_routes",
                 "details": route_errors[:4],
             }
@@ -1445,6 +1451,7 @@ def mcp_tool_navigate(arguments):
             "recommended": route_options[0],
             "mapRoute": route_options[0],
             "alternatives": route_options[1:],
+            "imperial_weekday_shuttle": imperial_shuttle_context(route_request),
             "provider": "google_routes",
         }
     except MCPToolError:

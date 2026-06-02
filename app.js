@@ -302,6 +302,26 @@ const places = [
 
 const API_BASE_STORAGE_KEY = "imperialNavigatorApiBase";
 const DEFAULT_REMOTE_API_BASE = "https://imperial-travel-agent-api.onrender.com";
+const MAINLAND_CHINA_WARNING_TEXT = [
+  "由于 Google Map 数据覆盖范围的限制，中国大陆地区的天气和交通信息可能不准确或无法获取。为获取更好的体验，请您选取港澳台或海外地区使用。",
+  "Due to Google Maps data coverage limitations, weather and traffic information in mainland China may be inaccurate or unavailable. For a better experience, please select Hong Kong, Macao, Taiwan, or an overseas region.",
+].join("\n\n");
+const MAINLAND_CHINA_POLYGONS = [
+  [
+    [73.5, 39.5], [74.8, 37.2], [78, 35], [78.5, 32], [80.3, 30], [79.5, 27],
+    [81.5, 25], [85, 27], [88, 27], [91, 28], [94, 29], [96, 28], [98, 25],
+    [100, 21.5], [103, 22], [106, 21.5], [109, 18.2], [111, 19.5], [112, 21.5],
+    [115, 21.8], [118, 23.5], [119.5, 25], [121.8, 29.5], [122, 31.5],
+    [121, 33], [122, 37], [124, 39], [124, 40.5], [126, 41], [128, 42],
+    [130.5, 42.4], [132, 45], [134.8, 48.4], [131, 48.8], [127, 49.5],
+    [123, 53.5], [120, 53.2], [116, 49], [112, 49], [108, 45], [103, 42],
+    [96, 44], [91, 46.5], [88, 48], [85, 47], [82, 45], [80, 43], [76, 41],
+    [73.5, 39.5],
+  ],
+  [
+    [108.5, 18], [111.2, 18], [111.2, 20.3], [108.5, 20.3], [108.5, 18],
+  ],
+];
 
 const $ = (id) => document.getElementById(id);
 const LANGUAGE_STORAGE_KEY = "imperialNavigatorLanguage";
@@ -327,6 +347,21 @@ const I18N = {
     selectCampus: "or select campus",
     mapSelection: "Map selection",
     useCurrentLocation: "Or use current location",
+    shuttleTitle: "Campus shuttle",
+    shuttleFrom: "From campus",
+    shuttleTo: "To campus",
+    shuttleNext: "Next shuttle",
+    shuttleChecking: "Checking timetable...",
+    shuttleWeekdayHint: "Weekday service between South Kensington, White City and Hammersmith.",
+    shuttleSource: "Timetable from Imperial College London.",
+    shuttleWeekend: "No service at weekends.",
+    shuttleSameCampus: "Choose two different campuses.",
+    shuttleNoMoreToday: "No more shuttle departures today.",
+    shuttleNextWeekday: "Next weekday service starts at {time}.",
+    shuttleNextDeparture: "{time}",
+    shuttleDetail: "{direction} from {from} towards {to}. Approximate departure from {from}.",
+    shuttleEastbound: "Eastbound",
+    shuttleWestbound: "Westbound",
     studySpaces: "Study & work spaces",
     preference: "Preference",
     quietSpace: "Quiet space",
@@ -367,13 +402,12 @@ const I18N = {
     expandIntro: "Expand introductions to the agent",
     collapseIntro: "Collapse introductions to the agent",
     howItWorks: "How it works?",
-    how1Title: "1. Ask with context",
-    how1Body: "Ask in natural language. Start by selecting a location on the map, using your current location, or choosing a campus preset, so the agent can understand where your journey begins.",
-    how2Title: "2. Choose the right workflow",
-    how2Body: "The agent decides whether your question needs tools, including navigation, route comparison, weather, transport status, and web search. Tools are called only when specific live information is needed.",
+    how1Title: "1. Start with where you are",
+    how1Body: "Choose a starting point on the map, use your current location, or select a campus preset. This gives the agent the context it needs to recommend places, compare routes, or check conditions around you.",
+    how2Title: "2. Ask naturally",
+    how2Body: "Type your question in everyday language. You can ask where to study, how to get somewhere, what the weather is like, or whether live travel information is needed. The agent will decide which tools to use based on your request.",
     how3Title: "3. Get actionable results",
-    how3Body: "The model uses the route, weather, and other data it receives to give practical advice. For navigation requests, it shows an interactive route preview with station and line details when available.",
-    howNote: "* This agent performs best in London. Due to data limitations, weather and traffic may be inaccurate in other regions.",
+    how3Body: "The agent combines your location, route data, weather, and other live information when available to give clear, actionable suggestions. For navigation requests, you’ll also see an interactive route preview with transport details.",
     weather: "Weather",
     atYour: "At your",
     startPoint: "start point",
@@ -422,7 +456,7 @@ const I18N = {
     locationAccuracyAbout: "Accuracy about {meters} m.",
     locationButtonLocating: "Locating...",
     usefulLinks: "Useful links",
-    footerNote: "This is an independent project and is not an official Imperial College London service. Route times and distances are provided by Google Maps and may vary in real time.",
+    footerNote: "This is an independent project and is not an official Imperial College London service. This agent can be used in most regions and performs best in London. Due to data limitations, weather and traffic may be inaccurate or unavailable in some regions, e.g., China mainland.",
     checking: "Checking",
     pending: "Pending",
     connected: "Connected",
@@ -451,9 +485,24 @@ const I18N = {
     selectCampus: "或选择校区",
     mapSelection: "地图选点",
     useCurrentLocation: "使用当前位置",
+    shuttleTitle: "实时校车",
+    shuttleFrom: "出发校区",
+    shuttleTo: "到达校区",
+    shuttleNext: "下一班校车",
+    shuttleChecking: "正在查询时刻表...",
+    shuttleWeekdayHint: "工作日往返于 South Kensington、White City 与 Hammersmith。",
+    shuttleSource: "时刻表来源：Imperial College London。",
+    shuttleWeekend: "Imperial 校车周末不运营。",
+    shuttleSameCampus: "请选择两个不同的校区。",
+    shuttleNoMoreToday: "今天已经没有后续校车班次。",
+    shuttleNextWeekday: "下一个工作日首班为 {time}。",
+    shuttleNextDeparture: "{time}",
+    shuttleDetail: "{direction}，从 {from} 开往 {to} 方向。此为 {from} 的预计发车时间。",
+    shuttleEastbound: "东行",
+    shuttleWestbound: "西行",
     studySpaces: "学习与办公空间",
     preference: "偏好",
-    quietSpace: "安静学习",
+    quietSpace: "安静空间",
     groupWork: "小组讨论",
     lateNightWork: "夜间学习",
     nearestSeat: "就近找座",
@@ -462,7 +511,7 @@ const I18N = {
     loadMoreStudySpaces: "查看更多空间",
     collapseStudySpaces: "收起更多空间",
     travelAgent: "出行智能体",
-    summaryTitle: "获取路线、天气、或出行建议",
+    summaryTitle: "获取路线导航、天气、或出行建议",
     agentModeTools: "Agent 使用的工具",
     askAgent: "向 Agent 提问",
     questionPlaceholder: "想去哪？可以尝试询问路线、天气或其他出行问题",
@@ -476,7 +525,7 @@ const I18N = {
     quickLibraryQuestion: "从我当前选择的出发点附近有哪些图书馆？",
     quickWeatherQuestion: "我当前选择的出发点现在天气怎么样？",
     quickTflQuestion: "现在 TfL 线路状态如何？有没有线路延误或中断？",
-    agentPlaceholder: "一切就绪，向 Agent 提问后答案会在此处显示。",
+    agentPlaceholder: "向 Agent 提问后答案会在此处显示，交互式地图将在导航工具被调用后显示。",
     routeMap: "路线地图",
     routeMapButton: "关闭以查看路线图",
     weatherDestinationRequired: "请先向 Agent 提问以生成一条导航路线，然后再更新目的地天气。",
@@ -488,16 +537,15 @@ const I18N = {
     exitFullScreen: "退出全屏",
     openGoogleMaps: "在 Google Maps 中查看更多路线",
     continueChat: "在聊天窗口继续",
-    expandIntro: "展开助手说明书",
-    collapseIntro: "收起助手说明",
-    howItWorks: "Agent 是如何工作的？",
-    how1Title: "1. 自然语言提问",
-    how1Body: "你可以用自然语言提问。先在地图上选点、使用当前位置，或选择一个校区预设，让助手知道你的行程从哪里开始。",
-    how2Title: "2. 自动选择合适工具调用",
-    how2Body: "助手会判断你问题是否需要使用工具，包括导航、路线比较、天气、交通状况和网页搜索；工具在有特定需要实时时才会调用。",
+    expandIntro: "展开 Agent 使用指南",
+    collapseIntro: "收起 Agent 使用指南",
+    howItWorks: "「 使用指南 」",
+    how1Title: "1. 选择你的出发位置",
+    how1Body: "你可以在地图上选择起点、使用当前位置，或直接选择一个校区预设。这样 Agent 就能理解你的行程从哪里开始，并据此推荐学习空间、比较路线或查询周边信息。如果你不想选择，直接告诉 Agent 你在哪里也可以。",
+    how2Title: "2. 用自然语言提问",
+    how2Body: "直接用自然语言输入你的问题即可。你可以询问哪里适合学习办公、如何前往某个地点、当前天气如何、前往多个地点的路程比较等等，或是否需要查看实时交通信息。Agent 会根据你的问题判断是否需要调用，以及调用哪些工具。",
     how3Title: "3. 得到可执行建议",
-    how3Body: "模型会根据得到的路线、天气等数据提供相应的建议；在导航需求中会展示交互式路线预览，并可显示具体车站与线路信息。",
-    howNote: "* 由于使用的数据来源限制，此 agent 在伦敦地区能达到最佳效果。在其他地区使用时天气和交通状态可能不准确。",
+    how3Body: "Agent 会结合你的起点、路线、天气和其他可用实时信息给出实用建议。涉及导航时，页面还会显示交互式路线预览，并在可用时提供站点、线路和交通方式等细节。请注意由于 Google Maps 的数据限制，路线预览功能<strong class=\"how-inline-emphasis\">在中国大陆可能无法使用</strong>。",
     weather: "天气",
     atYour: "目前显示的天气位置为",
     startPoint: "「 图选位置 」",
@@ -546,6 +594,7 @@ const I18N = {
     locationAccuracyAbout: "精度约 {meters} 米。",
     locationButtonLocating: "定位中...",
     usefulLinks: "相关链接",
+    footerNote: "本网页为个人项目，而非帝国理工学院的官方服务。本 Agent 可在全球大多数地区使用，在伦敦地区表现最佳。由于数据覆盖范围的限制，中国大陆地区的天气和交通信息可能不准确或无法获取，请您选取港澳台或海外地区使用。",
     pending: "暂未使用",
     connected: "已连接",
     offline: "离线",
@@ -609,6 +658,11 @@ function applyLanguage() {
     ["label[for='startPoint']", "startingLocation"],
     [".select-note", "selectCampus"],
     ["#useCurrentLocation", "useCurrentLocation"],
+    [".shuttle-module .left-section-title", "shuttleTitle"],
+    ["label[for='shuttleFrom']", "shuttleFrom"],
+    ["label[for='shuttleTo']", "shuttleTo"],
+    [".shuttle-result span", "shuttleNext"],
+    ["#shuttleSource", "shuttleSource"],
     [".recommendation-module .left-section-title", "studySpaces"],
     ["label[for='scenario']", "preference"],
     [".field-row span", "walkingComfortLimit"],
@@ -632,11 +686,10 @@ function applyLanguage() {
     [".how-grid div:nth-child(2) strong", "how2Title"],
     [".how-grid div:nth-child(2) span", "how2Body"],
     [".how-grid div:nth-child(3) strong", "how3Title"],
-    [".how-grid div:nth-child(3) span", "how3Body"],
-    [".how-note", "howNote"],
     [".weather-module .eyebrow", "weather"],
     [".weather-action-label", "updateWeatherAt"],
     ["#updateWeatherCurrentButton", "currentLocation"],
+    ["#updateWeatherMapButton", "mapSelection"],
     ["#updateWeatherDestinationButton", "destinationButton"],
     [".weather-summary-label", "aiSummary"],
     [".weather-metric-card[data-weather-metric='feelsLike'] span", "feelsLike"],
@@ -658,11 +711,19 @@ function applyLanguage() {
   ];
   textMap.forEach(([selector, key]) => setElementText(selector, t(key)));
 
+  const how3Body = document.querySelector(".how-grid div:nth-child(3) span");
+  if (how3Body) {
+    how3Body.innerHTML = t("how3Body");
+  }
+
   setElementText("#weatherScopePrefix", t("atYour"));
   const questionInput = $("userQuestion");
   if (questionInput) questionInput.placeholder = t("questionPlaceholder");
   const modalInput = $("modalUserQuestion");
   if (modalInput) modalInput.placeholder = t("modalPlaceholder");
+  $("walkDecrease")?.setAttribute("aria-label", currentLanguage === "zh" ? "减少步行舒适上限" : "Decrease walking comfort limit");
+  $("walkIncrease")?.setAttribute("aria-label", currentLanguage === "zh" ? "增加步行舒适上限" : "Increase walking comfort limit");
+  document.querySelector(".walk-stepper")?.setAttribute("aria-label", t("walkingComfortLimit"));
 
   const startOptions = {
     mapSelection: t("mapSelection"),
@@ -672,6 +733,9 @@ function applyLanguage() {
     stMarys: "St Mary's",
   };
   document.querySelectorAll("#startPoint option").forEach((option) => {
+    option.textContent = startOptions[option.value] || option.textContent;
+  });
+  document.querySelectorAll("#shuttleFrom option, #shuttleTo option").forEach((option) => {
     option.textContent = startOptions[option.value] || option.textContent;
   });
   const scenarioOptions = {
@@ -791,6 +855,47 @@ const controls = {
   scenario: $("scenario"),
   startPoint: $("startPoint"),
   walkTolerance: $("walkTolerance"),
+  walkDecrease: $("walkDecrease"),
+  walkIncrease: $("walkIncrease"),
+  shuttleFrom: $("shuttleFrom"),
+  shuttleTo: $("shuttleTo"),
+};
+
+const SHUTTLE_CAMPUS_ORDER = {
+  eastbound: ["hammersmith", "whiteCity", "southKensington"],
+  westbound: ["southKensington", "whiteCity", "hammersmith"],
+};
+const SHUTTLE_CAMPUSES = ["southKensington", "whiteCity", "hammersmith"];
+const SHUTTLE_CAMPUS_SYNC_RADIUS_KM = 2;
+
+const SHUTTLE_TIMETABLE = {
+  eastbound: {
+    hammersmith: [
+      "07:30", "08:00", "08:30", "09:00", "09:30", "10:00",
+      "10:30", "11:00", "11:30", "12:00", "12:30", "13:00",
+      "13:30", "14:00", "14:30", "15:00", "15:30", "16:00",
+      "16:30",
+    ],
+    whiteCity: [
+      "07:40", "08:10", "08:40", "09:10", "09:40", "10:10",
+      "10:40", "11:10", "11:40", "12:10", "12:40", "13:10",
+      "13:40", "14:10", "14:40", "15:10", "15:40", "16:10",
+      "16:40", "17:30", "18:15",
+    ],
+  },
+  westbound: {
+    southKensington: [
+      "08:15", "08:45", "09:15", "09:45", "10:15", "10:45",
+      "11:15", "11:55", "12:25", "12:55", "13:15", "13:45",
+      "14:15", "14:45", "15:15", "15:45", "16:15", "16:45",
+      "17:15", "18:00",
+    ],
+    whiteCity: [
+      "08:50", "09:20", "09:50", "10:20", "10:50", "11:20",
+      "11:50", "12:20", "12:50", "13:20", "13:50", "14:20",
+      "14:50", "15:20", "15:50", "16:20", "16:50", "17:20",
+    ],
+  },
 };
 
 const preferenceWeights = {
@@ -830,10 +935,13 @@ let weatherRequestId = 0;
 let weatherUpdatedForKey = "";
 let weatherSummaryRequestId = 0;
 let weatherSummaryUpdatedForKey = "";
-let lastWeatherScope = "start point";
+let lastWeatherScope = "current location";
 let lastWeatherScopeLocation = "";
 let latestWeatherData = null;
 let latestWeatherStart = null;
+// When true, selecting or setting a start point will auto-refresh weather.
+// Set to false to require the user to click the "Update weather data at" buttons.
+let autoRefreshWeatherOnSelect = false;
 let tflStatusRequestId = 0;
 let latestTflStatusData = null;
 let latestNavigationData = null;
@@ -1097,7 +1205,7 @@ function weatherConditionLabel(conditionType, isDaytime) {
 
 function setWeatherLoading(message = currentLanguage === "zh" ? "正在加载天气数据..." : "Loading weather data...") {
   weatherSummaryRequestId += 1;
-  [$("updateWeatherCurrentButton"), $("updateWeatherDestinationButton")].forEach((button) => {
+  [$("updateWeatherCurrentButton"), $("updateWeatherMapButton"), $("updateWeatherDestinationButton")].forEach((button) => {
     if (!button) return;
     button.disabled = true;
   });
@@ -1111,10 +1219,15 @@ function setWeatherLoading(message = currentLanguage === "zh" ? "正在加载天
 
 function setWeatherButtonReady() {
   const currentButton = $("updateWeatherCurrentButton");
+  const mapButton = $("updateWeatherMapButton");
   const destinationButton = $("updateWeatherDestinationButton");
   if (currentButton) {
     currentButton.disabled = false;
     currentButton.textContent = t("currentLocation");
+  }
+  if (mapButton) {
+    mapButton.disabled = false;
+    mapButton.textContent = t("mapSelection");
   }
   if (destinationButton) {
     destinationButton.disabled = false;
@@ -1129,13 +1242,13 @@ function setWeatherScope(scope = "start point", locationName = "") {
   lastWeatherScopeLocation = locationName;
   const isDestination = scope === "destination";
   const isCurrentLocation = scope === "current location";
-  const isCurrentOrStart = isCurrentLocation || scope === "start point";
   const cleanLocationName = String(locationName || "").trim();
   label.textContent = isDestination && cleanLocationName
     ? `${t("destination").toLowerCase()}: ${cleanLocationName}`
     : (isDestination ? t("destination").toLowerCase() : (isCurrentLocation ? t("currentLocation") : t("startPoint")));
   label.classList.toggle("destination", isDestination);
-  $("updateWeatherCurrentButton")?.classList.toggle("is-active", isCurrentOrStart);
+  $("updateWeatherCurrentButton")?.classList.toggle("is-active", isCurrentLocation);
+  $("updateWeatherMapButton")?.classList.toggle("is-active", scope === "start point");
   $("updateWeatherDestinationButton")?.classList.toggle("is-active", isDestination);
 }
 
@@ -1184,7 +1297,10 @@ function restoreWeatherState(state) {
 function renderWeatherData(data, start) {
   latestWeatherData = data;
   latestWeatherStart = start;
-  setWeatherScope(start?.weatherScope === "destination" ? "destination" : "start point", start?.label);
+  const weatherScope = ["current location", "destination", "start point"].includes(start?.weatherScope)
+    ? start.weatherScope
+    : "start point";
+  setWeatherScope(weatherScope, start?.label);
   const weatherCard = $("weatherCard");
   if (weatherCard) {
     weatherCard.classList.remove("weather-card--loading");
@@ -1803,21 +1919,39 @@ function displayTflLineName(line) {
 }
 
 function setTflStatusLoading() {
-  $("tflStatusTitle").textContent = currentLanguage === "zh" ? "伦敦线路实时状态：正在加载..." : "London lines right now: loading status...";
+  lockTflLinesHeight();
+  if (!latestTflStatusData) {
+    $("tflStatusTitle").textContent = currentLanguage === "zh" ? "伦敦线路实时状态：正在加载..." : "London lines right now: loading status...";
+  }
   hideTflTooltip();
-  $("tflLines").innerHTML = "";
-  $("tflStatusMeta").textContent = t("tflMeta");
+  $("tflStatusMeta").textContent = currentLanguage === "zh" ? "正在刷新 TfL 状态..." : "Refreshing TfL status...";
   const button = $("refreshTflStatus");
   if (button) button.disabled = true;
 }
 
+function lockTflLinesHeight() {
+  const linesEl = $("tflLines");
+  if (!linesEl || !linesEl.children.length) return;
+  linesEl.style.minHeight = `${Math.ceil(linesEl.getBoundingClientRect().height)}px`;
+}
+
+function unlockTflLinesHeight() {
+  const linesEl = $("tflLines");
+  if (!linesEl) return;
+  window.setTimeout(() => {
+    linesEl.style.minHeight = "";
+  }, 260);
+}
+
 function renderTflStatusError(message) {
   $("tflStatusTitle").textContent = currentLanguage === "zh" ? "伦敦线路实时状态：暂不可用" : "London lines right now: status unavailable";
-  $("tflLines").innerHTML = "";
+  if (!latestTflStatusData) $("tflLines").innerHTML = "";
   $("tflStatusMeta").textContent = message || (currentLanguage === "zh" ? "请稍后刷新重试。" : "Try refreshing in a moment.");
+  unlockTflLinesHeight();
 }
 
 function renderTflStatus(data) {
+  const shouldAnimateLines = !latestTflStatusData;
   latestTflStatusData = data;
   const lines = sortTflLines(Array.isArray(data?.lines) ? data.lines : []);
   const summary = data?.summary || {};
@@ -1832,13 +1966,15 @@ function renderTflStatus(data) {
 
   $("tflLines").innerHTML = lines.map((line, index) => {
     const reason = translateTflReason(line.reason || "");
+    const tooltipReason = String(line.reason || "").trim();
     const status = translateTflStatus(line.status);
     const color = tflLineColor(line.id);
-    const reasonAttributes = reason
-      ? ` data-reason="${escapeHtml(reason)}" aria-label="${escapeHtml(`${status}: ${reason}`)}"`
+    const revealClass = shouldAnimateLines ? "" : " scroll-reveal scroll-reveal--visible";
+    const reasonAttributes = tooltipReason
+      ? ` data-reason="${escapeHtml(tooltipReason)}" aria-label="${escapeHtml(`${status}: ${tooltipReason}`)}"`
       : "";
     return `
-      <div class="tfl-line ${tflStatusClass(line.severity)}" style="--line-color: ${escapeHtml(color)}; --line-index: ${index}">
+      <div class="tfl-line ${tflStatusClass(line.severity)}${revealClass}" style="--line-color: ${escapeHtml(color)}; --line-index: ${index}">
         <div class="tfl-line-copy">
           <div class="tfl-line-name" title="${escapeHtml(line.name || "Unknown line")}">${escapeHtml(displayTflLineName(line))}</div>
           <span class="tfl-line-mode">${escapeHtml(formatTflMode(line.mode))}</span>
@@ -1855,6 +1991,7 @@ function renderTflStatus(data) {
   $("tflStatusMeta").textContent = currentLanguage === "zh"
     ? `数据来自 Transport for London · 更新于 ${updatedText}`
     : `Live status from Transport for London · Updated ${updatedText}`;
+  unlockTflLinesHeight();
 }
 
 function ensureTflTooltip() {
@@ -2039,8 +2176,172 @@ function openPlaceWebsiteFromCard(card) {
   showExternalConfirm(website);
 }
 
+function campusDisplayName(value) {
+  const names = {
+    southKensington: "South Kensington",
+    whiteCity: "White City",
+    hammersmith: "Hammersmith",
+  };
+  return names[value] || value;
+}
+
+function isShuttleCampus(value) {
+  return SHUTTLE_CAMPUSES.includes(value);
+}
+
+function defaultShuttleDestination(from) {
+  return from === "southKensington" ? "whiteCity" : "southKensington";
+}
+
+function syncShuttleDestinationIfSame() {
+  if (!controls.shuttleFrom || !controls.shuttleTo) return;
+  const from = controls.shuttleFrom.value;
+  if (!isShuttleCampus(from) || controls.shuttleTo.value !== from) return;
+  controls.shuttleTo.value = defaultShuttleDestination(from);
+}
+
+function setShuttleFromCampus(campusKey) {
+  if (!isShuttleCampus(campusKey) || !controls.shuttleFrom) return false;
+  const changed = controls.shuttleFrom.value !== campusKey;
+  controls.shuttleFrom.value = campusKey;
+  syncShuttleDestinationIfSame();
+  return changed;
+}
+
+function nearestShuttleCampusWithinRadius(point, radiusKm = SHUTTLE_CAMPUS_SYNC_RADIUS_KM) {
+  if (!point || !Number.isFinite(point.lat) || !Number.isFinite(point.lng)) return "";
+  return SHUTTLE_CAMPUSES
+    .map((key) => ({ key, distance: distanceBetweenKm(point, startOffsets[key]) }))
+    .filter(({ distance }) => Number.isFinite(distance) && distance <= radiusKm)
+    .sort((a, b) => a.distance - b.distance)[0]?.key || "";
+}
+
+function parseClockMinutes(value) {
+  const [hours, minutes] = String(value).split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function formatClockForDisplay(value) {
+  const [hours, minutes] = String(value).split(":").map(Number);
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function isWeekday(date = new Date()) {
+  const day = date.getDay();
+  return day >= 1 && day <= 5;
+}
+
+function shuttleDirectionForRoute(from, to) {
+  for (const [direction, stops] of Object.entries(SHUTTLE_CAMPUS_ORDER)) {
+    if (stops.indexOf(from) >= 0 && stops.indexOf(to) > stops.indexOf(from)) return direction;
+  }
+  return "";
+}
+
+function nextShuttleForRoute(from, to, date = new Date()) {
+  if (!from || !to || from === to) {
+    return { status: "same" };
+  }
+  const direction = shuttleDirectionForRoute(from, to);
+  const times = direction ? SHUTTLE_TIMETABLE[direction]?.[from] || [] : [];
+  if (!direction || !times.length) {
+    return { status: "unsupported" };
+  }
+  if (!isWeekday(date)) {
+    return { status: "weekend", direction, firstTime: times[0] };
+  }
+  const nowMinutes = date.getHours() * 60 + date.getMinutes();
+  const nextTime = times.find((time) => parseClockMinutes(time) >= nowMinutes);
+  if (!nextTime) {
+    return { status: "finished", direction, firstTime: times[0] };
+  }
+  return { status: "available", direction, time: nextTime };
+}
+
+function renderShuttleLookup() {
+  const from = controls.shuttleFrom?.value;
+  const to = controls.shuttleTo?.value;
+  const resultEl = $("shuttleResult");
+  const nextTimeEl = $("shuttleNextTime");
+  const detailEl = $("shuttleDetail");
+  if (!nextTimeEl || !detailEl) return;
+
+  const setShuttleHeadlineMode = (isTime) => {
+    nextTimeEl.classList.toggle("is-time", Boolean(isTime));
+    nextTimeEl.classList.toggle("is-message", !isTime);
+  };
+
+  const finishShuttleRender = () => {
+    if (!resultEl) return;
+    const contentKey = `${from}:${to}:${nextTimeEl.textContent}:${detailEl.textContent}`;
+    const previousKey = resultEl.dataset.shuttleContentKey;
+    resultEl.dataset.shuttleContentKey = contentKey;
+    if (previousKey && previousKey !== contentKey) {
+      animateClass(resultEl, "shuttle-result--reveal");
+    }
+  };
+
+  const result = nextShuttleForRoute(from, to);
+  const fromName = campusDisplayName(from);
+  const toName = campusDisplayName(to);
+  const directionLabel = result.direction === "eastbound" ? t("shuttleEastbound") : t("shuttleWestbound");
+
+  if (result.status === "same") {
+    setShuttleHeadlineMode(false);
+    nextTimeEl.textContent = t("shuttleSameCampus");
+    detailEl.textContent = t("shuttleWeekdayHint");
+    finishShuttleRender();
+    return;
+  }
+  if (result.status === "weekend") {
+    setShuttleHeadlineMode(false);
+    nextTimeEl.textContent = t("shuttleWeekend");
+    detailEl.textContent = t("shuttleNextWeekday", { time: formatClockForDisplay(result.firstTime) });
+    finishShuttleRender();
+    return;
+  }
+  if (result.status === "finished") {
+    setShuttleHeadlineMode(false);
+    nextTimeEl.textContent = t("shuttleNoMoreToday");
+    detailEl.textContent = t("shuttleNextWeekday", { time: formatClockForDisplay(result.firstTime) });
+    finishShuttleRender();
+    return;
+  }
+  if (result.status !== "available") {
+    setShuttleHeadlineMode(false);
+    nextTimeEl.textContent = t("shuttleChecking");
+    detailEl.textContent = t("shuttleWeekdayHint");
+    finishShuttleRender();
+    return;
+  }
+
+  setShuttleHeadlineMode(true);
+  nextTimeEl.textContent = t("shuttleNextDeparture", { time: formatClockForDisplay(result.time) });
+  detailEl.textContent = t("shuttleDetail", {
+    direction: directionLabel,
+    from: fromName,
+    to: toName,
+  });
+  finishShuttleRender();
+}
+
 function updateOutputs() {
-  $("walkOutput").textContent = currentLanguage === "zh" ? `${controls.walkTolerance.value} 分钟` : `${controls.walkTolerance.value} min`;
+  const walkValue = Number(controls.walkTolerance.value);
+  const stepperValue = $("walkStepperValue");
+  const stepperUnit = $("walkStepperUnit");
+  if (stepperValue) stepperValue.textContent = String(walkValue);
+  if (stepperUnit) stepperUnit.textContent = currentLanguage === "zh" ? "分钟" : "min";
+  if (controls.walkDecrease) controls.walkDecrease.disabled = walkValue <= 5;
+  if (controls.walkIncrease) controls.walkIncrease.disabled = walkValue >= 35;
+  renderShuttleLookup();
+}
+
+function setWalkTolerance(value) {
+  const nextValue = Math.max(5, Math.min(35, Number(value)));
+  controls.walkTolerance.value = String(nextValue);
+  updateOutputs();
+  render();
+  if (controls.scenario.value === "nearest") refreshRoutes();
 }
 
 async function answerQuestion(question, options = {}) {
@@ -2052,6 +2353,7 @@ async function answerQuestion(question, options = {}) {
     return;
   }
 
+  collapseHowItWorks();
   setAgentMode("Pending");
   renderLoadingAnswer(t("understandingRequest"));
   const minLoadingReadyAt = Date.now() + MIN_LOADING_MS;
@@ -2631,6 +2933,8 @@ function applyQuestionIntent(question) {
 }
 
 function buildAgentContext(context) {
+  const shuttleFrom = controls.shuttleFrom?.value;
+  const shuttleTo = controls.shuttleTo?.value;
   return {
     scenario: scenarioProfiles[context.scenario].label,
     startPoint: context.start.label,
@@ -2647,6 +2951,20 @@ function buildAgentContext(context) {
     },
     routeStatus,
     routeUpdatedAt,
+    imperialWeekdayShuttle: {
+      available: true,
+      operates: "weekdays",
+      campuses: SHUTTLE_CAMPUSES.map(campusDisplayName),
+      reminder: "For routes between South Kensington, White City, and Hammersmith, mention that Imperial runs a weekday campus shuttle and suggest checking the timetable.",
+      timetableUrl: "https://www.imperial.ac.uk/admin-services/property/travel/shuttle-bus/",
+      selectedRoute: isShuttleCampus(shuttleFrom) && isShuttleCampus(shuttleTo) && shuttleFrom !== shuttleTo
+        ? {
+            from: campusDisplayName(shuttleFrom),
+            to: campusDisplayName(shuttleTo),
+            direction: shuttleDirectionForRoute(shuttleFrom, shuttleTo) || null,
+          }
+        : null,
+    },
     dataNote: "Library names come from Imperial College London Library Services' Our libraries page. Travel time and distance use Google Routes API when available; comfort is a prototype estimate.",
   };
 }
@@ -3511,6 +3829,38 @@ function setMapStartPoint(latLng) {
   setMapStartCoordinates(latLng.lat(), latLng.lng());
 }
 
+function isPointInPolygon(lat, lng, polygon) {
+  let inside = false;
+  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index++) {
+    const [lngA, latA] = polygon[index];
+    const [lngB, latB] = polygon[previous];
+    const intersects = ((latA > lat) !== (latB > lat))
+      && (lng < ((lngB - lngA) * (lat - latA)) / (latB - latA) + lngA);
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+function isWithinBox(lat, lng, box) {
+  return lat >= box.minLat && lat <= box.maxLat && lng >= box.minLng && lng <= box.maxLng;
+}
+
+function isMainlandChinaCoordinate(lat, lng) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+  const excludedRegions = [
+    { minLat: 22.13, maxLat: 22.58, minLng: 113.8, maxLng: 114.5 }, // Hong Kong
+    { minLat: 22.03, maxLat: 22.25, minLng: 113.5, maxLng: 113.65 }, // Macao
+    { minLat: 21.8, maxLat: 25.4, minLng: 119.3, maxLng: 122.1 }, // Taiwan
+  ];
+  if (excludedRegions.some((box) => isWithinBox(lat, lng, box))) return false;
+  return MAINLAND_CHINA_POLYGONS.some((polygon) => isPointInPolygon(lat, lng, polygon));
+}
+
+function maybeShowMainlandChinaCoverageWarning(lat, lng) {
+  if (!isMainlandChinaCoordinate(lat, lng)) return;
+  showToolInfo("mainlandChinaCoverage", MAINLAND_CHINA_WARNING_TEXT);
+}
+
 function setMapStartCoordinates(lat, lng, statusMessage = "") {
   startOffsets.mapSelection = {
     label: "Map selection",
@@ -3521,9 +3871,11 @@ function setMapStartCoordinates(lat, lng, statusMessage = "") {
   controls.startPoint.value = "mapSelection";
   if (startMarker) startMarker.setPosition({ lat, lng });
   if (startMap) startMap.panTo({ lat, lng });
+  setShuttleFromCampus(nearestShuttleCampusWithinRadius({ lat, lng }));
   updateStartMapStatus(statusMessage);
   render();
-  void refreshWeatherForStart(getStartPoint(), true);
+  maybeShowMainlandChinaCoverageWarning(lat, lng);
+  if (autoRefreshWeatherOnSelect) void refreshWeatherForStart(getStartPoint(), true);
   if (controls.scenario.value === "nearest") refreshRoutes();
 }
 
@@ -3535,9 +3887,10 @@ function selectCampusStart(key) {
     startMap.panTo({ lat: campus.lat, lng: campus.lng });
     startMap.setZoom(13);
   }
+  setShuttleFromCampus(key);
   updateStartMapStatus();
   render();
-  void refreshWeatherForStart(getStartPoint(), true);
+  if (autoRefreshWeatherOnSelect) void refreshWeatherForStart(getStartPoint(), true);
   if (controls.scenario.value === "nearest") refreshRoutes();
 }
 
@@ -3806,6 +4159,21 @@ async function updateWeatherAtDestination() {
   }
 }
 
+async function updateWeatherAtMapSelection() {
+  try {
+    await refreshWeatherForStart(
+      {
+        ...getStartPoint(),
+        weatherScope: "start point",
+      },
+      true,
+      { preserveOnError: true, throwOnError: true },
+    );
+  } catch (error) {
+    showWeatherLocationAlert(error.message || "Weather data is unavailable for the selected map point.");
+  }
+}
+
 async function updateWeatherAtCurrentLocation() {
   if (!navigator.geolocation) {
     showWeatherLocationAlert("This browser does not support current location.");
@@ -3836,6 +4204,15 @@ async function updateWeatherAtCurrentLocation() {
   }
 }
 
+async function refreshDefaultWeatherScope() {
+  setWeatherScope("current location");
+  if (!navigator.geolocation) return;
+  const permissionState = await readGeolocationPermissionState();
+  if (permissionState === "granted") {
+    await updateWeatherAtCurrentLocation();
+  }
+}
+
 async function refreshIntegrationStatus() {
   try {
     const response = await apiFetch("/api/health");
@@ -3852,7 +4229,7 @@ async function refreshIntegrationStatus() {
     if (data.googleMapsBrowserKey) {
       googleMapsBrowserKey = data.googleMapsBrowserKey;
       loadGoogleStartMap(data.googleMapsBrowserKey);
-      void refreshWeatherForStart(getStartPoint(), true);
+      void refreshDefaultWeatherScope();
     } else {
       $("startMapStatus").textContent = "Google Maps browser key missing; use the campus selector below.";
       renderWeatherError("Google Maps browser key missing.");
@@ -3918,7 +4295,8 @@ async function refreshRoutes() {
 }
 
 Object.values(controls).forEach((control) => {
-  control.addEventListener("input", () => {
+  if (!control || control === controls.walkDecrease || control === controls.walkIncrease) return;
+  const handleControlUpdate = () => {
     if (control === controls.walkTolerance) {
       updateOutputs();
       return;
@@ -3927,10 +4305,17 @@ Object.values(controls).forEach((control) => {
       selectCampusStart(controls.startPoint.value);
       return;
     }
+    if (control === controls.shuttleFrom) {
+      syncShuttleDestinationIfSame();
+    }
     render();
     if (controls.scenario.value === "nearest") refreshRoutes();
-  });
+  };
+  control.addEventListener("input", handleControlUpdate);
+  control.addEventListener("change", handleControlUpdate);
 });
+controls.walkDecrease?.addEventListener("click", () => setWalkTolerance(Number(controls.walkTolerance.value) - 5));
+controls.walkIncrease?.addEventListener("click", () => setWalkTolerance(Number(controls.walkTolerance.value) + 5));
 $("updateRecommendations").addEventListener("click", () => {
   render();
   if (controls.scenario.value === "nearest") refreshRoutes();
@@ -3954,6 +4339,7 @@ $("recommendations").addEventListener("keydown", (event) => {
 });
 $("useCurrentLocation").addEventListener("click", requestCurrentLocation);
 $("updateWeatherCurrentButton").addEventListener("click", updateWeatherAtCurrentLocation);
+$("updateWeatherMapButton").addEventListener("click", updateWeatherAtMapSelection);
 $("updateWeatherDestinationButton").addEventListener("click", updateWeatherAtDestination);
 $("refreshTflStatus").addEventListener("click", refreshTflStatus);
 $("tflLines").addEventListener("mouseover", (event) => {
@@ -4308,13 +4694,22 @@ const SCROLL_REVEAL_SELECTOR = [
   ".signal-tile",
   ".agent-tools",
   ".quick-prompts button",
+  ".recommendation-module",
+  ".weather-module",
   ".weather-metric-card",
+  ".tfl-module",
   ".tfl-line",
   ".place-card",
   ".how-grid > div",
 ].join(", ");
 
 let scrollRevealObserver = null;
+let earlyModuleRevealScheduled = false;
+
+function shouldRevealScrollElement(entry) {
+  const earlyModuleReveal = entry.target.matches?.(".recommendation-module, .weather-module, .tfl-module");
+  return earlyModuleReveal ? entry.intersectionRatio >= 0.08 : entry.intersectionRatio >= 0.14;
+}
 
 function revealScrollElement(element) {
   element.classList.remove("scroll-reveal--pending");
@@ -4343,6 +4738,25 @@ function registerScrollRevealElements(root = document) {
   root.querySelectorAll?.(SCROLL_REVEAL_SELECTOR).forEach(observeScrollRevealElement);
 }
 
+function revealPeekingModules() {
+  document.querySelectorAll(".recommendation-module.scroll-reveal--pending, .weather-module.scroll-reveal--pending, .tfl-module.scroll-reveal--pending").forEach((element) => {
+    const rect = element.getBoundingClientRect();
+    if (rect.top < window.innerHeight - 80 && rect.bottom > 0) {
+      revealScrollElement(element);
+      scrollRevealObserver?.unobserve(element);
+    }
+  });
+}
+
+function schedulePeekingModuleReveal() {
+  if (earlyModuleRevealScheduled) return;
+  earlyModuleRevealScheduled = true;
+  window.requestAnimationFrame(() => {
+    earlyModuleRevealScheduled = false;
+    revealPeekingModules();
+  });
+}
+
 function initScrollReveal() {
   if (!("IntersectionObserver" in window)) {
     document.querySelectorAll(".scroll-reveal--pending").forEach(revealScrollElement);
@@ -4352,16 +4766,19 @@ function initScrollReveal() {
 
   scrollRevealObserver = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
-      if (!entry.isIntersecting) return;
+      if (!shouldRevealScrollElement(entry)) return;
       revealScrollElement(entry.target);
       scrollRevealObserver.unobserve(entry.target);
     });
   }, {
-    threshold: 0.14,
+    threshold: [0.08, 0.14],
     rootMargin: "0px 0px -7% 0px",
   });
 
   registerScrollRevealElements();
+  revealPeekingModules();
+  window.addEventListener("scroll", schedulePeekingModuleReveal, { passive: true });
+  window.addEventListener("resize", schedulePeekingModuleReveal);
 
   const mutationObserver = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
@@ -4369,6 +4786,7 @@ function initScrollReveal() {
         if (node instanceof HTMLElement) registerScrollRevealElements(node);
       });
     });
+    schedulePeekingModuleReveal();
   });
   mutationObserver.observe(document.body, { childList: true, subtree: true });
 }
@@ -4397,3 +4815,4 @@ initScrollReveal();
 initFooterReveal();
 refreshIntegrationStatus();
 refreshTflStatus();
+window.setInterval(renderShuttleLookup, 60000);
