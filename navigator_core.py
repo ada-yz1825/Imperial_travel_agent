@@ -26,6 +26,16 @@ LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama").lower()
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5.2")
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "qwen/qwen3-32b")
 TOGETHER_MODEL = os.environ.get("TOGETHER_MODEL", "Qwen/Qwen3.5-9B")
+DEFAULT_TOGETHER_CHAT_MODEL = "Qwen/Qwen3-235B-A22B-Instruct-2507-tput"
+DEFAULT_TOGETHER_CHAT_MODEL_ID = "qwen235b"
+DEFAULT_TOGETHER_CHAT_MODELS = [
+        {
+            "id": DEFAULT_TOGETHER_CHAT_MODEL_ID,
+            "label": "Qwen3 235B",
+            "model": DEFAULT_TOGETHER_CHAT_MODEL,
+            "description": "Current default model",
+        }
+]
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3")
 OLLAMA_NUM_PREDICT = int(os.environ.get("OLLAMA_NUM_PREDICT", "1200"))
 CHAT_HISTORY_LIMIT = int(os.environ.get("CHAT_HISTORY_LIMIT", "6"))
@@ -129,12 +139,61 @@ def get_together_model():
     return get_env_value("TOGETHER_MODEL") or TOGETHER_MODEL
 
 
+def get_together_chat_models():
+    raw = get_env_value("TOGETHER_CHAT_MODELS_JSON")
+    if raw:
+        try:
+            parsed = json.loads(raw)
+            models = []
+            for item in parsed if isinstance(parsed, list) else []:
+                if not isinstance(item, dict):
+                    continue
+                model_id = str(item.get("id") or "").strip()
+                label = str(item.get("label") or "").strip()
+                model = str(item.get("model") or "").strip()
+                if not model_id or not label or not model:
+                    continue
+                description = str(item.get("description") or "").strip()
+                models.append(
+                    {
+                        "id": model_id,
+                        "label": label,
+                        "model": model,
+                        "description": description,
+                    }
+                )
+            if models:
+                return models
+        except (TypeError, ValueError, json.JSONDecodeError):
+            pass
+    return [dict(item) for item in DEFAULT_TOGETHER_CHAT_MODELS]
+
+
+def get_default_chat_model_id():
+    models = get_together_chat_models()
+    return str(models[0].get("id") or DEFAULT_TOGETHER_CHAT_MODEL_ID)
+
+
+def resolve_together_chat_model(model_id):
+    target_id = str(model_id or "").strip() or get_default_chat_model_id()
+    for item in get_together_chat_models():
+        if item.get("id") == target_id:
+            return dict(item)
+    return None
+
+
+def get_weather_summary_together_model():
+    return get_env_value("WEATHER_SUMMARY_TOGETHER_MODEL") or DEFAULT_TOGETHER_CHAT_MODEL
+
+
 def get_ollama_model():
     return get_env_value("OLLAMA_MODEL") or OLLAMA_MODEL
 
 
-def current_llm_model():
-    provider = get_llm_provider()
+def current_llm_model(provider_override=None, model_override=None):
+    provider = (provider_override or get_llm_provider() or "ollama").lower()
+    if model_override:
+        return str(model_override).strip()
     if provider == "openai":
         return get_openai_model()
     if provider == "groq":
@@ -2337,7 +2396,7 @@ def call_groq(api_key, payload):
     return call_groq_messages(api_key, messages, max_completion_tokens=max_tokens, temperature=temperature)
 
 
-def call_together(api_key, payload):
+def call_together(api_key, payload, model_override=None):
     prompt = build_agent_prompt(payload)
     history = payload.get("history", [])[-CHAT_HISTORY_LIMIT:]
     messages = [{"role": "system", "content": system_prompt(payload)}]
@@ -2351,7 +2410,14 @@ def call_together(api_key, payload):
     messages.append({"role": "user", "content": prompt})
     temperature = 0.55 if is_weather_summary_payload(payload) else 0.2
     max_tokens = WEATHER_SUMMARY_MAX_COMPLETION_TOKENS if is_weather_summary_payload(payload) else TOGETHER_MAX_COMPLETION_TOKENS
-    return call_together_messages(api_key, messages, max_completion_tokens=max_tokens, temperature=temperature)
+    selected_model = get_weather_summary_together_model() if is_weather_summary_payload(payload) else model_override
+    return call_together_messages(
+        api_key,
+        messages,
+        max_completion_tokens=max_tokens,
+        temperature=temperature,
+        model_override=selected_model,
+    )
 
 
 def call_groq_messages(api_key, messages, max_completion_tokens=GROQ_MAX_COMPLETION_TOKENS, temperature=0.2):
@@ -2382,10 +2448,10 @@ def call_groq_messages(api_key, messages, max_completion_tokens=GROQ_MAX_COMPLET
     return extract_groq_text(data)
 
 
-def call_together_messages(api_key, messages, max_completion_tokens=TOGETHER_MAX_COMPLETION_TOKENS, temperature=0.2):
+def call_together_messages(api_key, messages, max_completion_tokens=TOGETHER_MAX_COMPLETION_TOKENS, temperature=0.2, model_override=None):
     request_body = json.dumps(
         {
-            "model": get_together_model(),
+            "model": current_llm_model("together", model_override or get_together_model()),
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_completion_tokens,

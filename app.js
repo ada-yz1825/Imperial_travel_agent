@@ -340,6 +340,7 @@ const I18N = {
     heroTitle: "Start Planning your next journey",
     heroText: "Choose your starting point, ask the agent anything, and get study-space recommendations or live route plans.",
     llmLabel: "LLM",
+    llmSwitchHint: "Tap to switch",
     apiKeys: "API Keys",
     chooseStart: "Choose where to start",
     startingLocation: "Click on map or use your current location",
@@ -434,7 +435,16 @@ const I18N = {
     close: "Close",
     modalPlaceholder: "Continue the conversation...",
     send: "Send",
+    answerModelLabel: "Answered with {model}",
+    chatModelSectionTitle: "Conversation model",
+    chatModelSectionBody: "Switch the main chat model for this page. Tool choice and the final answer will follow your selection.",
+    chatModelCurrent: "Current chat model: {model}",
+    chatModelHelper: "GLM-5 is the higher-capability option.",
+    chatModelRetryHint: "You can try switching to the other model and retrying.",
+    chatModelSwitchUnavailable: "Model switching is currently unavailable.",
+    externalConfirmTitle: "Open external link",
     externalConfirm: "You are about to leave this page and open a new tab. Continue?",
+    startupWaitTitle: "Waking up the server",
     openNewTab: "Open in new tab",
     cancel: "Cancel",
     mapPoint: "Map point {lat}, {lng}",
@@ -479,6 +489,7 @@ const I18N = {
     heroTitle: "使用 Agent 规划行程",
     heroText: "首先选择你的位置，再向 Agent 提出需求，即可获取附近的工作学习空间推荐、实时路线规划、路线交互式地图、交通情况与天气辅助建议。",
     llmLabel: "大语言模型",
+    llmSwitchHint: "点击切换",
     apiKeys: "外部 API",
     chooseStart: "选择出发地点",
     startingLocation: "点击地图、拖动标记，或使用当前位置。",
@@ -538,7 +549,7 @@ const I18N = {
     fullScreen: "全屏地图",
     exitFullScreen: "退出全屏",
     openGoogleMaps: "在 Google Maps 中查看更多路线",
-    continueChat: "在聊天窗口继续",
+    continueChat: "打开聊天窗口继续对话",
     expandIntro: "展开 Agent 使用指南",
     collapseIntro: "收起 Agent 使用指南",
     howItWorks: "「 使用指南 」",
@@ -573,7 +584,16 @@ const I18N = {
     close: "关闭",
     modalPlaceholder: "继续对话...",
     send: "发送",
+    answerModelLabel: "本次回答模型：{model}",
+    chatModelSectionTitle: "对话模型",
+    chatModelSectionBody: "切换当前页面主对话所使用的模型。",
+    chatModelCurrent: "当前对话模型：{model}",
+    chatModelHelper: "GLM-5 是更高级的模型。",
+    chatModelRetryHint: "你可以尝试切换到另一个模型后重试。",
+    chatModelSwitchUnavailable: "当前暂时无法切换模型。",
+    externalConfirmTitle: "打开外部链接",
     externalConfirm: "即将离开当前页面并打开新标签页，是否继续？",
+    startupWaitTitle: "正在唤醒服务器",
     openNewTab: "打开新标签页",
     cancel: "取消",
     mapPoint: "地图点位 {lat}, {lng}",
@@ -655,6 +675,7 @@ function applyLanguage() {
     [".hero-panel h1", "heroTitle"],
     [".hero-text", "heroText"],
     ["#llmSignalTile span", "llmLabel"],
+    ["#llmSignalAction", "llmSwitchHint"],
     ["#routesSignalTile span", "apiKeys"],
     [".start-module .left-section-title", "chooseStart"],
     ["label[for='startPoint']", "startingLocation"],
@@ -707,6 +728,8 @@ function applyLanguage() {
     ["#modalAskButton", "send"],
     ["#confirmOpenLink", "openNewTab"],
     ["#cancelOpenLink", "cancel"],
+    ["#externalConfirmTitle", "externalConfirmTitle"],
+    ["#startupWaitText .modal-info-title", "startupWaitTitle"],
     ["#closeToolInfo", "close"],
     [".footer-useful-links-title", "usefulLinks"],
     [".sig-note", "footerNote"],
@@ -726,6 +749,8 @@ function applyLanguage() {
   $("walkDecrease")?.setAttribute("aria-label", currentLanguage === "zh" ? "减少步行舒适上限" : "Decrease walking comfort limit");
   $("walkIncrease")?.setAttribute("aria-label", currentLanguage === "zh" ? "增加步行舒适上限" : "Increase walking comfort limit");
   document.querySelector(".walk-stepper")?.setAttribute("aria-label", t("walkingComfortLimit"));
+  updateLlmModelHint();
+  refreshActiveToolInfo();
 
   const startOptions = {
     mapSelection: t("mapSelection"),
@@ -835,11 +860,75 @@ function apiFetch(path, options) {
 function formatModelDisplayName(value) {
   const text = String(value || "").trim();
   if (!text) return "";
-  if (text === "Qwen/Qwen3-235B-A22B-Instruct-2507-tput") {
-    return "Qwen3-235B-A22B";
-  }
+  if (text === "Qwen/Qwen3-235B-A22B-Instruct-2507-tput") return "Qwen3 235B";
+  if (text === "Qwen 235B") return "Qwen3 235B";
+  if (text === "zai-org/GLM-5") return "GLM-5";
   const slashIndex = text.indexOf("/");
   return slashIndex >= 0 ? text.slice(slashIndex + 1) || text : text;
+}
+
+function normalizeChatModelOption(option) {
+  if (!option || typeof option !== "object") return null;
+  const id = String(option.id || "").trim();
+  const model = String(option.model || "").trim();
+  if (!id || !model) return null;
+  return {
+    id,
+    label: formatModelDisplayName(String(option.label || "").trim() || model),
+    description: String(option.description || "").trim(),
+    model,
+    available: option.available !== false,
+  };
+}
+
+function getChatModelOptions() {
+  return chatModelOptions.filter((option) => option.available !== false);
+}
+
+function getChatModelOptionById(modelId = selectedChatModelId) {
+  return getChatModelOptions().find((option) => option.id === modelId) || null;
+}
+
+function getActiveChatModelOption() {
+  return getChatModelOptionById(selectedChatModelId)
+    || getChatModelOptionById(defaultChatModelId)
+    || getChatModelOptions()[0]
+    || null;
+}
+
+function getRequestedChatModelId() {
+  return getActiveChatModelOption()?.id || "";
+}
+
+function updateLlmModelHint() {
+  const activeModel = getActiveChatModelOption();
+  if (activeModel) {
+    integrationStatus.llm = activeModel.label;
+  }
+}
+
+function setSelectedChatModel(modelId, options = {}) {
+  const nextModel = getChatModelOptionById(modelId);
+  if (!nextModel) return;
+  selectedChatModelId = nextModel.id;
+  updateLlmModelHint();
+  render();
+  if (options.refreshModal !== false) refreshActiveToolInfo();
+}
+
+function clearLatestAnswerModelLabel() {
+  latestAnswerModelLabel = "";
+}
+
+function setLatestAnswerModelLabel(value) {
+  latestAnswerModelLabel = formatModelDisplayName(value);
+}
+
+function renderAnswerWithModelMeta(markdownHtml) {
+  const metaHtml = latestAnswerModelLabel
+    ? `<div class="agent-answer-model-note">${escapeHtml(t("answerModelLabel", { model: latestAnswerModelLabel }))}</div>`
+    : "";
+  return `<div class="agent-answer-output">${markdownHtml}</div>${metaHtml}`;
 }
 
 function weatherApiUrl(start, apiKey) {
@@ -923,6 +1012,12 @@ let integrationStatus = {
   mcp: "Checking",
   tools: "Pending",
 };
+let chatModelOptions = [];
+let defaultChatModelId = "";
+let selectedChatModelId = "";
+let activeToolInfoKind = "";
+let activeToolInfoOverrideContent = "";
+let latestAnswerModelLabel = "";
 let startMap = null;
 let startMarker = null;
 let routeMap = null;
@@ -1997,7 +2092,7 @@ function renderTflStatus(data) {
     const color = tflLineColor(line.id);
     const revealClass = shouldAnimateLines ? "" : " scroll-reveal scroll-reveal--visible";
     const reasonAttributes = tooltipReason
-      ? ` data-reason="${escapeHtml(tooltipReason)}" aria-label="${escapeHtml(`${status}: ${tooltipReason}`)}"`
+      ? ` data-tooltip-title="${escapeHtml(status)}" data-reason="${escapeHtml(tooltipReason)}" aria-label="${escapeHtml(`${status}: ${tooltipReason}`)}"`
       : "";
     return `
       <div class="tfl-line ${tflStatusClass(line.severity)}${revealClass}" style="--line-color: ${escapeHtml(color)}; --line-index: ${index}">
@@ -2034,8 +2129,12 @@ function ensureTflTooltip() {
 function showTflTooltip(target) {
   const reason = target?.dataset?.reason;
   if (!reason) return;
+  const title = target?.dataset?.tooltipTitle || (currentLanguage === "zh" ? "线路提示" : "Line notice");
   const tooltip = ensureTflTooltip();
-  tooltip.textContent = reason;
+  tooltip.innerHTML = `
+    <strong class="tfl-tooltip-title">${escapeHtml(title)}</strong>
+    <span class="tfl-tooltip-body">${escapeHtml(reason)}</span>
+  `;
   tooltip.hidden = false;
   tooltip.classList.remove("is-hiding");
   tooltip.classList.add("is-visible");
@@ -2373,6 +2472,7 @@ function setWalkTolerance(value) {
 async function answerQuestion(question, options = {}) {
   const cleaned = question.trim();
   if (!cleaned) {
+    clearLatestAnswerModelLabel();
     $("agentAnswer").textContent = currentLanguage === "zh"
       ? "可以这样问：从 South Kensington 坐公共交通去 Hammersmith Campus。"
       : "Ask something like: from South Kensington to Hammersmith Campus by transit.";
@@ -2387,6 +2487,7 @@ async function answerQuestion(question, options = {}) {
   const loadingSessionId = renderLoadingAnswer(t("understandingRequest"));
 
   clearRoutePreview();
+  clearLatestAnswerModelLabel();
   applyQuestionIntent(cleaned);
   if (shouldUseRoutesForStudyQuestion(cleaned) || controls.scenario.value === "nearest") {
     await refreshRoutes();
@@ -2401,6 +2502,7 @@ async function answerQuestion(question, options = {}) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         stream: true,
+        chatModelId: getRequestedChatModelId(),
         question: cleaned,
         contextStart: currentStartContext(),
         context: buildAgentContext(context),
@@ -2424,6 +2526,11 @@ async function answerQuestion(question, options = {}) {
       ? await readStreamingAnswer(response, { loadingSessionId })
       : await readJsonAnswer(response);
     const answer = sanitizeModelOutput(agentResult.answer || "");
+    setLatestAnswerModelLabel(agentResult.model || "");
+    if (agentResult.chatModelId) {
+      setSelectedChatModel(agentResult.chatModelId, { refreshModal: false });
+    }
+    $("agentAnswer").innerHTML = renderAnswerWithModelMeta(renderMarkdown(answer));
     setAgentMode(formatAgentTools(agentResult.toolsUsed || []));
 
     chatHistory.push({ role: "assistant", content: answer });
@@ -2443,6 +2550,7 @@ async function answerQuestion(question, options = {}) {
     await waitForMinimumLoading(minLoadingReadyAt);
     cancelAnswerRender();
     hideAgentActions();
+    clearLatestAnswerModelLabel();
     const errorMessage = formatAgentError(error);
     $("agentAnswer").innerHTML = `
       <div class="agent-answer-output agent-answer-output--error">${renderMarkdown(errorMessage)}</div>
@@ -2637,7 +2745,7 @@ function stepAnswerRender(state, now = performance.now()) {
       const answerEl = $("agentAnswer");
       if (answerEl) {
         answerEl.innerHTML = state.rendered
-          ? `<div class="agent-answer-output">${renderMarkdown(state.rendered)}</div>`
+          ? renderAnswerWithModelMeta(renderMarkdown(state.rendered))
           : "";
         answerEl.classList.remove("agent-answer--streaming");
         answerEl.classList.remove("agent-answer--chunk");
@@ -2707,23 +2815,35 @@ function cancelAnswerRender() {
 function formatAgentError(error) {
   const message = sanitizeModelOutput(error?.message || "").trim();
   const normalized = message.toLowerCase();
+  const retryHint = t("chatModelRetryHint");
+  const withRetryHint = (base) => String(base || "").includes(retryHint) ? String(base || "").trim() : `${base} ${retryHint}`.trim();
   if (/(429|rate limit|too many requests|quota|usage limit|resource exhausted|billing|overloaded)/i.test(message)) {
-    return "The AI service is currently rate-limited or out of quota. Please try again in a minute.";
+    return withRetryHint(currentLanguage === "zh"
+      ? "AI 服务当前触发了速率限制或额度限制，请稍后再试。"
+      : "The AI service is currently rate-limited or out of quota. Please try again in a minute.");
   }
   if (/(timeout|timed out|deadline|abort)/i.test(message)) {
-    return "The AI service took too long to respond. Please try again.";
+    return withRetryHint(currentLanguage === "zh"
+      ? "AI 服务响应时间过长，请重试。"
+      : "The AI service took too long to respond. Please try again.");
   }
   if (/(network|failed to fetch|connection|offline)/i.test(message)) {
-    return "The AI service could not be reached. Please check the connection and try again.";
+    return withRetryHint(currentLanguage === "zh"
+      ? "AI 服务当前无法连接，请检查网络后重试。"
+      : "The AI service could not be reached. Please check the connection and try again.");
   }
   if (/(500|502|503|504|server error|bad gateway|service unavailable|gateway timeout)/i.test(message)) {
-    return "The AI service is temporarily unavailable. Please try again shortly.";
+    return withRetryHint(currentLanguage === "zh"
+      ? "AI 服务暂时不可用，请稍后重试。"
+      : "The AI service is temporarily unavailable. Please try again shortly.");
   }
   if (containsCjkText(message)) {
-    return "The agent could not finish that request. Please try again.";
+    return withRetryHint(message || "The agent could not finish that request. Please try again.");
   }
-  if (normalized) return message;
-  return "The agent could not finish that request. Please try again.";
+  if (normalized) return withRetryHint(message);
+  return withRetryHint(currentLanguage === "zh"
+    ? "Agent 暂时无法完成这次请求，请重试。"
+    : "The agent could not finish that request. Please try again.");
 }
 
 function containsCjkText(value) {
@@ -2755,6 +2875,7 @@ function renderLoadingAnswer(message) {
   cancelAnswerRender();
   clearRoutePreview();
   hideAgentActions();
+  clearLatestAnswerModelLabel();
   const loadingSessionId = ++loadingRenderSessionId;
   const answerEl = $("agentAnswer");
   if (answerEl) {
@@ -4274,8 +4395,21 @@ async function refreshIntegrationStatus() {
     const response = await apiFetch("/api/health");
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Health check failed");
+    chatModelOptions = Array.isArray(data.chatModels)
+      ? data.chatModels.map(normalizeChatModelOption).filter(Boolean)
+      : [];
+    defaultChatModelId = String(data.defaultChatModelId || "").trim();
+    if (getChatModelOptionById(selectedChatModelId)) {
+      setSelectedChatModel(selectedChatModelId, { refreshModal: false });
+    } else if (getChatModelOptionById(defaultChatModelId)) {
+      setSelectedChatModel(defaultChatModelId, { refreshModal: false });
+    } else if (getChatModelOptions()[0]) {
+      setSelectedChatModel(getChatModelOptions()[0].id, { refreshModal: false });
+    } else {
+      selectedChatModelId = "";
+    }
     integrationStatus = {
-      llm: data.llmConnected ? formatModelDisplayName(data.llmStatus || "Connected") : formatModelDisplayName(data.llmStatus || "Offline"),
+      llm: getActiveChatModelOption()?.label || (data.llmConnected ? formatModelDisplayName(data.llmStatus || "Connected") : formatModelDisplayName(data.llmStatus || "Offline")),
       routes: integrationStatus.routes || "Checking",
       maps: integrationStatus.maps || "Checking",
       mcp: data.mcpConnected ? "Connected" : "Offline",
@@ -4296,6 +4430,9 @@ async function refreshIntegrationStatus() {
       scheduleIntegrationRetry();
     }
   } catch (error) {
+    chatModelOptions = [];
+    defaultChatModelId = "";
+    selectedChatModelId = "";
     integrationStatus = {
       llm: "Local API offline",
       routes: "Local API offline",
@@ -4461,11 +4598,42 @@ const agentToolsTile = $("agentToolsTile");
 let pendingExternalHref = null;
 
 const TOOL_INFO_COPY = {
-  routes: "API Keys power the live-data layer of the app.\n\nThe Google Maps browser key loads the map, geocodes places, and enables weather lookups. The Google Routes key provides live travel time, distance, and route geometry when the agent enters navigation mode, and supports route comparison across public transport, walking, cycling, and driving.\n\nThe Weather API returns current conditions for your selected start point or navigation destination. The TfL Status API reports live London line disruptions so route previews and status cards can surface service issues. When all configured keys and services are available, this tile shows Keys Ready.",
-  llm: "The LLM handles conversation, intent understanding, and study-space recommendations. When route planning is needed, it uses Google Routes data rather than guessing travel time.",
-  agent: "The model now chooses tools itself. The top signal shows the tool currently used by the model, or Pending when no tool is used.",
-  weatherLocation: "Current-location weather requires browser location permission.",
-  weatherDestination: "Please ask the agent for a navigation route first, then update weather at the parsed destination.",
+  routes: {
+    title: "Live data and API keys",
+    body: "API Keys power the live-data layer of the app.\n\nThe Google Maps browser key loads the map, geocodes places, and enables weather lookups. The Google Routes key provides live travel time, distance, and route geometry when the agent enters navigation mode, and supports route comparison across public transport, walking, cycling, and driving.\n\nThe Weather API returns current conditions for your selected start point or navigation destination. The TfL Status API reports live London line disruptions so route previews and status cards can surface service issues. When all configured keys and services are available, this tile shows Keys Ready.",
+    zhTitle: "实时数据与 API 密钥",
+    zhBody: "API 密钥支撑应用中的实时数据能力。\n\nGoogle Maps 浏览器密钥用于加载地图、地理编码地点和天气查询。Google Routes 密钥用于在导航模式下提供实时出行时间、距离和路线几何，并支持公共交通、步行、骑行和驾车之间的比较。\n\nWeather API 返回所选出发点或导航目的地的当前天气；TfL Status API 返回伦敦线路实时运营状态。当密钥和服务均可用时，这里会显示“服务已连接”。",
+  },
+  llm: {
+    title: "Language model status",
+    body: "The LLM handles conversation, intent understanding, synthesizing gathered information, and providing answers. When tool calls are needed, the LLM automatically decides which tools to use to get more accurate results.",
+    zhTitle: "语言模型状态",
+    zhBody: "LLM 负责对话、理解意图，总结获得的信息并提供答案。需要调用工具时，LLM 会自动决定使用什么工具，以获得更准确的结果。",
+  },
+  agent: {
+    title: "Agent tools",
+    body: "The model now chooses tools itself. The top signal shows the tool currently used by the model, or Pending when no tool is used.",
+    zhTitle: "Agent 工具",
+    zhBody: "模型会在回答时自行选择工具。顶部状态会显示当前使用的工具；不需要工具时显示待命。",
+  },
+  weatherLocation: {
+    title: "Current-location weather",
+    body: "Current-location weather requires browser location permission.",
+    zhTitle: "当前位置天气",
+    zhBody: "当前位置天气需要浏览器位置权限。",
+  },
+  weatherDestination: {
+    title: "Destination weather",
+    body: "Please ask the agent for a navigation route first, then update weather at the parsed destination.",
+    zhTitle: "目的地天气",
+    zhBody: "请先让助手生成一条导航路线，然后再更新目的地天气。",
+  },
+  mainlandChinaCoverage: {
+    title: "Coverage limitation",
+    body: MAINLAND_CHINA_WARNING_TEXT,
+    zhTitle: "数据覆盖限制",
+    zhBody: MAINLAND_CHINA_WARNING_TEXT,
+  },
 };
 
 const WEATHER_METRIC_INFO = {
@@ -4538,6 +4706,8 @@ function showExternalConfirm(href) {
   void externalConfirmModalEl.offsetWidth;
   externalConfirmModalEl.classList.remove("closing");
   externalConfirmModalEl.classList.add("visible");
+  const title = $("externalConfirmTitle");
+  if (title) title.textContent = t("externalConfirmTitle");
   const txt = $("externalConfirmText");
   if (txt) txt.textContent = t("externalConfirm");
 }
@@ -4556,56 +4726,133 @@ function hideExternalConfirm() {
 
 function showToolInfo(kind, overrideContent = "") {
   if (!toolInfoModalEl || !toolInfoTextEl) return;
-  const content = String(overrideContent || toolInfoCopy(kind));
-  toolInfoTextEl.innerHTML = kind === "agent"
-    ? renderAgentToolInfo()
-    : WEATHER_METRIC_INFO[kind]
-      ? renderWeatherMetricInfo(kind)
-      : escapeHtml(content).replace(/\n/g, "<br />");
+  activeToolInfoKind = kind;
+  activeToolInfoOverrideContent = overrideContent;
+  toolInfoTextEl.innerHTML = renderToolInfoContent(kind, overrideContent);
   toolInfoModalEl.hidden = false;
   void toolInfoModalEl.offsetWidth;
   toolInfoModalEl.classList.remove("closing");
   toolInfoModalEl.classList.add("visible");
 }
 
-function toolInfoCopy(kind) {
-  if (currentLanguage === "zh") {
-    const zhCopy = {
-      routes: "API 密钥支撑应用中的实时数据能力。\n\nGoogle Maps 浏览器密钥用于加载地图、地理编码地点和天气查询。Google Routes 密钥用于在导航模式下提供实时出行时间、距离和路线几何，并支持公共交通、步行、骑行和驾车之间的比较。\n\nWeather API 返回所选出发点或导航目的地的当前天气；TfL Status API 返回伦敦线路实时运营状态。当密钥和服务均可用时，这里会显示“服务已连接”。",
-      llm: "LLM 负责对话、理解意图和学习空间推荐。需要路线规划时，它会使用 Google Routes 数据，而不是凭空猜测出行时间。",
-      agent: "模型会在回答时自行选择工具。顶部状态会显示当前使用的工具；不需要工具时显示待命。",
-      weatherLocation: "当前位置天气需要浏览器位置权限。",
-      weatherDestination: "请先让助手生成一条导航路线，然后再更新目的地天气。",
-    };
-    return zhCopy[kind] || zhCopy.llm;
-  }
-  return TOOL_INFO_COPY[kind] || TOOL_INFO_COPY.llm;
+function refreshActiveToolInfo() {
+  if (!toolInfoModalEl || !toolInfoTextEl || toolInfoModalEl.hidden || !activeToolInfoKind) return;
+  toolInfoTextEl.innerHTML = renderToolInfoContent(activeToolInfoKind, activeToolInfoOverrideContent);
+}
+
+function renderToolInfoContent(kind, overrideContent = "") {
+  if (kind === "llm") return renderLlmToolInfo();
+  if (kind === "agent") return renderAgentToolInfo();
+  if (WEATHER_METRIC_INFO[kind]) return renderWeatherMetricInfo(kind);
+  return renderGenericToolInfo(kind, overrideContent);
+}
+
+function toolInfoCopy(kind, overrideContent = "") {
+  const fallback = TOOL_INFO_COPY.llm;
+  const info = TOOL_INFO_COPY[kind] || fallback;
+  const title = currentLanguage === "zh" ? (info.zhTitle || info.title) : info.title;
+  const defaultBody = currentLanguage === "zh" ? (info.zhBody || info.body) : info.body;
+  return {
+    title,
+    body: String(overrideContent || defaultBody || ""),
+  };
+}
+
+function renderGenericToolInfo(kind, overrideContent = "") {
+  const info = toolInfoCopy(kind, overrideContent);
+  const paragraphs = info.body
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br />")}</p>`)
+    .join("");
+  return `
+    <section class="modal-copy">
+      <h3>${escapeHtml(info.title)}</h3>
+      <div class="modal-copy-body">${paragraphs}</div>
+    </section>
+  `;
+}
+
+function renderLlmToolInfo() {
+  const activeModel = getActiveChatModelOption();
+  const currentLabel = activeModel?.label || formatModelDisplayName(integrationStatus.llm) || t("chatModelSwitchUnavailable");
+  const modelButtons = getChatModelOptions().length
+    ? `
+      <div class="chat-model-switcher" role="group" aria-label="${escapeHtml(t("chatModelSectionTitle"))}">
+        ${getChatModelOptions().map((option) => `
+          <button
+            type="button"
+            class="chat-model-option${option.id === activeModel?.id ? " is-active" : ""}"
+            data-chat-model-id="${escapeHtml(option.id)}"
+            aria-pressed="${option.id === activeModel?.id ? "true" : "false"}"
+          >
+            <strong>${escapeHtml(option.label)}</strong>
+            ${option.description ? `<span>${escapeHtml(option.description)}</span>` : ""}
+          </button>
+        `).join("")}
+      </div>
+    `
+    : `<p class="chat-model-unavailable">${escapeHtml(t("chatModelSwitchUnavailable"))}</p>`;
+  return `
+    <section class="modal-copy">
+      <h3>${escapeHtml(currentLanguage === "zh" ? TOOL_INFO_COPY.llm.zhTitle : TOOL_INFO_COPY.llm.title)}</h3>
+      <div class="modal-copy-body">
+        <p>${escapeHtml(currentLanguage === "zh" ? TOOL_INFO_COPY.llm.zhBody : TOOL_INFO_COPY.llm.body)}</p>
+      </div>
+      <div class="chat-model-panel">
+        <div class="chat-model-panel-header">
+          <strong>${escapeHtml(t("chatModelSectionTitle"))}</strong>
+          <span>${escapeHtml(t("chatModelCurrent", { model: currentLabel }))}</span>
+        </div>
+        <div class="modal-copy-body modal-copy-body--compact">
+          <p>${escapeHtml(t("chatModelSectionBody"))}</p>
+        </div>
+        ${modelButtons}
+        <p class="chat-model-helper">${escapeHtml(t("chatModelHelper"))}</p>
+      </div>
+    </section>
+  `;
 }
 
 function renderAgentToolInfo() {
   if (currentLanguage === "zh") {
     return `
-      <p>模型会在回答时自行选择工具；以下是目前支持的工具列表：</p>
-      <div class="tool-info-list">
-        <div class="tool-info-item"><strong>导航</strong>：使用谷歌地图路线 API 获取实时出行时间、距离和路线。</div>
-        <div class="tool-info-item"><strong>路线对比</strong>： 用于比较不同目的地或交通方式的出行估计。</div>
-        <div class="tool-info-item"><strong>天气</strong>：使用谷歌天气 API 获取出发点或目的地的当前天气。</div>
-        <div class="tool-info-item"><strong>TfL 状态</strong>： 查询路线涉及的伦敦线路是否有延误或中断。</div>
-        <div class="tool-info-item"><strong>联网搜索</strong>： 用于百科类和公共事实类问题，并提供来源链接。</div>
-      </div>
-      <p>模型开始调用工具时，这个状态会立即更新。</p>
+      <section class="modal-copy">
+        <h3>Agent 工具</h3>
+        <div class="modal-copy-body">
+          <p>模型会在回答时自行选择工具；以下是目前支持的工具列表：</p>
+        </div>
+        <div class="tool-info-list">
+          <div class="tool-info-item"><strong>导航</strong>：使用谷歌地图路线 API 获取实时出行时间、距离和路线。</div>
+          <div class="tool-info-item"><strong>路线对比</strong>： 用于比较不同目的地或交通方式的出行估计。</div>
+          <div class="tool-info-item"><strong>天气</strong>：使用谷歌天气 API 获取出发点或目的地的当前天气。</div>
+          <div class="tool-info-item"><strong>TfL 状态</strong>： 查询路线涉及的伦敦线路是否有延误或中断。</div>
+          <div class="tool-info-item"><strong>联网搜索</strong>： 用于百科类和公共事实类问题，并提供来源链接。</div>
+        </div>
+        <div class="modal-copy-body">
+          <p>模型开始调用工具时，这个状态会立即更新。</p>
+        </div>
+      </section>
     `;
   }
   return `
-    <p>The model chooses tools itself while answering. If no tool is needed, the signal stays Pending.</p>
-    <div class="tool-info-list">
-      <div class="tool-info-item"><strong>Navigation</strong> uses Google Routes for live travel time, distance, and route geometry.</div>
-      <div class="tool-info-item"><strong>Route Comparison</strong> compares travel estimates to destinations based on candidates.</div>
-      <div class="tool-info-item"><strong>Weather</strong> uses Google Weather API for current conditions at a start point or destination.</div>
-      <div class="tool-info-item"><strong>TfL Status</strong> checks live disruption status for London lines used by a route.</div>
-      <div class="tool-info-item"><strong>Web Search</strong> looks up encyclopedia-style and public factual questions with source links.</div>
-    </div>
-    <p>The signal updates as soon as the model starts a tool call.</p>
+    <section class="modal-copy">
+      <h3>Agent tools</h3>
+      <div class="modal-copy-body">
+        <p>The model chooses tools itself while answering. If no tool is needed, the signal stays Pending.</p>
+      </div>
+      <div class="tool-info-list">
+        <div class="tool-info-item"><strong>Navigation</strong> uses Google Routes for live travel time, distance, and route geometry.</div>
+        <div class="tool-info-item"><strong>Route Comparison</strong> compares travel estimates to destinations based on candidates.</div>
+        <div class="tool-info-item"><strong>Weather</strong> uses Google Weather API for current conditions at a start point or destination.</div>
+        <div class="tool-info-item"><strong>TfL Status</strong> checks live disruption status for London lines used by a route.</div>
+        <div class="tool-info-item"><strong>Web Search</strong> looks up encyclopedia-style and public factual questions with source links.</div>
+      </div>
+      <div class="modal-copy-body">
+        <p>The signal updates as soon as the model starts a tool call.</p>
+      </div>
+    </section>
   `;
 }
 
@@ -4616,16 +4863,20 @@ function renderWeatherMetricInfo(kind) {
   const body = currentLanguage === "zh" ? info.zhBody : info.body;
   const note = currentLanguage === "zh" ? info.zhNote : info.note;
   return `
-    <section class="weather-metric-info">
+    <section class="modal-copy weather-metric-info">
       <h3>${escapeHtml(title)}</h3>
-      <p>${escapeHtml(body)}</p>
-      <p><strong>${currentLanguage === "zh" ? "出行提示：" : "Planning note:"}</strong> ${escapeHtml(note)}</p>
+      <div class="modal-copy-body">
+        <p>${escapeHtml(body)}</p>
+        <p><strong>${currentLanguage === "zh" ? "出行提示：" : "Planning note:"}</strong> ${escapeHtml(note)}</p>
+      </div>
     </section>
   `;
 }
 
 function hideToolInfo() {
   if (!toolInfoModalEl || toolInfoModalEl.hidden) return;
+  activeToolInfoKind = "";
+  activeToolInfoOverrideContent = "";
   toolInfoModalEl.classList.remove("visible");
   toolInfoModalEl.classList.add("closing");
   toolInfoModalEl.addEventListener("animationend", function handler() {
@@ -4720,6 +4971,11 @@ if (closeToolInfoBtn) {
 }
 if (toolInfoModalEl) {
   toolInfoModalEl.addEventListener("click", (event) => {
+    const modelButton = event.target.closest("[data-chat-model-id]");
+    if (modelButton) {
+      setSelectedChatModel(modelButton.dataset.chatModelId);
+      return;
+    }
     if (event.target === toolInfoModalEl) hideToolInfo();
   });
 }

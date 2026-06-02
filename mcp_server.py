@@ -27,6 +27,7 @@ from navigator_core import (
     check_llm_health,
     classify_agent_intent,
     current_llm_model,
+    get_default_chat_model_id,
     get_google_maps_api_key,
     get_google_maps_browser_key,
     get_groq_api_key,
@@ -37,13 +38,16 @@ from navigator_core import (
     get_openai_api_key,
     get_openai_model,
     get_together_api_key,
+    get_together_chat_models,
     get_together_model,
+    get_weather_summary_together_model,
     imperial_shuttle_context,
     mode_label,
     navigation_mode_candidates,
     parse_navigation_query,
     public_place_payload,
     read_http_error,
+    resolve_together_chat_model,
     resolve_location,
     strip_reasoning_text,
     valid_lat_lng,
@@ -335,8 +339,8 @@ def is_study_recommendation_request(question):
     return any(term in text for term in study_terms)
 
 
-def call_tool_choice_model(messages, tools):
-    provider = get_llm_provider()
+def call_tool_choice_model(messages, tools, provider_override=None, model_override=None):
+    provider = (provider_override or get_llm_provider() or "").lower()
     if provider == "groq":
         api_key = get_groq_api_key()
         if not api_key:
@@ -356,7 +360,7 @@ def call_tool_choice_model(messages, tools):
         return call_chat_completion_tools(
             TOGETHER_API_URL,
             api_key,
-            get_together_model(),
+            current_llm_model("together", model_override or get_together_model()),
             messages,
             tools,
             provider="together",
@@ -1056,6 +1060,38 @@ def public_tool_trace(tool_trace):
     return public_items
 
 
+def resolve_chat_target(payload):
+    provider = get_llm_provider()
+    if provider != "together":
+        return {
+            "provider": provider,
+            "model": current_llm_model(),
+            "chatModelId": "",
+        }
+
+    context = payload.get("context") or {}
+    if isinstance(context, dict) and context.get("task") == "weather_summary":
+        return {
+            "provider": "together",
+            "model": get_weather_summary_together_model(),
+            "chatModelId": "",
+        }
+
+    requested_id = str(payload.get("chatModelId") or "").strip() or get_default_chat_model_id()
+    selected = resolve_together_chat_model(requested_id)
+    if not selected:
+        raise MCPToolError(
+            "The selected chat model is unavailable. Please switch models and try again.",
+            status=400,
+            payload={"error": "The selected chat model is unavailable. Please switch models and try again."},
+        )
+    return {
+        "provider": "together",
+        "model": str(selected.get("model") or get_together_model()),
+        "chatModelId": str(selected.get("id") or requested_id),
+    }
+
+
 def mcp_tool_agent_answer(arguments):
     payload = (arguments or {}).get("payload") or {}
     context = payload.get("context") or {}
@@ -1065,7 +1101,8 @@ def mcp_tool_agent_answer(arguments):
         result.setdefault("toolCalls", [])
         return result
 
-    provider = get_llm_provider()
+    chat_target = resolve_chat_target(payload)
+    provider = chat_target["provider"]
     if provider not in {"groq", "openai", "together"}:
         result = mcp_tool_chat_complete({"payload": payload})
         result.setdefault("toolsUsed", [])
@@ -1081,7 +1118,7 @@ def mcp_tool_agent_answer(arguments):
 
     try:
         for _ in range(AGENT_TOOL_CALL_LIMIT):
-            message = call_tool_choice_model(messages, tools)
+            message = call_tool_choice_model(messages, tools, provider_override=provider, model_override=chat_target["model"])
             tool_calls = message.get("tool_calls") or []
             if not tool_calls:
                 answer = strip_reasoning_text(message.get("content") or "").strip()
@@ -1090,8 +1127,9 @@ def mcp_tool_agent_answer(arguments):
                     answer = fallback.get("answer", "") if isinstance(fallback, dict) else str(fallback or "")
                 result = {
                     "answer": answer,
-                    "model": current_llm_model(),
+                    "model": chat_target["model"],
                     "provider": provider,
+                    "chatModelId": chat_target["chatModelId"],
                     "toolsUsed": [item["name"] for item in tool_trace if item.get("status") == "ok"],
                     "toolCalls": public_tool_trace(tool_trace),
                 }
@@ -1147,8 +1185,9 @@ def mcp_tool_agent_answer(arguments):
         answer = final.get("answer", "") if isinstance(final, dict) else str(final or "")
         result = {
             "answer": answer,
-            "model": current_llm_model(),
+            "model": chat_target["model"],
             "provider": provider,
+            "chatModelId": chat_target["chatModelId"],
             "toolsUsed": [item["name"] for item in tool_trace if item.get("status") == "ok"],
             "toolCalls": public_tool_trace(tool_trace),
         }
@@ -1156,18 +1195,40 @@ def mcp_tool_agent_answer(arguments):
         return result
     except urllib.error.HTTPError as error:
         message = error.read().decode("utf-8", errors="replace")
-        raise MCPToolError(format_model_http_error(message), status=error.code, payload={"error": format_model_http_error(message)})
+        formatted = format_model_http_error(message)
+        raise MCPToolError(
+            f"{formatted} You can try switching to the other model and retrying.",
+            status=error.code,
+            payload={"error": f"{formatted} You can try switching to the other model and retrying."},
+        )
     except urllib.error.URLError:
-        raise MCPToolError("模型服务连接失败，请稍后重试。", status=503, payload={"error": "模型服务连接失败，请稍后重试。"})
+        raise MCPToolError(
+            "The model service could not be reached. You can try switching to the other model and retrying.",
+            status=503,
+            payload={"error": "The model service could not be reached. You can try switching to the other model and retrying."},
+        )
 
 
 def mcp_tool_health(arguments):
     llm_status = check_llm_health()
+    together_ready = bool(get_together_api_key())
+    chat_models = [
+        {
+            "id": item.get("id"),
+            "label": item.get("label"),
+            "description": item.get("description", ""),
+            "available": together_ready,
+            "model": item.get("model"),
+        }
+        for item in get_together_chat_models()
+    ]
     return {
         "ok": True,
         "app": APP_NAME,
         "provider": get_llm_provider(),
         "model": current_llm_model(),
+        "defaultChatModelId": get_default_chat_model_id(),
+        "chatModels": chat_models,
         "streaming": True,
         "llmConnected": llm_status["connected"],
         "llmStatus": llm_status["label"],
@@ -1181,7 +1242,8 @@ def mcp_tool_health(arguments):
 
 def mcp_tool_chat_complete(arguments):
     payload = (arguments or {}).get("payload") or {}
-    provider = get_llm_provider()
+    chat_target = resolve_chat_target(payload)
+    provider = chat_target["provider"]
     try:
         if provider == "openai":
             api_key = get_openai_api_key()
@@ -1220,7 +1282,12 @@ def mcp_tool_chat_complete(arguments):
                         "setup": "LLM_PROVIDER=together TOGETHER_API_KEY=你的密钥 python3 server.py",
                     },
                 )
-            return {"answer": call_together(api_key, payload), "model": get_together_model(), "provider": "together"}
+            return {
+                "answer": call_together(api_key, payload, model_override=chat_target["model"]),
+                "model": chat_target["model"],
+                "provider": "together",
+                "chatModelId": chat_target["chatModelId"],
+            }
 
         answer = "".join(call_ollama_stream(payload)).strip()
         if not answer:
@@ -1230,7 +1297,9 @@ def mcp_tool_chat_complete(arguments):
         raise
     except urllib.error.HTTPError as error:
         message = error.read().decode("utf-8", errors="replace")
-        raise MCPToolError(format_model_http_error(message), status=error.code, payload={"error": format_model_http_error(message)})
+        formatted = format_model_http_error(message)
+        hint = " You can try switching to the other model and retrying." if provider == "together" else ""
+        raise MCPToolError(f"{formatted}{hint}", status=error.code, payload={"error": f"{formatted}{hint}"})
     except urllib.error.URLError:
         if provider == "ollama":
             raise MCPToolError(
@@ -1241,6 +1310,9 @@ def mcp_tool_chat_complete(arguments):
                     "setup": f"ollama run {get_ollama_model()}",
                 },
             )
+        if provider == "together":
+            message = "The model service could not be reached. You can try switching to the other model and retrying."
+            raise MCPToolError(message, status=503, payload={"error": message})
         raise MCPToolError("模型服务连接失败，请稍后重试。", status=503, payload={"error": "模型服务连接失败，请稍后重试。"})
 
 

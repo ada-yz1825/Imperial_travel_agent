@@ -22,6 +22,7 @@
           <div id="llmSignalTile" class="signal-tile" role="button" tabindex="0" aria-label="About LLM status">
             <span>LLM</span>
             <strong id="llmSignal">Checking</strong>
+            <small id="llmSignalAction" class="signal-action-text">Tap to switch</small>
           </div>
           <div id="routesSignalTile" class="signal-tile" role="button" tabindex="0" aria-label="About API Keys status">
             <span>API Keys</span>
@@ -301,7 +302,12 @@
     <div class="confirm-modal" id="externalConfirmModal" hidden>
       <div class="confirm-modal-panel">
         <div class="confirm-modal-body">
+          <section class="modal-copy">
+            <h3 id="externalConfirmTitle" class="modal-info-title">Open external link</h3>
+            <div class="modal-copy-body">
             <p id="externalConfirmText">You are about to leave this page and open a new tab. Are you sure you want to continue?</p>
+            </div>
+          </section>
           </div>
           <div class="confirm-modal-actions">
             <button id="confirmOpenLink" class="cta">Open in new tab</button>
@@ -324,13 +330,16 @@
     <div class="confirm-modal" id="startupWaitModal" hidden>
       <div class="confirm-modal-panel startup-wait-panel">
         <div class="confirm-modal-body">
-          <div id="startupWaitText" class="tool-info-text">
+          <section id="startupWaitText" class="modal-copy modal-copy-centered">
             <div class="startup-wait-visual" aria-hidden="true">
               <span class="startup-wait-ring"></span>
             </div>
-            <p>The backend server is hosted on Render, so it may take around <strong>30 seconds</strong> to wake up after a quiet period.</p>
-            <p>Please give it a moment — even travel agents need a quick stretch before work.</p>
-          </div>
+            <h3 class="modal-info-title">Waking up the server</h3>
+            <div class="modal-copy-body">
+              <p>The backend server is hosted on Render, so it may take around <strong>30 seconds</strong> to wake up after a quiet period.</p>
+              <p>Please give it a moment — even travel agents need a quick stretch before work.</p>
+            </div>
+          </section>
         </div>
       </div>
     </div>
