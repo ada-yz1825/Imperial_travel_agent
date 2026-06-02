@@ -372,6 +372,7 @@ const I18N = {
     updateRecommendations: "Update recommendations",
     loadMoreStudySpaces: "Load more spaces",
     collapseStudySpaces: "Collapse spaces",
+    studySpacesTooFar: "No nearby study spaces are shown because the closest listed library is more than {distance} km away.",
     travelAgent: "Travel agent",
     summaryTitle: "Ask to plan, explore, or navigate",
     agentModeTools: "Agent mode or tools",
@@ -510,6 +511,7 @@ const I18N = {
     updateRecommendations: "更新推荐",
     loadMoreStudySpaces: "查看更多空间",
     collapseStudySpaces: "收起更多空间",
+    studySpacesTooFar: "由于最近的图书馆也超过 {distance} 公里，这里暂不显示推荐；我们只推荐 50 公里内的图书馆。",
     travelAgent: "出行智能体",
     summaryTitle: "获取路线导航、天气、或出行建议",
     agentModeTools: "Agent 使用的工具",
@@ -905,8 +907,12 @@ const preferenceWeights = {
   budget: 45,
 };
 
+const RECOMMENDATION_DISTANCE_LIMIT_KM = 50;
+const RECOMMENDATION_COLLAPSED_LIMIT = 2;
+const RECOMMENDATION_EXPANDED_LIMIT = 5;
 let latestRanked = [];
-let recommendationDisplayLimit = 2;
+let latestAvailableRecommendations = [];
+let recommendationDisplayLimit = RECOMMENDATION_COLLAPSED_LIMIT;
 let routeRequestId = 0;
 let routeStatus = "Routes on demand";
 let routeUpdatedAt = "Estimate";
@@ -1083,19 +1089,28 @@ function render() {
   updateAgentModeSignal(integrationStatus.tools, false);
   maybeShowStartupWaitModal();
 
-  latestRanked = places
+  latestAvailableRecommendations = places
     .map((place) => scorePlace(place, context))
     .sort((a, b) => b.total - a.total)
-    .slice(0, recommendationDisplayLimit);
+    .filter((place) => place.adjustedDistance <= RECOMMENDATION_DISTANCE_LIMIT_KM);
+  latestRanked = latestAvailableRecommendations.slice(0, recommendationDisplayLimit);
 
-  $("recommendations").innerHTML = latestRanked.map(renderCard).join("");
+  $("recommendations").innerHTML = latestRanked.length
+    ? latestRanked.map(renderCard).join("")
+    : renderRecommendationEmptyState();
   updateRecommendationLoadMoreButton();
 }
 
 function updateRecommendationLoadMoreButton() {
   const button = $("loadMoreStudySpaces");
   if (!button) return;
-  if (recommendationDisplayLimit >= 5) {
+  const hasMoreRecommendations = latestAvailableRecommendations.length > latestRanked.length;
+  button.hidden = !hasMoreRecommendations;
+  if (!hasMoreRecommendations) {
+    button.setAttribute("aria-expanded", String(recommendationDisplayLimit > RECOMMENDATION_COLLAPSED_LIMIT));
+    return;
+  }
+  if (recommendationDisplayLimit > RECOMMENDATION_COLLAPSED_LIMIT) {
     button.textContent = t("collapseStudySpaces");
     button.setAttribute("aria-expanded", "true");
     button.disabled = false;
@@ -1104,6 +1119,12 @@ function updateRecommendationLoadMoreButton() {
   button.textContent = t("loadMoreStudySpaces");
   button.setAttribute("aria-expanded", "false");
   button.disabled = false;
+}
+
+function renderRecommendationEmptyState() {
+  return `
+    <p class="recommendation-empty" role="status">${t("studySpacesTooFar", { distance: RECOMMENDATION_DISTANCE_LIMIT_KM })}</p>
+  `;
 }
 
 function collapseHowItWorks() {
@@ -1209,11 +1230,10 @@ function setWeatherLoading(message = currentLanguage === "zh" ? "正在加载天
     if (!button) return;
     button.disabled = true;
   });
-  $("weatherTemperature").textContent = "Loading...";
-  $("weatherDescription").textContent = message;
-  $("weatherDescription").hidden = false;
-  $("weatherTemperature").textContent = currentLanguage === "zh" ? "加载中..." : "Loading...";
-  setWeatherSummary(currentLanguage === "zh" ? "正在等待 AI 简报..." : "Waiting for the LLM summary...");
+  $("weatherTemperature").textContent = "--";
+  $("weatherDescription").textContent = "";
+  $("weatherDescription").hidden = true;
+  setWeatherSummaryLoading("");
   $("weatherMeta").textContent = currentLanguage === "zh" ? "正在从 Google Weather API 获取当前天气。" : "Fetching current conditions from Google Weather API.";
 }
 
@@ -1405,9 +1425,10 @@ function setWeatherSummary(value) {
 }
 
 function setWeatherSummaryLoading(message = "Generating a short weather summary") {
+  const label = String(message || "").trim();
   $("weatherSummary").innerHTML = `
     <span class="weather-summary-loading" role="status" aria-live="polite">
-      <span class="weather-summary-loading-text">${escapeHtml(message)}</span>
+      ${label ? `<span class="weather-summary-loading-text">${escapeHtml(label)}</span>` : ""}
       <span class="weather-summary-loading-dots" aria-hidden="true"><span></span><span></span><span></span></span>
     </span>
   `;
@@ -1487,8 +1508,8 @@ async function refreshWeatherForStart(start = getStartPoint(), force = false, op
   weatherUpdatedForKey = weatherKey;
   animateClass($("weatherCard"), "weather-card--loading");
   setWeatherLoading(currentLanguage === "zh"
-    ? `正在查询 ${start.label || "已选出发点"} 附近的天气...`
-    : `Checking weather near ${start.label || "your selected start point"}...`);
+    ? `正在查询天气...`
+    : `Checking weather...`);
   try {
     const response = await fetch(weatherApiUrl(start, googleMapsBrowserKey));
     const data = await response.json();
@@ -4321,7 +4342,9 @@ $("updateRecommendations").addEventListener("click", () => {
   if (controls.scenario.value === "nearest") refreshRoutes();
 });
 $("loadMoreStudySpaces").addEventListener("click", () => {
-  recommendationDisplayLimit = recommendationDisplayLimit >= 5 ? 2 : 5;
+  recommendationDisplayLimit = recommendationDisplayLimit >= RECOMMENDATION_EXPANDED_LIMIT
+    ? RECOMMENDATION_COLLAPSED_LIMIT
+    : RECOMMENDATION_EXPANDED_LIMIT;
   render();
 });
 $("expandHowItWorks").addEventListener("click", toggleHowItWorks);

@@ -672,6 +672,43 @@ html[lang="zh-CN"] h3 {
   margin-top: 12px;
 }
 
+.recommendation-empty {
+  position: relative;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  grid-column: 1 / -1;
+  gap: 12px;
+  align-items: center;
+  min-height: 86px;
+  margin: 2px 0;
+  border: 1px solid rgba(39, 103, 168, 0.18);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(39, 103, 168, 0.1), rgba(255, 255, 255, 0.84) 62%),
+    #fff;
+  box-shadow: 0 12px 28px rgba(24, 32, 42, 0.08);
+  color: #405065;
+  padding: 18px 16px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.recommendation-empty::before {
+  content: "i";
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(39, 103, 168, 0.18);
+  border-radius: 50%;
+  background: rgba(39, 103, 168, 0.1);
+  color: var(--blue);
+  font-size: 0.95rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
 .expandable-action {
   position: relative;
   display: inline-flex;
@@ -2937,6 +2974,10 @@ html[lang="zh-CN"] .weather-header .weather-choice-button {
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
+}
+
+.recommendation-grid:has(.recommendation-empty) {
+  gap: 0;
 }
 
 .place-card {
