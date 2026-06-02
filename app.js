@@ -340,7 +340,6 @@ const I18N = {
     heroTitle: "Start Planning your next journey",
     heroText: "Choose your starting point, ask the agent anything, and get study-space recommendations or live route plans.",
     llmLabel: "LLM",
-    llmSwitchHint: "Tap to switch",
     apiKeys: "API Keys",
     chooseStart: "Choose where to start",
     startingLocation: "Click on map or use your current location",
@@ -440,6 +439,8 @@ const I18N = {
     chatModelSectionBody: "Switch the main chat model for this page. Tool choice and the final answer will follow your selection.",
     chatModelCurrent: "Current chat model: {model}",
     chatModelHelper: "GLM-5 is the higher-capability option.",
+    chatModelDetailsHint: "Click to view details",
+    apiKeysDetailsHint: "Click to view details",
     chatModelRetryHint: "You can try switching to the other model and retrying.",
     chatModelSwitchUnavailable: "Model switching is currently unavailable.",
     externalConfirmTitle: "Open external link",
@@ -489,7 +490,6 @@ const I18N = {
     heroTitle: "使用 Agent 规划行程",
     heroText: "首先选择你的位置，再向 Agent 提出需求，即可获取附近的工作学习空间推荐、实时路线规划、路线交互式地图、交通情况与天气辅助建议。",
     llmLabel: "大语言模型",
-    llmSwitchHint: "点击切换",
     apiKeys: "外部 API",
     chooseStart: "选择出发地点",
     startingLocation: "点击地图、拖动标记，或使用当前位置。",
@@ -589,6 +589,8 @@ const I18N = {
     chatModelSectionBody: "切换当前页面主对话所使用的模型。",
     chatModelCurrent: "当前对话模型：{model}",
     chatModelHelper: "GLM-5 是更高级的模型。",
+    chatModelDetailsHint: "点击查看详情",
+    apiKeysDetailsHint: "点击查看详情",
     chatModelRetryHint: "你可以尝试切换到另一个模型后重试。",
     chatModelSwitchUnavailable: "当前暂时无法切换模型。",
     externalConfirmTitle: "打开外部链接",
@@ -675,8 +677,9 @@ function applyLanguage() {
     [".hero-panel h1", "heroTitle"],
     [".hero-text", "heroText"],
     ["#llmSignalTile span", "llmLabel"],
-    ["#llmSignalAction", "llmSwitchHint"],
+    ["#llmSignalTile .signal-action-text", "chatModelDetailsHint"],
     ["#routesSignalTile span", "apiKeys"],
+    ["#routesSignalTile .signal-action-text", "apiKeysDetailsHint"],
     [".start-module .left-section-title", "chooseStart"],
     ["label[for='startPoint']", "startingLocation"],
     [".select-note", "selectCampus"],
@@ -898,6 +901,34 @@ function getActiveChatModelOption() {
 
 function getRequestedChatModelId() {
   return getActiveChatModelOption()?.id || "";
+}
+
+function renderSignalModelButton(option) {
+  if (!option) return "";
+  const active = option.id === getRequestedChatModelId();
+  return `
+    <button
+      type="button"
+      class="signal-model-option${active ? " is-active" : ""}"
+      data-chat-model-id="${escapeHtml(option.id)}"
+      aria-pressed="${active ? "true" : "false"}"
+    >
+      <strong>${escapeHtml(option.label)}</strong>
+    </button>
+  `;
+}
+
+function renderLlmSignalPopover() {
+  const popover = $("llmSignalPopover");
+  if (!popover) return;
+  const options = getChatModelOptions();
+  if (!options.length) {
+    popover.innerHTML = "";
+    popover.hidden = true;
+    return;
+  }
+  popover.hidden = false;
+  popover.innerHTML = options.map((option) => renderSignalModelButton(option)).join("");
 }
 
 function updateLlmModelHint() {
@@ -1183,6 +1214,7 @@ function render() {
   const context = getContext();
 
   $("llmSignal").textContent = translateStatusText(integrationStatus.llm);
+  renderLlmSignalPopover();
   $("routesSignal").textContent = translateStatusText(integrationStatus.routes);
   const mapsSig = $("mapsSignal"); if (mapsSig) mapsSig.textContent = translateStatusText(integrationStatus.maps);
   const mcpSig = $("mcpSignal"); if (mcpSig) mcpSig.textContent = translateStatusText(integrationStatus.mcp);
@@ -4593,6 +4625,7 @@ const toolInfoModalEl = $("toolInfoModal");
 const toolInfoTextEl = $("toolInfoText");
 const closeToolInfoBtn = $("closeToolInfo");
 const llmSignalTile = $("llmSignalTile");
+const llmSignalPopover = $("llmSignalPopover");
 const routesSignalTile = $("routesSignalTile");
 const agentToolsTile = $("agentToolsTile");
 let pendingExternalHref = null;
@@ -4909,7 +4942,10 @@ function hideStartupWaitModal() {
 
 function bindSignalTileInfo(tile, kind) {
   if (!tile) return;
-  tile.addEventListener("click", () => showToolInfo(kind));
+  tile.addEventListener("click", (event) => {
+    if (event.target.closest("[data-chat-model-id]")) return;
+    showToolInfo(kind);
+  });
   tile.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
@@ -4931,6 +4967,16 @@ bindSignalTileInfo(llmSignalTile, "llm");
 bindSignalTileInfo(routesSignalTile, "routes");
 bindSignalTileInfo(agentToolsTile, "agent");
 
+if (llmSignalPopover) {
+  llmSignalPopover.addEventListener("click", (event) => {
+    const modelButton = event.target.closest("[data-chat-model-id]");
+    if (!modelButton) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedChatModel(modelButton.dataset.chatModelId);
+  });
+}
+
 document.querySelectorAll(".weather-metric-card[data-weather-metric]").forEach((card) => {
   const metric = card.dataset.weatherMetric;
   card.addEventListener("click", () => showToolInfo(metric));
@@ -4943,26 +4989,18 @@ document.querySelectorAll(".weather-metric-card[data-weather-metric]").forEach((
 
 // Fallback delegated handlers in case tiles are re-rendered or late-mounted.
 document.addEventListener("click", (event) => {
-  const tile = event.target.closest("#llmSignalTile, #routesSignalTile, #agentToolsTile");
+  const tile = event.target.closest("#routesSignalTile, #agentToolsTile");
   if (!tile) return;
-  const kind = tile.id === "routesSignalTile"
-    ? "routes"
-    : tile.id === "agentToolsTile"
-      ? "agent"
-      : "llm";
+  const kind = tile.id === "routesSignalTile" ? "routes" : "agent";
   showToolInfo(kind);
 });
 
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Enter" && event.key !== " ") return;
-  const tile = event.target.closest("#llmSignalTile, #routesSignalTile, #agentToolsTile");
+  const tile = event.target.closest("#routesSignalTile, #agentToolsTile");
   if (!tile) return;
   event.preventDefault();
-  const kind = tile.id === "routesSignalTile"
-    ? "routes"
-    : tile.id === "agentToolsTile"
-      ? "agent"
-      : "llm";
+  const kind = tile.id === "routesSignalTile" ? "routes" : "agent";
   showToolInfo(kind);
 });
 

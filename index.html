@@ -19,14 +19,16 @@
           </p>
         </div>
         <div class="city-signal" aria-label="live campus signals">
-          <div id="llmSignalTile" class="signal-tile" role="button" tabindex="0" aria-label="About LLM status">
+          <div id="llmSignalTile" class="signal-tile signal-tile--interactive" role="group" tabindex="0" aria-label="Conversation model selector">
             <span>LLM</span>
             <strong id="llmSignal">Checking</strong>
-            <small id="llmSignalAction" class="signal-action-text">Tap to switch</small>
+            <span class="signal-action-text" aria-hidden="true"></span>
+            <div id="llmSignalPopover" class="signal-model-popover" aria-label="Select conversation model" hidden></div>
           </div>
-          <div id="routesSignalTile" class="signal-tile" role="button" tabindex="0" aria-label="About API Keys status">
+          <div id="routesSignalTile" class="signal-tile signal-tile--hint" role="button" tabindex="0" aria-label="About API Keys status">
             <span>API Keys</span>
             <strong id="routesSignal">Checking</strong>
+            <span class="signal-action-text" aria-hidden="true"></span>
           </div>
         </div>
       </section>
