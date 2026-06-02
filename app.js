@@ -438,7 +438,9 @@ const I18N = {
     chatModelSectionTitle: "Conversation model",
     chatModelSectionBody: "Switch the main chat model for this page. Tool choice and the final answer will follow your selection.",
     chatModelCurrent: "Current chat model: {model}",
-    chatModelHelper: "GLM-5 is the higher-capability option.",
+    chatModelHelperTitle: "About this model",
+    chatModelHelperQwen: "Qwen3-235B-A22B is Alibaba Qwen’s flagship open-weight MoE model, with 235B total parameters and about 22B active parameters, suitable for reasoning, coding, multilingual tasks, and agent-style tool use.",
+    chatModelHelperGlm: "GLM-5 is Z.ai / Zhipu’s large-scale MoE model, with about 744B total parameters and 40B active parameters, mainly designed for complex coding and long-horizon agent workflows.",
     chatModelDetailsHint: "Click to view details",
     apiKeysDetailsHint: "Click to view details",
     chatModelRetryHint: "You can try switching to the other model and retrying.",
@@ -588,7 +590,9 @@ const I18N = {
     chatModelSectionTitle: "对话模型",
     chatModelSectionBody: "切换当前页面主对话所使用的模型。",
     chatModelCurrent: "当前对话模型：{model}",
-    chatModelHelper: "GLM-5 是更高级的模型。",
+    chatModelHelperTitle: "关于该模型",
+    chatModelHelperQwen: "Qwen3-235B-A22B 是阿里 Qwen 系列的旗舰开源 MoE 模型，总参数 235B、激活参数约 22B，适合推理、代码、多语言任务和 Agent 工具调用场景。",
+    chatModelHelperGlm: "GLM-5 是 Z.ai / 智谱推出的大规模 MoE 模型，总参数约 744B、激活参数约 40B，主要面向复杂代码、软件工程和长周期 Agent 任务。",
     chatModelDetailsHint: "点击查看详情",
     apiKeysDetailsHint: "点击查看详情",
     chatModelRetryHint: "你可以尝试切换到另一个模型后重试。",
@@ -631,7 +635,7 @@ const I18N = {
     walkEstimateLabel: "步行预估",
     minuteUnitShort: "分钟",
     usingTool: "正在使用{tool}工具",
-    understandingRequest: "正在理解您的请求",
+    understandingRequest: "正在理解您的需求",
   },
 };
 
@@ -4810,6 +4814,10 @@ function renderGenericToolInfo(kind, overrideContent = "") {
 function renderLlmToolInfo() {
   const activeModel = getActiveChatModelOption();
   const currentLabel = activeModel?.label || formatModelDisplayName(integrationStatus.llm) || t("chatModelSwitchUnavailable");
+  const modelIdentity = `${activeModel?.id || ""} ${activeModel?.model || ""} ${activeModel?.label || ""}`.toLowerCase();
+  const helperText = modelIdentity.includes("glm")
+    ? t("chatModelHelperGlm")
+    : t("chatModelHelperQwen");
   const modelButtons = getChatModelOptions().length
     ? `
       <div class="chat-model-switcher" role="group" aria-label="${escapeHtml(t("chatModelSectionTitle"))}">
@@ -4842,7 +4850,10 @@ function renderLlmToolInfo() {
           <p>${escapeHtml(t("chatModelSectionBody"))}</p>
         </div>
         ${modelButtons}
-        <p class="chat-model-helper">${escapeHtml(t("chatModelHelper"))}</p>
+        <div class="chat-model-helper-block">
+          <strong>${escapeHtml(t("chatModelHelperTitle"))}</strong>
+          <p class="chat-model-helper">${escapeHtml(helperText)}</p>
+        </div>
       </div>
     </section>
   `;
