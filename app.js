@@ -947,7 +947,7 @@ let latestWeatherData = null;
 let latestWeatherStart = null;
 // When true, selecting or setting a start point will auto-refresh weather.
 // Set to false to require the user to click the "Update weather data at" buttons.
-let autoRefreshWeatherOnSelect = false;
+let autoRefreshWeatherOnSelect = true;
 let tflStatusRequestId = 0;
 let latestTflStatusData = null;
 let latestNavigationData = null;
@@ -955,6 +955,11 @@ const chatHistory = [];
 let lastAnimatedChatMessageKey = "";
 let startupWaitModalShown = false;
 let startupWaitModalTimer = null;
+const INTEGRATION_RETRY_BASE_MS = 1500;
+const INTEGRATION_RETRY_MAX_MS = 12000;
+let integrationRetryDelayMs = INTEGRATION_RETRY_BASE_MS;
+let integrationRetryTimer = null;
+let weatherAutoRefreshRequested = false;
 // Streamed answers render on animation frames so text flows continuously instead
 // of popping in as visibly separate chunks.
 const STREAM_RENDER_FRAME_DELAY_MS = 16;
@@ -3141,6 +3146,16 @@ function initStartPickerMap() {
 
   updateStartMapStatus();
   setGoogleMapsStatus(true, routesKeyConfigured);
+  if (!latestWeatherData) {
+    void refreshWeatherForStart(
+      {
+        ...getStartPoint(),
+        weatherScope: "start point",
+      },
+      true,
+      { preserveOnError: true },
+    );
+  }
   if (pendingRoutePreview) renderRoutePreview(pendingRoutePreview);
 }
 
@@ -4226,12 +4241,32 @@ async function updateWeatherAtCurrentLocation() {
 }
 
 async function refreshDefaultWeatherScope() {
-  setWeatherScope("current location");
-  if (!navigator.geolocation) return;
-  const permissionState = await readGeolocationPermissionState();
-  if (permissionState === "granted") {
-    await updateWeatherAtCurrentLocation();
-  }
+  const start = getStartPoint();
+  setWeatherScope("start point", start?.label);
+  await refreshWeatherForStart(
+    {
+      ...start,
+      weatherScope: "start point",
+    },
+    true,
+    { preserveOnError: true },
+  );
+}
+
+function clearIntegrationRetry() {
+  integrationRetryDelayMs = INTEGRATION_RETRY_BASE_MS;
+  if (!integrationRetryTimer) return;
+  window.clearTimeout(integrationRetryTimer);
+  integrationRetryTimer = null;
+}
+
+function scheduleIntegrationRetry() {
+  if (integrationRetryTimer) return;
+  integrationRetryTimer = window.setTimeout(() => {
+    integrationRetryTimer = null;
+    integrationRetryDelayMs = Math.min(INTEGRATION_RETRY_MAX_MS, Math.round(integrationRetryDelayMs * 1.6));
+    void refreshIntegrationStatus();
+  }, integrationRetryDelayMs);
 }
 
 async function refreshIntegrationStatus() {
@@ -4250,10 +4285,15 @@ async function refreshIntegrationStatus() {
     if (data.googleMapsBrowserKey) {
       googleMapsBrowserKey = data.googleMapsBrowserKey;
       loadGoogleStartMap(data.googleMapsBrowserKey);
-      void refreshDefaultWeatherScope();
+      clearIntegrationRetry();
+      if (!weatherAutoRefreshRequested) {
+        weatherAutoRefreshRequested = true;
+        void refreshDefaultWeatherScope();
+      }
     } else {
       $("startMapStatus").textContent = "Google Maps browser key missing; use the campus selector below.";
       renderWeatherError("Google Maps browser key missing.");
+      scheduleIntegrationRetry();
     }
   } catch (error) {
     integrationStatus = {
@@ -4265,6 +4305,7 @@ async function refreshIntegrationStatus() {
     };
     $("startMapStatus").innerHTML = `Local API not connected. Run <code>PORT=8001 python3 server.py</code>, or open this page with <code>?api=http://localhost:8001</code> if you use another port.`;
     renderWeatherError("Local API is not connected, so the browser key is not available.");
+    scheduleIntegrationRetry();
   }
   render();
 }
