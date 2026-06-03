@@ -412,7 +412,7 @@ const I18N = {
     weather: "Weather",
     atYour: "At your",
     startPoint: "start point",
-    currentLocation: "current location",
+    currentLocation: "My location",
     updateWeatherAt: "Update weather data at",
     destinationButton: "Destination",
     today: "Today",
@@ -450,7 +450,7 @@ const I18N = {
     startupWaitTitle: "Waking up the server",
     openNewTab: "Open in new tab",
     cancel: "Cancel",
-    mapPoint: "Map point {lat}, {lng}",
+    mapPoint: "Map selection {lat}, {lng}",
     mapPointSelected: "{label} selected",
     mapGuidance: "Click the map, drag the marker, or use your current location.",
     locationRequiresHttps: "Location requires HTTPS or localhost.",
@@ -562,9 +562,9 @@ const I18N = {
     how3Title: "3. 得到可执行建议",
     how3Body: "Agent 会结合你的起点、路线、天气和其他可用实时信息给出实用建议。涉及导航时，页面还会显示交互式路线预览，并在可用时提供站点、线路和交通方式等细节。请注意由于 Google Maps 的数据限制，路线预览功能<strong class=\"how-inline-emphasis\">在中国大陆可能无法使用</strong>。",
     weather: "天气",
-    atYour: "目前显示的天气位置为",
+    atYour: "天气位置为",
     startPoint: "图选位置",
-    currentLocation: "当前位置",
+    currentLocation: "我的位置",
     updateWeatherAt: "更新天气位置",
     destinationButton: "目的地",
     today: "今天",
@@ -1071,7 +1071,7 @@ let weatherRequestId = 0;
 let weatherUpdatedForKey = "";
 let weatherSummaryRequestId = 0;
 let weatherSummaryUpdatedForKey = "";
-let lastWeatherScope = "current location";
+let lastWeatherScope = "My location";
 let lastWeatherScopeLocation = "";
 let latestWeatherData = null;
 let latestWeatherStart = null;
@@ -1090,6 +1090,7 @@ const INTEGRATION_RETRY_MAX_MS = 12000;
 let integrationRetryDelayMs = INTEGRATION_RETRY_BASE_MS;
 let integrationRetryTimer = null;
 let weatherAutoRefreshRequested = false;
+const weatherNearbyLabelCache = new Map();
 // Streamed answers render on animation frames so text flows continuously instead
 // of popping in as visibly separate chunks.
 const STREAM_RENDER_FRAME_DELAY_MS = 16;
@@ -1392,6 +1393,7 @@ function setWeatherButtonReady() {
 }
 
 function setWeatherScope(scope = "start point", locationName = "") {
+  const prefix = $("weatherScopePrefix");
   const label = $("weatherScopeLabel");
   if (!label) return;
   lastWeatherScope = scope;
@@ -1399,9 +1401,22 @@ function setWeatherScope(scope = "start point", locationName = "") {
   const isDestination = scope === "destination";
   const isCurrentLocation = scope === "current location";
   const cleanLocationName = String(locationName || "").trim();
-  label.textContent = isDestination && cleanLocationName
-    ? `${t("destination").toLowerCase()}: ${cleanLocationName}`
-    : (isDestination ? t("destination").toLowerCase() : (isCurrentLocation ? t("currentLocation") : t("startPoint")));
+  if (prefix) {
+    if (isDestination) {
+      prefix.textContent = t("atYour");
+    } else if (cleanLocationName && currentLanguage === "zh") {
+      prefix.textContent = t("atYour");
+    } else {
+      prefix.textContent = cleanLocationName ? "" : t("atYour");
+    }
+  }
+  if (isDestination && cleanLocationName) {
+    label.textContent = `${t("destination").toLowerCase()}: ${cleanLocationName}`;
+  } else if (!isDestination && cleanLocationName) {
+    label.textContent = cleanLocationName;
+  } else {
+    label.textContent = isDestination ? t("destination").toLowerCase() : (isCurrentLocation ? t("currentLocation") : t("startPoint"));
+  }
   label.classList.toggle("destination", isDestination);
   $("updateWeatherCurrentButton")?.classList.toggle("is-active", isCurrentLocation);
   $("updateWeatherMapButton")?.classList.toggle("is-active", scope === "start point");
@@ -1456,7 +1471,8 @@ function renderWeatherData(data, start) {
   const weatherScope = ["current location", "destination", "start point"].includes(start?.weatherScope)
     ? start.weatherScope
     : "start point";
-  setWeatherScope(weatherScope, start?.label);
+  const nearbyScopeLabel = start?.nearbyFeatureName ? formatNearbyWeatherLabel(start.nearbyFeatureName) : start?.weatherScopeLabel;
+  setWeatherScope(weatherScope, nearbyScopeLabel || (weatherScope === "destination" ? start?.label : ""));
   const weatherCard = $("weatherCard");
   if (weatherCard) {
     weatherCard.classList.remove("weather-card--loading");
@@ -3303,16 +3319,14 @@ function initStartPickerMap() {
 
   updateStartMapStatus();
   setGoogleMapsStatus(true, routesKeyConfigured);
-  if (!latestWeatherData) {
-    void refreshWeatherForStart(
-      {
-        ...getStartPoint(),
-        weatherScope: "start point",
-      },
-      true,
-      { preserveOnError: true },
-    );
-  }
+  void refreshWeatherForNearbyStart(
+    {
+      ...getStartPoint(),
+      weatherScope: "start point",
+    },
+    true,
+    { preserveOnError: true },
+  );
   if (pendingRoutePreview) renderRoutePreview(pendingRoutePreview);
 }
 
@@ -4054,7 +4068,14 @@ function maybeShowMainlandChinaCoverageWarning(lat, lng) {
   showToolInfo("mainlandChinaCoverage", MAINLAND_CHINA_WARNING_TEXT);
 }
 
-function setMapStartCoordinates(lat, lng, statusMessage = "") {
+async function refreshWeatherForNearbyStart(start, force = true, options = {}) {
+  const fallbackLabel = start?.weatherScope === "current location" ? t("currentLocation") : t("startPoint");
+  const weatherStart = await withNearbyWeatherScopeLabel(start, fallbackLabel);
+  setWeatherScope(weatherStart.weatherScope || "start point", weatherStart.weatherScopeLabel);
+  return refreshWeatherForStart(weatherStart, force, options);
+}
+
+function setMapStartCoordinates(lat, lng, statusMessage = "", weatherScope = "start point") {
   startOffsets.mapSelection = {
     label: "Map selection",
     lat,
@@ -4068,7 +4089,16 @@ function setMapStartCoordinates(lat, lng, statusMessage = "") {
   updateStartMapStatus(statusMessage);
   render();
   maybeShowMainlandChinaCoverageWarning(lat, lng);
-  if (autoRefreshWeatherOnSelect) void refreshWeatherForStart(getStartPoint(), true);
+  if (autoRefreshWeatherOnSelect) {
+    void refreshWeatherForNearbyStart(
+      {
+        ...getStartPoint(),
+        weatherScope,
+      },
+      true,
+      { preserveOnError: true },
+    );
+  }
   if (controls.scenario.value === "nearest") refreshRoutes();
 }
 
@@ -4258,7 +4288,7 @@ async function requestCurrentLocation() {
     const { latitude, longitude, accuracy } = position.coords;
     const accuracyText = Number.isFinite(accuracy) ? ` ${t("locationAccuracyAbout", { meters: Math.round(accuracy) })}` : "";
     const sourceText = position.source === "last known" ? t("locationUsingLastKnownShort") : t("locationUsingCurrent");
-    setMapStartCoordinates(latitude, longitude, `${sourceText}${accuracyText}`);
+    setMapStartCoordinates(latitude, longitude, `${sourceText}${accuracyText}`, "current location");
   } catch (error) {
     $("startMapStatus").textContent = geolocationErrorMessage(error);
   } finally {
@@ -4283,26 +4313,100 @@ function browserGeocodePlaceText(placeText) {
   if (!address) {
     return Promise.reject(new Error("The navigation destination is missing."));
   }
-  if (!window.google?.maps?.Geocoder) {
-    return Promise.reject(new Error("Google Maps is not ready for destination lookup yet."));
-  }
+  return apiFetch(`/api/geocode-address?address=${encodeURIComponent(address)}`)
+    .then((response) => {
+      if (!response.ok) throw new Error(`Could not find weather coordinates for ${address}.`);
+      return response.json();
+    });
+}
 
-  const geocoder = new google.maps.Geocoder();
-  return new Promise((resolve, reject) => {
-    geocoder.geocode({ address }, (results, status) => {
-      const result = Array.isArray(results) ? results[0] : null;
-      const location = result?.geometry?.location;
-      if (status !== "OK" || !location) {
-        reject(new Error(`Could not find weather coordinates for ${address}.`));
-        return;
-      }
-      resolve({
-        name: result.formatted_address || address,
-        lat: location.lat(),
-        lng: location.lng(),
+function cleanNearbyFeatureName(value) {
+  const text = String(value || "")
+    .replace(/\s+/g, " ")
+    .replace(/\s*,\s*(United Kingdom|UK|England|Greater London)$/i, "")
+    .trim();
+  if (!text || text.length > 36) return "";
+  if (/unnamed/i.test(text)) return "";
+  if (/^[A-Z0-9]{2,4}\s?[A-Z0-9]{2,4}$/i.test(text)) return "";
+  if (/^[A-Z0-9]{4,}\+[A-Z0-9]{2,}$/i.test(text)) return "";
+  return text;
+}
+
+function chooseShortNearbyFeature(results = []) {
+  const componentTypePriority = [
+    "route",
+    "point_of_interest",
+    "premise",
+    "neighborhood",
+    "sublocality",
+    "sublocality_level_1",
+    "locality",
+  ];
+  const candidates = [];
+
+  results.forEach((result, resultIndex) => {
+    (result?.address_components || []).forEach((component) => {
+      const types = component?.types || [];
+      const priority = componentTypePriority.findIndex((type) => types.includes(type));
+      if (priority === -1) return;
+      [component.long_name, component.short_name].forEach((name) => {
+        const cleanName = cleanNearbyFeatureName(name);
+        if (!cleanName) return;
+        candidates.push({ name: cleanName, priority, resultIndex });
       });
     });
   });
+
+  const unique = Array.from(new Map(candidates.map((candidate) => [candidate.name.toLowerCase(), candidate])).values());
+  unique.sort((left, right) =>
+    left.priority - right.priority ||
+    left.resultIndex - right.resultIndex ||
+    left.name.length - right.name.length
+  );
+  if (unique[0]?.name) return unique[0].name;
+
+  for (const result of results) {
+    const firstAddressPart = cleanNearbyFeatureName(String(result?.formatted_address || "").split(",")[0]);
+    if (firstAddressPart) return firstAddressPart;
+  }
+  return "";
+}
+
+function formatNearbyWeatherLabel(name) {
+  const cleanName = cleanNearbyFeatureName(name);
+  if (!cleanName) return "";
+  return currentLanguage === "zh" ? `${cleanName} 附近` : `Near ${cleanName}`;
+}
+
+function resolveNearbyWeatherFeatureName(lat, lng) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return Promise.resolve("");
+  const cacheKey = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+  if (weatherNearbyLabelCache.has(cacheKey)) {
+    return Promise.resolve(weatherNearbyLabelCache.get(cacheKey));
+  }
+
+  return apiFetch(`/api/reverse-geocode?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`)
+    .then((response) => {
+      if (!response.ok) throw new Error("Reverse geocoding failed.");
+      return response.json();
+    })
+    .then((data) => {
+      const featureName = chooseShortNearbyFeature([data]);
+      if (featureName) weatherNearbyLabelCache.set(cacheKey, featureName);
+      return featureName;
+    })
+    .catch(() => "");
+}
+
+async function withNearbyWeatherScopeLabel(start, fallbackLabel = "") {
+  const lat = Number(start?.lat);
+  const lng = Number(start?.lng);
+  const nearbyFeatureName = await resolveNearbyWeatherFeatureName(lat, lng);
+  return {
+    ...start,
+    nearbyFeatureName,
+    weatherScopeLabel: nearbyFeatureName ? formatNearbyWeatherLabel(nearbyFeatureName) : fallbackLabel,
+  };
 }
 
 async function resolveWeatherDestination() {
@@ -4354,16 +4458,16 @@ async function updateWeatherAtDestination() {
 
 async function updateWeatherAtMapSelection() {
   try {
-    await refreshWeatherForStart(
+    await refreshWeatherForNearbyStart(
       {
-        ...getStartPoint(),
+        ...startOffsets.mapSelection,
         weatherScope: "start point",
       },
       true,
       { preserveOnError: true, throwOnError: true },
     );
   } catch (error) {
-    showWeatherLocationAlert(error.message || "Weather data is unavailable for the selected map point.");
+    showWeatherLocationAlert(error.message || "Weather data is unavailable for the selected map selection.");
   }
 }
 
@@ -4382,7 +4486,7 @@ async function updateWeatherAtCurrentLocation() {
   try {
     const position = await resolveCurrentPosition();
     const { latitude, longitude } = position.coords;
-    await refreshWeatherForStart(
+    await refreshWeatherForNearbyStart(
       {
         label: t("currentLocation"),
         lat: latitude,
@@ -4399,8 +4503,8 @@ async function updateWeatherAtCurrentLocation() {
 
 async function refreshDefaultWeatherScope() {
   const start = getStartPoint();
-  setWeatherScope("start point", start?.label);
-  await refreshWeatherForStart(
+  setWeatherScope("start point", "");
+  await refreshWeatherForNearbyStart(
     {
       ...start,
       weatherScope: "start point",

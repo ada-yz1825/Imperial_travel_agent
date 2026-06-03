@@ -1510,6 +1510,42 @@ def geocode_location(text):
     }
 
 
+def reverse_geocode_location(lat, lng):
+    if not isinstance(lat, (int, float)) or not isinstance(lng, (int, float)):
+        return None
+    api_key = get_google_maps_api_key()
+    if not api_key:
+        return None
+    params = urllib.parse.urlencode({"latlng": f"{lat},{lng}", "key": api_key, "language": "en"})
+    request = urllib.request.Request(
+        f"{GOOGLE_GEOCODING_API_URL}?{params}",
+        headers={"User-Agent": APP_NAME},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            data = json.loads(response.read().decode("utf-8", errors="replace"))
+    except Exception:
+        return None
+
+    if data.get("status") != "OK":
+        return None
+    results = data.get("results") or []
+    if not results:
+        return None
+    result = results[0]
+    location = result.get("geometry", {}).get("location", {})
+    result_lat = location.get("lat")
+    result_lng = location.get("lng")
+    return {
+        "formatted_address": result.get("formatted_address") or "",
+        "address_components": result.get("address_components") or [],
+        "place_id": result.get("place_id") or "",
+        "lat": result_lat if isinstance(result_lat, (int, float)) else lat,
+        "lng": result_lng if isinstance(result_lng, (int, float)) else lng,
+    }
+
+
 def detect_travel_mode(query):
     text = str(query or "").lower()
     if any(word in text for word in ["walk", "walking", "步行", "走路", "走过去"]):

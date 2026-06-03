@@ -21,6 +21,8 @@ from navigator_core import (
     get_ollama_model,
     get_openai_model,
     get_together_model,
+    geocode_location,
+    reverse_geocode_location,
     strip_reasoning_text,
 )
 
@@ -285,6 +287,14 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
             self.handle_tfl_status()
             return
 
+        if self.path.startswith("/api/reverse-geocode"):
+            self.handle_reverse_geocode()
+            return
+
+        if self.path.startswith("/api/geocode-address"):
+            self.handle_geocode_address()
+            return
+
         super().do_GET()
 
     def do_POST(self):
@@ -356,6 +366,35 @@ class ImperialNavigatorHandler(SimpleHTTPRequestHandler):
             self.write_json({"error": f"TfL status request failed: {detail}"}, status=error.code)
         except Exception as error:
             self.write_json({"error": f"TfL status unavailable: {error}"}, status=503)
+
+    def handle_reverse_geocode(self):
+        try:
+            parsed = urllib.parse.urlparse(self.path)
+            query = urllib.parse.parse_qs(parsed.query)
+            lat = float((query.get("lat") or [""])[0])
+            lng = float((query.get("lng") or [""])[0])
+            result = reverse_geocode_location(lat, lng)
+            if not result:
+                self.write_json({"error": "Reverse geocoding failed."}, status=503)
+                return
+            self.write_json(result)
+        except (TypeError, ValueError):
+            self.write_json({"error": "Invalid latitude or longitude."}, status=400)
+        except Exception as error:
+            self.write_json({"error": f"Reverse geocoding unavailable: {error}"}, status=503)
+
+    def handle_geocode_address(self):
+        try:
+            parsed = urllib.parse.urlparse(self.path)
+            query = urllib.parse.parse_qs(parsed.query)
+            address = str((query.get("address") or [""])[0]).strip()
+            result = geocode_location(address)
+            if not result:
+                self.write_json({"error": "Geocoding failed."}, status=503)
+                return
+            self.write_json(result)
+        except Exception as error:
+            self.write_json({"error": f"Geocoding unavailable: {error}"}, status=503)
 
     def read_json(self):
         length = int(self.headers.get("Content-Length", "0"))
