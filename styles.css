@@ -312,6 +312,7 @@ input {
 .app-shell.language-switch-reveal .hero-copy,
 .app-shell.language-switch-reveal .city-signal,
 .app-shell.language-switch-reveal .start-module,
+.app-shell.language-switch-reveal .shuttle-module,
 .app-shell.language-switch-reveal .agent-module,
 .app-shell.language-switch-reveal .weather-module,
 .app-shell.language-switch-reveal .tfl-module,
@@ -333,6 +334,10 @@ input {
 
 .app-shell.language-switch-reveal .start-module {
   animation-delay: 70ms;
+}
+
+.app-shell.language-switch-reveal .shuttle-module {
+  animation-delay: 95ms;
 }
 
 .app-shell.language-switch-reveal .agent-module {

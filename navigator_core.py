@@ -1864,7 +1864,7 @@ def finalize_navigation_answer(answer, route_request, routes, study_options):
         answer = remove_unavailable_study_note(answer)
     with_source_note = append_navigation_source_note(answer, route_request, routes)
     with_destination_context = append_destination_context_note(with_source_note, route_request)
-    return strip_reasoning_text(append_imperial_shuttle_note(with_destination_context, route_request))
+    return strip_reasoning_text(with_destination_context)
 
 
 def append_destination_context_note(answer, route_request):
@@ -2018,26 +2018,6 @@ def campus_for_shuttle_place(place):
         if key in name:
             return label
     return None
-
-
-def append_imperial_shuttle_note(answer, route_request):
-    context = imperial_shuttle_context(route_request)
-    if not context["applies"]:
-        return answer
-    if re.search(r"\bshuttle\b|班车|穿梭巴士|校车", answer, flags=re.IGNORECASE):
-        return answer
-
-    if route_request.get("language") == "Chinese":
-        note = (
-            "另外，Imperial 在工作日运营连接 South Kensington、White City 和 Hammersmith 的班车；"
-            f"如果你需要，可以使用下方链接查看具体时间表：[Imperial shuttle]({IMPERIAL_SHUTTLE_URL})。"
-        )
-    else:
-        note = (
-            "Also, Imperial runs a weekday shuttle connecting South Kensington, White City and Hammersmith; "
-            f"use [Imperial shuttle]({IMPERIAL_SHUTTLE_URL}) to check the timetable."
-        )
-    return f"{answer.rstrip()}\n\n{note}"
 
 
 def remove_unavailable_study_note(answer):
