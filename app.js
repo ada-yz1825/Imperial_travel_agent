@@ -418,6 +418,12 @@ const I18N = {
     today: "Today",
     weatherNotLoaded: "Weather not loaded",
     weatherHint: "Use your selected start point, current location, or navigation destination.",
+    weatherUnavailable: "Weather unavailable",
+    weatherUnavailableDay: "Unavailable",
+    weatherCoverageLimitedDay: "Coverage limit",
+    weatherCoverageLimitedSummary: "Live weather is unavailable here because coverage is limited. Change location and try again to check another local weather source.",
+    weatherErrorSummary: "Live weather data is unavailable for this location right now. Try another nearby point or check again in a moment.",
+    weatherErrorMeta: "No live weather data is available for this selection right now.",
     aiSummary: "AI summary",
     waitingWeather: "Waiting for weather data.",
     feelsLike: "Feels like",
@@ -450,6 +456,7 @@ const I18N = {
     startupWaitTitle: "Waking up the server",
     startupWaitBodyPrimary: "The backend server is hosted on Render, so it may take around <strong>30 seconds</strong> to wake up after a quiet period.",
     startupWaitBodySecondary: "Please give it a moment while the service comes back online.",
+    startupWaitBodyTertiary: "If this message stays here for more than 30 seconds, try refreshing the page.",
     openNewTab: "Open in new tab",
     cancel: "Cancel",
     mapPoint: "Map selection {lat}, {lng}",
@@ -572,6 +579,12 @@ const I18N = {
     today: "今天",
     weatherNotLoaded: "天气尚未加载",
     weatherHint: "可使用出发点、当前位置或导航目的地获取天气。",
+    weatherUnavailable: "天气不可用",
+    weatherUnavailableDay: "暂不可用",
+    weatherCoverageLimitedDay: "数据覆盖限制",
+    weatherCoverageLimitedSummary: "该位置受数据覆盖限制影响，暂时无法获取实时天气。请更改位置后重试，会查询其他当地天气软件。",
+    weatherErrorSummary: "当前地点暂时无法获取实时天气。你可以稍后重试，或改选附近位置查看。",
+    weatherErrorMeta: "当前选择的位置暂无可用的实时天气数据。",
     aiSummary: "AI 简报",
     waitingWeather: "等待天气数据。",
     feelsLike: "体感温度",
@@ -604,6 +617,7 @@ const I18N = {
     startupWaitTitle: "正在唤醒服务器",
     startupWaitBodyPrimary: "后端服务部署在 Render 上，空闲一段时间后再次访问时，通常需要大约 <strong>30 秒</strong> 完成唤醒。",
     startupWaitBodySecondary: "请稍等片刻，服务恢复后会自动继续。",
+    startupWaitBodyTertiary: "如果这个弹窗停留超过 30 秒仍没有变化，请尝试刷新页面。",
     openNewTab: "打开新标签页",
     cancel: "取消",
     mapPoint: "地图点位 {lat}, {lng}",
@@ -659,6 +673,8 @@ function setLanguage(language) {
   render();
   if (latestWeatherData && latestWeatherStart) {
     renderWeatherData(latestWeatherData, latestWeatherStart);
+  } else if (latestWeatherErrorState) {
+    renderWeatherError(latestWeatherErrorState.message, latestWeatherErrorState.start);
   }
   if (latestTflStatusData) {
     renderTflStatus(latestTflStatusData);
@@ -756,6 +772,7 @@ function applyLanguage() {
     startupWaitBodyPrimary.innerHTML = t("startupWaitBodyPrimary");
   }
   setElementText("#startupWaitBodySecondary", t("startupWaitBodySecondary"));
+  setElementText("#startupWaitBodyTertiary", t("startupWaitBodyTertiary"));
 
   setElementText("#weatherScopePrefix", t("atYour"));
   const questionInput = $("userQuestion");
@@ -1084,6 +1101,7 @@ let lastWeatherScope = "My location";
 let lastWeatherScopeLocation = "";
 let latestWeatherData = null;
 let latestWeatherStart = null;
+let latestWeatherErrorState = null;
 // When true, selecting or setting a start point will auto-refresh weather.
 // Set to false to require the user to click the "Update weather data at" buttons.
 let autoRefreshWeatherOnSelect = true;
@@ -1094,6 +1112,7 @@ const chatHistory = [];
 let lastAnimatedChatMessageKey = "";
 let startupWaitModalShown = false;
 let startupWaitModalTimer = null;
+let startupWaitLongHintTimer = null;
 const INTEGRATION_RETRY_BASE_MS = 1500;
 const INTEGRATION_RETRY_MAX_MS = 12000;
 let integrationRetryDelayMs = INTEGRATION_RETRY_BASE_MS;
@@ -1432,61 +1451,49 @@ function setWeatherScope(scope = "start point", locationName = "") {
   $("updateWeatherDestinationButton")?.classList.toggle("is-active", isDestination);
 }
 
-function captureWeatherState() {
-  const ids = [
-    "weatherDay",
-    "weatherIcon",
-    "weatherTemperature",
-    "weatherDescription",
-    "weatherFeelsLike",
-    "weatherHumidity",
-    "weatherWind",
-    "weatherUv",
-    "weatherPrecipitation",
-    "weatherSummary",
-    "weatherMeta",
-    "weatherScopeLabel",
-  ];
-  return ids.reduce((state, id) => {
-    const element = $(id);
-    if (!element) return state;
-    state[id] = {
-      textContent: element.textContent,
-      htmlContent: id === "weatherSummary" ? element.innerHTML : undefined,
-      hidden: element.hidden,
-      className: element.className,
-    };
-    return state;
-  }, {});
+function setWeatherCardState(state = "default") {
+  const weatherCard = $("weatherCard");
+  if (!weatherCard) return;
+  weatherCard.classList.remove("weather-card--loading", "weather-card--error");
+  if (state === "error") {
+    weatherCard.classList.add("weather-card--error");
+  }
 }
 
-function restoreWeatherState(state) {
-  Object.entries(state || {}).forEach(([id, value]) => {
-    const element = $(id);
-    if (!element || !value) return;
-    if (id === "weatherSummary" && value.htmlContent !== undefined) {
-      element.innerHTML = value.htmlContent;
-    } else {
-      element.textContent = value.textContent;
-    }
-    element.hidden = value.hidden;
-    element.className = value.className;
-  });
+function weatherErrorSummaryText(start, message = "") {
+  if (start && isMainlandChinaCoordinate(start.lat, start.lng)) {
+    return currentLanguage === "zh"
+      ? "该位置受数据覆盖限制影响暂时无法获取实时天气，请更改位置后重试。如果您选择了中国大陆地区，更改为港澳台或海外地区方可使用天气功能。"
+      : "Live weather is unavailable here because coverage is limited. Change location and try again.";
+  }
+  if (/browser key|weather api|not available yet/i.test(String(message))) {
+    return currentLanguage === "zh"
+      ? "天气服务正在准备中，请稍后重试。"
+      : "The weather service is still getting ready. Please try again shortly.";
+  }
+  return t("weatherErrorSummary");
+}
+
+function weatherErrorMeta(start) {
+  if (!start || !Number.isFinite(start.lat) || !Number.isFinite(start.lng)) return t("weatherErrorMeta");
+  const label = start.label || (currentLanguage === "zh" ? "当前选择的位置" : "Selected location");
+  const coords = `${start.lat.toFixed(4)}, ${start.lng.toFixed(4)}`;
+  return currentLanguage === "zh"
+    ? `${label} · ${coords}`
+    : `${label} · ${coords}`;
 }
 
 function renderWeatherData(data, start) {
   latestWeatherData = data;
   latestWeatherStart = start;
+  latestWeatherErrorState = null;
   const weatherScope = ["current location", "destination", "start point"].includes(start?.weatherScope)
     ? start.weatherScope
     : "start point";
   const nearbyScopeLabel = start?.nearbyFeatureName ? formatNearbyWeatherLabel(start.nearbyFeatureName) : start?.weatherScopeLabel;
   setWeatherScope(weatherScope, nearbyScopeLabel || (weatherScope === "destination" ? start?.label : ""));
-  const weatherCard = $("weatherCard");
-  if (weatherCard) {
-    weatherCard.classList.remove("weather-card--loading");
-    animateClass(weatherCard, "weather-card--reveal");
-  }
+  setWeatherCardState("default");
+  if ($("weatherCard")) animateClass($("weatherCard"), "weather-card--reveal");
   $("weatherDay").textContent = weatherConditionLabel(data?.weatherCondition?.type, data?.isDaytime);
   $("weatherIcon").textContent = weatherIconEmoji(data?.weatherCondition?.type, data?.isDaytime);
   $("weatherIcon").removeAttribute("title");
@@ -1506,26 +1513,36 @@ function renderWeatherData(data, start) {
   void refreshWeatherSummary(data, start);
 }
 
-function renderWeatherError(message) {
+function renderWeatherError(message, start = null) {
   weatherSummaryRequestId += 1;
-  const weatherCard = $("weatherCard");
-  if (weatherCard) {
-    weatherCard.classList.remove("weather-card--loading");
-    animateClass(weatherCard, "weather-card--reveal");
+  latestWeatherData = null;
+  latestWeatherStart = null;
+  latestWeatherErrorState = { message, start };
+  if (start) {
+    const weatherScope = ["current location", "destination", "start point"].includes(start?.weatherScope)
+      ? start.weatherScope
+      : "start point";
+    const nearbyScopeLabel = start?.nearbyFeatureName ? formatNearbyWeatherLabel(start.nearbyFeatureName) : start?.weatherScopeLabel;
+    setWeatherScope(weatherScope, nearbyScopeLabel || (weatherScope === "destination" ? start?.label : ""));
   }
-  const fallbackSummary = buildWeatherFallbackSummary(null, null, message);
-  $("weatherDay").textContent = t("today");
-  $("weatherIcon").textContent = "--";
-  $("weatherTemperature").textContent = currentLanguage === "zh" ? "天气不可用" : "Weather unavailable";
-  $("weatherDescription").textContent = message;
-  $("weatherDescription").hidden = false;
+  setWeatherCardState("error");
+  if ($("weatherCard")) animateClass($("weatherCard"), "weather-card--reveal");
+  $("weatherDay").textContent = start && isMainlandChinaCoordinate(start.lat, start.lng)
+    ? t("weatherCoverageLimitedDay")
+    : t("weatherUnavailableDay");
+  $("weatherDay").hidden = false;
+  $("weatherIcon").textContent = "!";
+  $("weatherIcon").removeAttribute("title");
+  $("weatherTemperature").textContent = t("weatherUnavailable");
+  $("weatherDescription").textContent = "";
+  $("weatherDescription").hidden = true;
   $("weatherFeelsLike").textContent = "--";
   $("weatherHumidity").textContent = "--";
   $("weatherWind").textContent = "--";
   $("weatherUv").textContent = "--";
   $("weatherPrecipitation").textContent = "--";
-  setWeatherSummary(fallbackSummary);
-  $("weatherMeta").textContent = currentLanguage === "zh" ? "请确认 Google Maps 浏览器密钥已启用 Weather API。" : "Check that Weather API is enabled for your Google Maps browser key.";
+  setWeatherSummary(weatherErrorSummaryText(start, message));
+  $("weatherMeta").textContent = weatherErrorMeta(start);
 }
 
 function buildWeatherFallbackSummary(data, start, errorMessage = "") {
@@ -1660,13 +1677,14 @@ async function refreshWeatherForStart(start = getStartPoint(), force = false, op
   if (!force && weatherUpdatedForKey === weatherKey) return;
   if (!googleMapsBrowserKey) {
     if (options.throwOnError) throw new Error("Google Maps browser key is not available yet.");
-    renderWeatherError("Google Maps browser key is not available yet.");
+    renderWeatherError("Google Maps browser key is not available yet.", start);
     return;
   }
 
   const requestId = ++weatherRequestId;
-  const previousState = options.preserveOnError ? captureWeatherState() : null;
+  latestWeatherErrorState = null;
   weatherUpdatedForKey = weatherKey;
+  setWeatherCardState("default");
   animateClass($("weatherCard"), "weather-card--loading");
   setWeatherLoading(currentLanguage === "zh"
     ? `正在查询天气...`
@@ -1682,11 +1700,7 @@ async function refreshWeatherForStart(start = getStartPoint(), force = false, op
   } catch (error) {
     if (requestId !== weatherRequestId) return;
     weatherUpdatedForKey = "";
-    if (previousState) {
-      restoreWeatherState(previousState);
-    } else {
-      renderWeatherError(error.message || "Weather API request failed.");
-    }
+    renderWeatherError(error.message || "Weather API request failed.", start);
     if (options.throwOnError) throw error;
   } finally {
     if (requestId === weatherRequestId) setWeatherButtonReady();
@@ -4575,7 +4589,7 @@ async function refreshIntegrationStatus() {
       }
     } else {
       $("startMapStatus").textContent = "Google Maps browser key missing; use the campus selector below.";
-      renderWeatherError("Google Maps browser key missing.");
+      renderWeatherError("Google Maps browser key missing.", getStartPoint());
       scheduleIntegrationRetry();
     }
   } catch (error) {
@@ -4590,7 +4604,7 @@ async function refreshIntegrationStatus() {
       tools: integrationStatus.tools || "Pending",
     };
     $("startMapStatus").innerHTML = `Local API not connected. Run <code>PORT=8001 python3 server.py</code>, or open this page with <code>?api=http://localhost:8001</code> if you use another port.`;
-    renderWeatherError("Local API is not connected, so the browser key is not available.");
+    renderWeatherError("Local API is not connected, so the browser key is not available.", getStartPoint());
     scheduleIntegrationRetry();
   }
   render();
@@ -5044,17 +5058,35 @@ function hideToolInfo() {
 }
 
 const startupWaitModalEl = $("startupWaitModal");
+const startupWaitBodyTertiaryEl = $("startupWaitBodyTertiary");
+
+function resetStartupWaitLongHint() {
+  if (startupWaitLongHintTimer) {
+    window.clearTimeout(startupWaitLongHintTimer);
+    startupWaitLongHintTimer = null;
+  }
+  if (startupWaitBodyTertiaryEl) {
+    startupWaitBodyTertiaryEl.hidden = true;
+  }
+}
 
 function showStartupWaitModal() {
   if (!startupWaitModalEl) return;
+  resetStartupWaitLongHint();
   startupWaitModalEl.hidden = false;
   void startupWaitModalEl.offsetWidth;
   startupWaitModalEl.classList.remove("closing");
   startupWaitModalEl.classList.add("visible");
+  startupWaitLongHintTimer = window.setTimeout(() => {
+    startupWaitLongHintTimer = null;
+    if (!startupWaitModalEl || startupWaitModalEl.hidden || !startupWaitBodyTertiaryEl) return;
+    startupWaitBodyTertiaryEl.hidden = false;
+  }, 30000);
 }
 
 function hideStartupWaitModal() {
   if (!startupWaitModalEl || startupWaitModalEl.hidden) return;
+  resetStartupWaitLongHint();
   startupWaitModalEl.classList.remove("visible");
   startupWaitModalEl.classList.add("closing");
   startupWaitModalEl.addEventListener("animationend", function handler() {
