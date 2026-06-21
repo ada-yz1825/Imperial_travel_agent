@@ -1876,6 +1876,20 @@ body.route-map-fullscreen-open {
   max-width: 36ch;
 }
 
+.startup-wait-panel .modal-info-title {
+  font-size: 1.46rem;
+  margin-bottom: 8px;
+}
+
+html[lang="zh-CN"] .startup-wait-panel .modal-info-title {
+  font-size: 1.6rem;
+}
+
+html[lang="zh-CN"] .startup-wait-panel .modal-copy-body p {
+  font-family: var(--zh-title-font);
+  letter-spacing: 0;
+}
+
 @keyframes startup-spin {
   to { transform: rotate(360deg); }
 }

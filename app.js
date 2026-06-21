@@ -448,6 +448,8 @@ const I18N = {
     externalConfirmTitle: "Open external link",
     externalConfirm: "You are about to leave this page and open a new tab. Continue?",
     startupWaitTitle: "Waking up the server",
+    startupWaitBodyPrimary: "The backend server is hosted on Render, so it may take around <strong>30 seconds</strong> to wake up after a quiet period.",
+    startupWaitBodySecondary: "Please give it a moment while the service comes back online.",
     openNewTab: "Open in new tab",
     cancel: "Cancel",
     mapPoint: "Map selection {lat}, {lng}",
@@ -600,6 +602,8 @@ const I18N = {
     externalConfirmTitle: "打开外部链接",
     externalConfirm: "即将离开当前页面并打开新标签页，是否继续？",
     startupWaitTitle: "正在唤醒服务器",
+    startupWaitBodyPrimary: "后端服务部署在 Render 上，空闲一段时间后再次访问时，通常需要大约 <strong>30 秒</strong> 完成唤醒。",
+    startupWaitBodySecondary: "请稍等片刻，服务恢复后会自动继续。",
     openNewTab: "打开新标签页",
     cancel: "取消",
     mapPoint: "地图点位 {lat}, {lng}",
@@ -747,6 +751,11 @@ function applyLanguage() {
   if (how3Body) {
     how3Body.innerHTML = t("how3Body");
   }
+  const startupWaitBodyPrimary = $("startupWaitBodyPrimary");
+  if (startupWaitBodyPrimary) {
+    startupWaitBodyPrimary.innerHTML = t("startupWaitBodyPrimary");
+  }
+  setElementText("#startupWaitBodySecondary", t("startupWaitBodySecondary"));
 
   setElementText("#weatherScopePrefix", t("atYour"));
   const questionInput = $("userQuestion");
