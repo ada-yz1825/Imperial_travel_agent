@@ -28,6 +28,7 @@ GROQ_MODEL = os.environ.get("GROQ_MODEL", "qwen/qwen3-32b")
 TOGETHER_MODEL = os.environ.get("TOGETHER_MODEL", "Qwen/Qwen3.5-9B")
 DEFAULT_TOGETHER_CHAT_MODEL = "Qwen/Qwen3-235B-A22B-Instruct-2507-tput"
 DEFAULT_TOGETHER_CHAT_MODEL_ID = "qwen235b"
+DEFAULT_WEATHER_SUMMARY_TOGETHER_MODEL = "Qwen/Qwen2.5-7B-Instruct-Turbo"
 DEFAULT_TOGETHER_CHAT_MODELS = [
         {
             "id": DEFAULT_TOGETHER_CHAT_MODEL_ID,
@@ -183,7 +184,7 @@ def resolve_together_chat_model(model_id):
 
 
 def get_weather_summary_together_model():
-    return get_env_value("WEATHER_SUMMARY_TOGETHER_MODEL") or DEFAULT_TOGETHER_CHAT_MODEL
+    return get_env_value("WEATHER_SUMMARY_TOGETHER_MODEL") or DEFAULT_WEATHER_SUMMARY_TOGETHER_MODEL
 
 
 def get_ollama_model():

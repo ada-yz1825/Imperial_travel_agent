@@ -130,8 +130,8 @@ At minimum, set the provider and the keys for the features you want to use.
 export LLM_PROVIDER=together
 export TOGETHER_API_KEY=your_together_key
 export TOGETHER_MODEL=Qwen/Qwen3-235B-A22B-Instruct-2507-tput
-export TOGETHER_CHAT_MODELS_JSON='[{"id":"qwen235b","label":"Qwen3 235B","model":"Qwen/Qwen3-235B-A22B-Instruct-2507-tput","description":"Current default model"},{"id":"glm5","label":"GLM-5","model":"zai-org/GLM-5","description":"Higher-capability model"}]'
-export WEATHER_SUMMARY_TOGETHER_MODEL=Qwen/Qwen3-235B-A22B-Instruct-2507-tput
+export TOGETHER_CHAT_MODELS_JSON='[{"id":"qwen235b","label":"Qwen3 235B","model":"Qwen/Qwen3-235B-A22B-Instruct-2507-tput","description":"Current default model"},{"id":"glm52","label":"GLM-5.2","model":"zai-org/GLM-5.2","description":"Higher-capability model"}]'
+export WEATHER_SUMMARY_TOGETHER_MODEL=Qwen/Qwen2.5-7B-Instruct-Turbo
 export GOOGLE_MAPS_API_KEY=your_routes_key
 export GOOGLE_MAPS_BROWSER_KEY=your_browser_maps_and_weather_key
 ```

@@ -446,7 +446,7 @@ const I18N = {
     chatModelCurrent: "Current chat model: {model}",
     chatModelHelperTitle: "About this model",
     chatModelHelperQwen: "Qwen3-235B-A22B is Alibaba Qwen’s flagship open-weight MoE model, with 235B total parameters and about 22B active parameters, suitable for reasoning, coding, multilingual tasks, and agent-style tool use.",
-    chatModelHelperGlm: "GLM-5 is Z.ai / Zhipu’s large-scale MoE model, with about 744B total parameters and 40B active parameters, mainly designed for complex coding and long-horizon agent workflows.",
+    chatModelHelperGlm: "GLM-5.2 is Z.ai / Zhipu’s large-scale MoE model, with about 744B total parameters and 40B active parameters, mainly designed for complex coding and long-horizon agent workflows.",
     chatModelDetailsHint: "Click to view details",
     apiKeysDetailsHint: "Click to view details",
     chatModelRetryHint: "You can try switching to the other model and retrying.",
@@ -607,7 +607,7 @@ const I18N = {
     chatModelCurrent: "当前对话模型：{model}",
     chatModelHelperTitle: "关于该模型",
     chatModelHelperQwen: "Qwen3-235B-A22B 是阿里 Qwen 系列的旗舰开源 MoE 模型，总参数 235B、激活参数约 22B，适合推理、代码、多语言任务和 Agent 工具调用场景。",
-    chatModelHelperGlm: "GLM-5 是 Z.ai / 智谱推出的大规模 MoE 模型，总参数约 744B、激活参数约 40B，主要面向复杂代码、软件工程和长周期 Agent 任务。",
+    chatModelHelperGlm: "GLM-5.2 是 Z.ai / 智谱推出的大规模 MoE 模型，总参数约 744B、激活参数约 40B，主要面向复杂代码、软件工程和长周期 Agent 任务。",
     chatModelDetailsHint: "点击查看详情",
     apiKeysDetailsHint: "点击查看详情",
     chatModelRetryHint: "你可以尝试切换到另一个模型后重试。",
@@ -895,7 +895,8 @@ function formatModelDisplayName(value) {
   if (!text) return "";
   if (text === "Qwen/Qwen3-235B-A22B-Instruct-2507-tput") return "Qwen3 235B";
   if (text === "Qwen 235B") return "Qwen3 235B";
-  if (text === "zai-org/GLM-5") return "GLM-5";
+  if (text === "zai-org/GLM-5.2") return "GLM-5.2";
+  if (text === "zai-org/GLM-5") return "GLM-5.2";
   const slashIndex = text.indexOf("/");
   return slashIndex >= 0 ? text.slice(slashIndex + 1) || text : text;
 }
@@ -905,9 +906,20 @@ function normalizeChatModelOption(option) {
   const id = String(option.id || "").trim();
   const model = String(option.model || "").trim();
   if (!id || !model) return null;
+  const normalizedLabel = String(option.label || "").trim();
+  const displayLabel = (
+    model === "zai-org/GLM-5.2"
+    || model === "zai-org/GLM-5"
+    || normalizedLabel === "GLM-5"
+    || normalizedLabel === "GLM-5.2"
+    || id === "glm5"
+    || id === "glm52"
+  )
+    ? "GLM-5.2"
+    : (normalizedLabel || model);
   return {
     id,
-    label: formatModelDisplayName(String(option.label || "").trim() || model),
+    label: formatModelDisplayName(displayLabel),
     description: String(option.description || "").trim(),
     model,
     available: option.available !== false,
