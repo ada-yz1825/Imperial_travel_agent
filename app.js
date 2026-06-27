@@ -381,15 +381,19 @@ const I18N = {
     ask: "Ask",
     thinking: "Thinking",
     quickWhiteCity: "Go to White City",
+    quickOxford: "Go to Oxford",
     quickLibrary: "Nearby library",
     quickWeather: "Current weather",
     quickTfl: "TfL status",
     quickWhiteCityQuestion: "How do I get to White City Campus from my current selected start point?",
+    quickOxfordQuestion: "How do I get to Oxford from my current selected start point?",
     quickLibraryQuestion: "Which library is nearby from my selected starting point?",
     quickWeatherQuestion: "What's the current weather at my selected start point right now?",
     quickTflQuestion: "What's the current TfL status, and are any lines disrupted right now?",
     agentPlaceholder: "Ready when you are. Ask the agent a question to get started.",
     routeMap: "Route map",
+    routeChoices: "Routes",
+    routeChoiceLabel: "Route {index}",
     routeMapButton: "Close to view route map",
     weatherDestinationRequired: "Please ask the agent for a navigation route first, then update weather at the parsed destination.",
     start: "Start",
@@ -445,7 +449,7 @@ const I18N = {
     chatModelSectionBody: "Switch the main chat model for this page. Tool choice and the final answer will follow your selection.",
     chatModelCurrent: "Current chat model: {model}",
     chatModelHelperTitle: "About this model",
-    chatModelHelperQwen: "Qwen3-235B-A22B is Alibaba Qwen’s flagship open-weight MoE model, with 235B total parameters and about 22B active parameters, suitable for reasoning, coding, multilingual tasks, and agent-style tool use.",
+    chatModelHelperMiniMax: "MiniMax M3 is MiniMax’s large-scale MoE model for strong general reasoning, coding, long-context understanding, and agent-style tool use.",
     chatModelHelperGlm: "GLM-5.2 is Z.ai / Zhipu’s large-scale MoE model, with about 744B total parameters and 40B active parameters, mainly designed for complex coding and long-horizon agent workflows.",
     chatModelDetailsHint: "Click to view details",
     apiKeysDetailsHint: "Click to view details",
@@ -542,15 +546,19 @@ const I18N = {
     ask: "发送",
     thinking: "思考中",
     quickWhiteCity: "去白城校区",
+    quickOxford: "去牛津",
     quickLibrary: "附近图书馆",
     quickWeather: "当前天气",
     quickTfl: "伦敦地铁实时状态",
     quickWhiteCityQuestion: "从我当前选择的出发点怎么去 White City Campus？",
+    quickOxfordQuestion: "从我当前选择的出发点怎么去牛津？",
     quickLibraryQuestion: "从我当前选择的出发点附近有哪些图书馆？",
     quickWeatherQuestion: "我当前选择的出发点现在天气怎么样？",
     quickTflQuestion: "现在 TfL 线路状态如何？有没有线路延误或中断？",
     agentPlaceholder: "向 Agent 提问后答案会在此处显示，交互式地图将在导航工具被调用后显示。",
     routeMap: "路线地图",
+    routeChoices: "路线选择",
+    routeChoiceLabel: "路线 {index}",
     routeMapButton: "关闭以查看路线图",
     weatherDestinationRequired: "请先向 Agent 提问以生成一条导航路线，然后再更新目的地天气。",
     start: "起点",
@@ -559,7 +567,7 @@ const I18N = {
     update: "更新",
     fullScreen: "全屏地图",
     exitFullScreen: "退出全屏",
-    openGoogleMaps: "在 Google Maps 中查看更多路线",
+    openGoogleMaps: "在 Google Maps 中导航",
     continueChat: "打开聊天窗口继续对话",
     expandIntro: "展开 Agent 使用指南",
     collapseIntro: "收起 Agent 使用指南",
@@ -606,7 +614,7 @@ const I18N = {
     chatModelSectionBody: "切换当前页面主对话所使用的模型。",
     chatModelCurrent: "当前对话模型：{model}",
     chatModelHelperTitle: "关于该模型",
-    chatModelHelperQwen: "Qwen3-235B-A22B 是阿里 Qwen 系列的旗舰开源 MoE 模型，总参数 235B、激活参数约 22B，适合推理、代码、多语言任务和 Agent 工具调用场景。",
+    chatModelHelperMiniMax: "MiniMax M3 是 MiniMax 的大规模 MoE 模型，适合通用推理、代码、长上下文理解和 Agent 工具调用场景。",
     chatModelHelperGlm: "GLM-5.2 是 Z.ai / 智谱推出的大规模 MoE 模型，总参数约 744B、激活参数约 40B，主要面向复杂代码、软件工程和长周期 Agent 任务。",
     chatModelDetailsHint: "点击查看详情",
     apiKeysDetailsHint: "点击查看详情",
@@ -726,7 +734,6 @@ function applyLanguage() {
     [".route-endpoints div:first-child span", "start"],
     [".route-endpoints div:last-child span", "destination"],
     ["label[for='routeModeSelect']", "transportMode"],
-    ["#routeUpdateButton", "update"],
     ["#routeFullscreenButton", routeMapFullscreen ? "exitFullScreen" : "fullScreen"],
     ["#googleMapsLink", "openGoogleMaps"],
     ["#openChatButton", "continueChat"],
@@ -810,6 +817,7 @@ function applyLanguage() {
 
   const quickPrompts = [
     ["quickWhiteCity", "quickWhiteCityQuestion"],
+    ["quickOxford", "quickOxfordQuestion"],
     ["quickLibrary", "quickLibraryQuestion"],
     ["quickWeather", "quickWeatherQuestion"],
     ["quickTfl", "quickTflQuestion"],
@@ -893,6 +901,8 @@ function apiFetch(path, options) {
 function formatModelDisplayName(value) {
   const text = String(value || "").trim();
   if (!text) return "";
+  if (text === "MiniMaxAI/MiniMax-M3") return "MiniMax M3";
+  if (text === "MiniMax M3") return "MiniMax M3";
   if (text === "Qwen/Qwen3-235B-A22B-Instruct-2507-tput") return "Qwen3 235B";
   if (text === "Qwen 235B") return "Qwen3 235B";
   if (text === "zai-org/GLM-5.2") return "GLM-5.2";
@@ -908,6 +918,12 @@ function normalizeChatModelOption(option) {
   if (!id || !model) return null;
   const normalizedLabel = String(option.label || "").trim();
   const displayLabel = (
+    model === "MiniMaxAI/MiniMax-M3"
+    || normalizedLabel === "MiniMax M3"
+    || id === "minimaxm3"
+  )
+    ? "MiniMax M3"
+    : (
     model === "zai-org/GLM-5.2"
     || model === "zai-org/GLM-5"
     || normalizedLabel === "GLM-5"
@@ -966,10 +982,10 @@ function renderLlmSignalPopover() {
   const options = getChatModelOptions();
   if (!options.length) {
     popover.innerHTML = "";
-    popover.hidden = true;
+    setElementHidden(popover, true);
     return;
   }
-  popover.hidden = false;
+  setElementHidden(popover, false);
   popover.innerHTML = options.map((option) => renderSignalModelButton(option)).join("");
 }
 
@@ -997,11 +1013,189 @@ function setLatestAnswerModelLabel(value) {
   latestAnswerModelLabel = formatModelDisplayName(value);
 }
 
-function renderAnswerWithModelMeta(markdownHtml) {
+function renderAnswerWithModelMeta(markdownHtml, options = {}) {
+  return `<div class="agent-answer-output">${injectRouteMapPlaceholder(markdownHtml, options)}</div>`;
+}
+
+function agentAnswerBodyEl() {
+  return $("agentAnswerBody") || $("agentAnswer");
+}
+
+function agentAnswerRouteSlotEl() {
+  return document.querySelector("[data-route-map-slot='inline']") || $("agentAnswerRouteSlot");
+}
+
+function agentAnswerMetaSlotEl() {
+  return $("agentAnswerMetaSlot");
+}
+
+function setAgentAnswerHtml(html) {
+  const body = agentAnswerBodyEl();
+  if (body) body.innerHTML = html;
+}
+
+function setAgentAnswerMetaHtml(html = "") {
+  const meta = agentAnswerMetaSlotEl();
+  if (meta) meta.innerHTML = html;
+}
+
+function setElementHidden(target, hidden) {
+  const element = typeof target === "string" ? $(target) : target;
+  if (!element) return false;
+  element.hidden = Boolean(hidden);
+  return true;
+}
+
+function hasRouteMapContentBlock(blocks = []) {
+  return Array.isArray(blocks) && blocks.some((block) => block?.type === "route_map");
+}
+
+function escapeRegExp(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function injectRouteMapPlaceholder(markdownHtml, options = {}) {
+  const html = String(markdownHtml || "");
+  const enableInlineRouteMap = Boolean(options.inlineRouteMap);
+  const slotHtml = `<div class="agent-answer-inline-route-slot" data-route-map-slot="inline"></div>`;
+  const placeholderPattern = new RegExp(`<p>\\s*${escapeRegExp(ROUTE_MAP_PLACEHOLDER)}\\s*<\\/p>`, "g");
+  if (!enableInlineRouteMap) {
+    return stripStandaloneRouteMapLeadIn(
+      html
+        .replace(placeholderPattern, "")
+        .replace(new RegExp(escapeRegExp(ROUTE_MAP_PLACEHOLDER), "g"), "")
+    );
+  }
+  if (placeholderPattern.test(html)) {
+    return html.replace(placeholderPattern, slotHtml);
+  }
+  if (html.includes(ROUTE_MAP_PLACEHOLDER)) {
+    return html
+      .replace(new RegExp(`<br \\/>\\s*${escapeRegExp(ROUTE_MAP_PLACEHOLDER)}`, "g"), `</p>${slotHtml}<p>`)
+      .replace(new RegExp(`${escapeRegExp(ROUTE_MAP_PLACEHOLDER)}\\s*<br \\/>`, "g"), `${slotHtml}`)
+      .replaceAll(ROUTE_MAP_PLACEHOLDER, slotHtml)
+      .replace(/<p>\s*<\/p>/g, "");
+  }
+  return html;
+}
+
+const ROUTE_MAP_LEAD_IN_PATTERNS = [
+  /^\s*(?:以下|下面|这里是|这是)这段行程的交互路线地图[。.!！]*\s*$/gim,
+  /^\s*(?:以下|下面|这里是|这是)本次行程的交互路线地图[。.!！]*\s*$/gim,
+  /^\s*(?:here(?: is|'s)|below is|here's)\s+the interactive route map for (?:this trip|the trip)\.?\s*$/gim,
+];
+
+function stripStandaloneRouteMapLeadIn(value) {
+  let text = String(value || "");
+  ROUTE_MAP_LEAD_IN_PATTERNS.forEach((pattern) => {
+    text = text.replace(pattern, "");
+  });
+  return text
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function stripRouteMapPlaceholder(value) {
+  return stripStandaloneRouteMapLeadIn(String(value || "")
+    .replace(new RegExp(`^\\s*${escapeRegExp(ROUTE_MAP_PLACEHOLDER)}\\s*$`, "gm"), "")
+    .replace(new RegExp(escapeRegExp(ROUTE_MAP_PLACEHOLDER), "g"), "")
+    .replace(/\n{3,}/g, "\n\n"));
+}
+
+function refreshAgentAnswerMeta() {
   const metaHtml = latestAnswerModelLabel
     ? `<div class="agent-answer-model-note">${escapeHtml(t("answerModelLabel", { model: latestAnswerModelLabel }))}</div>`
     : "";
-  return `<div class="agent-answer-output">${markdownHtml}</div>${metaHtml}`;
+  setAgentAnswerMetaHtml(metaHtml);
+}
+
+function restoreRoutePreviewPlacement() {
+  const preview = $("routePreview");
+  const actions = $("agentActions");
+  if (!preview || !actions?.parentNode) return;
+  preview.classList.remove("route-preview--inline");
+  if (preview.parentNode !== actions.parentNode || preview.nextElementSibling !== actions) {
+    actions.parentNode.insertBefore(preview, actions);
+  }
+}
+
+function attachRoutePreviewToAnswer() {
+  const preview = $("routePreview");
+  const slot = agentAnswerRouteSlotEl();
+  if (!preview || !slot) return;
+  preview.classList.add("route-preview--inline");
+  slot.replaceChildren(preview);
+  window.setTimeout(() => {
+    if (routeMap && window.google?.maps) {
+      google.maps.event.trigger(routeMap, "resize");
+    }
+  }, 60);
+}
+
+function routePreviewDefaultHeight() {
+  return $("routePreview")?.classList.contains("route-preview--inline") ? "280px" : "360px";
+}
+
+function buildGoogleMapsHref(data = latestNavigationData, route = data?.recommended) {
+  if (!data?.origin || !data?.destination) return "";
+  const routeStart = routePolylineEndpoint(route, "origin");
+  const routeEnd = routePolylineEndpoint(route, "destination");
+  const selectedStart = controls.startPoint.value === "mapSelection" ? currentStartContext() : null;
+  const origin = googleMapsPlaceValue(routeStart, googleMapsPlaceValue(selectedStart, googleMapsPlaceValue(data.originPlace, data.origin)));
+  const destination = googleMapsPlaceValue(routeEnd, googleMapsPlaceValue(data.destinationPlace, data.destination));
+  if (!origin || !destination) return "";
+  const params = new URLSearchParams({
+    api: "1",
+    origin,
+    destination,
+    travelmode: googleMapsTravelMode(route?.mode),
+  });
+  return `https://www.google.com/maps/dir/?${params.toString()}`;
+}
+
+function buildImperialShuttleHint(shuttle) {
+  if (!shuttle?.show_hint || !shuttle?.schedule_url) return "";
+  const scheduleUrl = String(shuttle.schedule_url || "").trim();
+  if (!scheduleUrl) return "";
+  const originCampus = String(shuttle.origin_campus || "").trim();
+  const destinationCampus = String(shuttle.destination_campus || "").trim();
+  if (!originCampus || !destinationCampus || originCampus === destinationCampus) return "";
+
+  if (currentLanguage === "zh") {
+    return `另外，Imperial 工作日校车可作为 ${originCampus} 与 ${destinationCampus} 之间的补充选择：[Imperial shuttle](${scheduleUrl})。`;
+  }
+
+  return `Imperial's weekday campus shuttle can also be a useful option between ${originCampus} and ${destinationCampus}: [Imperial shuttle](${scheduleUrl}).`;
+}
+
+function buildNavigationAnswerSuffix(answer, data = latestNavigationData, route = data?.recommended) {
+  if (!data?.origin || !data?.destination) return "";
+  const extras = [];
+  const lowerAnswer = String(answer || "").toLowerCase();
+  const shuttleHint = buildImperialShuttleHint(data.imperial_weekday_shuttle);
+  if (shuttleHint && !lowerAnswer.includes("imperial.ac.uk/admin-services/property/travel/shuttle-bus/")) {
+    extras.push(shuttleHint);
+  }
+  const googleMapsHref = buildGoogleMapsHref(data, route);
+  if (googleMapsHref && !lowerAnswer.includes("google.com/maps/dir/")) {
+    extras.push(currentLanguage === "zh"
+      ? `如果你想查看实时信息或继续使用导航，也可以直接在 [Google Maps 中打开这条路线](${googleMapsHref})。`
+      : `If you'd like to check live updates or continue with navigation, you can also [open this route in Google Maps](${googleMapsHref}).`);
+  }
+  return extras.length ? `\n\n${extras.join("\n\n")}` : "";
+}
+
+function ensureRouteMapPlaceholder(answer, data = latestNavigationData) {
+  const text = String(answer || "").trim();
+  if (!data?.origin || !data?.destination) return text;
+  if (!hasNavigationResult(data)) return text;
+  return text;
+}
+
+function finalizeAgentAnswer(answer, data = latestNavigationData, route = data?.recommended) {
+  const base = ensureRouteMapPlaceholder(sanitizeModelOutput(answer || ""), data);
+  if (!data?.origin || !data?.destination) return base;
+  return `${base}${buildNavigationAnswerSuffix(base, data, route)}`.trim();
 }
 
 function weatherApiUrl(start, apiKey) {
@@ -1031,6 +1225,7 @@ const SHUTTLE_CAMPUS_ORDER = {
 };
 const SHUTTLE_CAMPUSES = ["southKensington", "whiteCity", "hammersmith"];
 const SHUTTLE_CAMPUS_SYNC_RADIUS_KM = 2;
+const ROUTE_MAP_PLACEHOLDER = "[[ROUTE_MAP]]";
 
 const SHUTTLE_TIMETABLE = {
   eastbound: {
@@ -1102,6 +1297,7 @@ let pendingRoutePreview = null;
 let activeRoutePreview = null;
 let routeMapFullscreen = false;
 let routeMapPlaceholder = null;
+let selectedRoutePreviewVariantKey = "";
 let googleMapsLoading = false;
 let routesKeyConfigured = false;
 let googleMapsBrowserKey = "";
@@ -1282,7 +1478,7 @@ function updateRecommendationLoadMoreButton() {
   const button = $("loadMoreStudySpaces");
   if (!button) return;
   const hasMoreRecommendations = latestAvailableRecommendations.length > latestRanked.length;
-  button.hidden = !hasMoreRecommendations;
+  setElementHidden(button, !hasMoreRecommendations);
   if (!hasMoreRecommendations) {
     button.setAttribute("aria-expanded", String(recommendationDisplayLimit > RECOMMENDATION_COLLAPSED_LIMIT));
     return;
@@ -1308,8 +1504,8 @@ function collapseHowItWorks() {
   const section = $("howItWorks");
   const button = $("expandHowItWorks");
   if (!section || !button) return;
-  section.hidden = true;
-  button.hidden = false;
+  setElementHidden(section, true);
+  setElementHidden(button, false);
   updateHowItWorksToggle();
 }
 
@@ -1327,7 +1523,7 @@ function toggleHowItWorks() {
   const button = $("expandHowItWorks");
   if (!section || !button) return;
   const shouldExpand = section.hidden;
-  section.hidden = !shouldExpand;
+  setElementHidden(section, !shouldExpand);
   if (shouldExpand) {
     section.classList.remove("how-it-works--pop");
     void section.offsetWidth;
@@ -1335,7 +1531,7 @@ function toggleHowItWorks() {
   } else {
     section.classList.remove("how-it-works--pop");
   }
-  button.hidden = false;
+  setElementHidden(button, false);
   updateHowItWorksToggle();
 }
 
@@ -1409,7 +1605,7 @@ function setWeatherLoading(message = currentLanguage === "zh" ? "正在加载天
   });
   $("weatherTemperature").textContent = "--";
   $("weatherDescription").textContent = "";
-  $("weatherDescription").hidden = true;
+    setElementHidden("weatherDescription", true);
   setWeatherSummaryLoading("");
   $("weatherMeta").textContent = currentLanguage === "zh" ? "正在从 Google Weather API 获取当前天气。" : "Fetching current conditions from Google Weather API.";
 }
@@ -1511,7 +1707,7 @@ function renderWeatherData(data, start) {
   $("weatherIcon").removeAttribute("title");
   $("weatherTemperature").textContent = formatTemperature(data?.temperature);
   $("weatherDescription").textContent = "";
-  $("weatherDescription").hidden = true;
+    setElementHidden("weatherDescription", true);
   $("weatherFeelsLike").textContent = formatTemperature(data?.feelsLikeTemperature);
   $("weatherHumidity").textContent = Number.isFinite(data?.relativeHumidity) ? `${data.relativeHumidity}%` : "--";
   $("weatherWind").textContent = formatWind(data?.wind);
@@ -1542,12 +1738,12 @@ function renderWeatherError(message, start = null) {
   $("weatherDay").textContent = start && isMainlandChinaCoordinate(start.lat, start.lng)
     ? t("weatherCoverageLimitedDay")
     : t("weatherUnavailableDay");
-  $("weatherDay").hidden = false;
+  setElementHidden("weatherDay", false);
   $("weatherIcon").textContent = "!";
   $("weatherIcon").removeAttribute("title");
   $("weatherTemperature").textContent = t("weatherUnavailable");
   $("weatherDescription").textContent = "";
-  $("weatherDescription").hidden = true;
+    setElementHidden("weatherDescription", true);
   $("weatherFeelsLike").textContent = "--";
   $("weatherHumidity").textContent = "--";
   $("weatherWind").textContent = "--";
@@ -1660,8 +1856,8 @@ async function refreshWeatherSummary(data, start) {
       body: JSON.stringify({
         stream: false,
         question: currentLanguage === "zh"
-          ? "请用自然、简短的中文为天气卡片写 1-2 句话天气简报。不要使用 Markdown 标题。"
-          : "Write a short, natural weather summary for the weather card in 1-2 sentences. Do not use Markdown headings.",
+          ? "请用自然、简短但可以稍微展开的中文，为天气卡片写 2-3 句话天气简报。不要使用 Markdown 标题。"
+          : "Write a natural weather summary for the weather card in 2-3 sentences. Keep it concise, but it can be a little fuller than a one-line summary. Do not use Markdown headings.",
         context: {
           task: "weather_summary",
           language: currentLanguage === "zh" ? "Chinese" : "English",
@@ -2208,7 +2404,7 @@ function ensureTflTooltip() {
   tooltip = document.createElement("div");
   tooltip.id = "tflTooltip";
   tooltip.className = "tfl-tooltip";
-  tooltip.hidden = true;
+  setElementHidden(tooltip, true);
   document.body.appendChild(tooltip);
   return tooltip;
 }
@@ -2222,7 +2418,7 @@ function showTflTooltip(target) {
     <strong class="tfl-tooltip-title">${escapeHtml(title)}</strong>
     <span class="tfl-tooltip-body">${escapeHtml(reason)}</span>
   `;
-  tooltip.hidden = false;
+  setElementHidden(tooltip, false);
   tooltip.classList.remove("is-hiding");
   tooltip.classList.add("is-visible");
   const targetRect = target.getBoundingClientRect();
@@ -2246,7 +2442,7 @@ function hideTflTooltip() {
   tooltip.classList.add("is-hiding");
   window.setTimeout(() => {
     if (tooltip.classList.contains("is-hiding")) {
-      tooltip.hidden = true;
+      setElementHidden(tooltip, true);
       tooltip.classList.remove("is-hiding");
     }
   }, 160);
@@ -2560,9 +2756,13 @@ async function answerQuestion(question, options = {}) {
   const cleaned = question.trim();
   if (!cleaned) {
     clearLatestAnswerModelLabel();
-    $("agentAnswer").textContent = currentLanguage === "zh"
-      ? "可以这样问：从 South Kensington 坐公共交通去 Hammersmith Campus。"
-      : "Ask something like: from South Kensington to Hammersmith Campus by transit.";
+    const body = agentAnswerBodyEl();
+    if (body) {
+      body.textContent = currentLanguage === "zh"
+        ? "可以这样问：从 South Kensington 坐公共交通去 Hammersmith Campus。"
+        : "Ask something like: from South Kensington to Hammersmith Campus by transit.";
+    }
+    setAgentAnswerMetaHtml("");
     return;
   }
 
@@ -2612,25 +2812,35 @@ async function answerQuestion(question, options = {}) {
     const agentResult = isStreamingResponse
       ? await readStreamingAnswer(response, { loadingSessionId })
       : await readJsonAnswer(response);
-    const answer = sanitizeModelOutput(agentResult.answer || "");
+    const rawAnswer = agentResult.answer || "";
     setLatestAnswerModelLabel(agentResult.model || "");
     if (agentResult.chatModelId) {
       setSelectedChatModel(agentResult.chatModelId, { refreshModal: false });
     }
-    $("agentAnswer").innerHTML = renderAnswerWithModelMeta(renderMarkdown(answer));
     setAgentMode(formatAgentTools(agentResult.toolsUsed || []));
-
-    chatHistory.push({ role: "assistant", content: answer });
-    trimChatHistory();
-    if (hasNavigationResult(agentResult)) {
-      latestNavigationData = { ...agentResult, answer };
-      renderRoutePreview(latestNavigationData);
-      renderAgentActions(latestNavigationData, latestNavigationData.recommended);
+    const wantsInlineRouteMap = Boolean(agentResult.inlineMapRequested) || hasRouteMapContentBlock(agentResult.contentBlocks);
+    if (hasNavigationResult(agentResult) && wantsInlineRouteMap) {
+      latestNavigationData = { ...agentResult, answer: rawAnswer };
     } else {
       latestNavigationData = null;
       clearRoutePreview();
       renderAgentActions();
     }
+    const answer = finalizeAgentAnswer(rawAnswer, latestNavigationData, latestNavigationData?.recommended);
+    cancelAnswerRender();
+    setAgentAnswerHtml(renderAnswerWithModelMeta(
+      renderMarkdown(answer),
+      { inlineRouteMap: Boolean(latestNavigationData) },
+    ));
+    refreshAgentAnswerMeta();
+    if (latestNavigationData) {
+      attachRoutePreviewToAnswer();
+      renderRoutePreview(latestNavigationData);
+      renderAgentActions(latestNavigationData, latestNavigationData.recommended);
+    }
+
+    chatHistory.push({ role: "assistant", content: answer });
+    trimChatHistory();
     renderChatModalHistory();
     collapseHowItWorks();
   } catch (error) {
@@ -2638,10 +2848,11 @@ async function answerQuestion(question, options = {}) {
     cancelAnswerRender();
     hideAgentActions();
     clearLatestAnswerModelLabel();
+    setAgentAnswerMetaHtml("");
     const errorMessage = formatAgentError(error);
-    $("agentAnswer").innerHTML = `
+    setAgentAnswerHtml(`
       <div class="agent-answer-output agent-answer-output--error">${renderMarkdown(errorMessage)}</div>
-    `;
+    `);
     if (options.skipUserPush) {
       chatHistory.push({ role: "assistant", content: errorMessage });
       trimChatHistory();
@@ -2827,13 +3038,14 @@ function scheduleAnswerRenderStep(state, delayMs = STREAM_RENDER_FRAME_DELAY_MS)
 function stepAnswerRender(state, now = performance.now()) {
   if (!state || state.sessionId !== answerRenderSessionId) return;
 
-  if (!state.queue) {
-    if (state.completed) {
+    if (!state.queue) {
+      if (state.completed) {
       const answerEl = $("agentAnswer");
       if (answerEl) {
-        answerEl.innerHTML = state.rendered
-          ? renderAnswerWithModelMeta(renderMarkdown(state.rendered))
-          : "";
+        setAgentAnswerHtml(state.rendered
+          ? renderAnswerWithModelMeta(renderMarkdown(stripRouteMapPlaceholder(state.rendered)))
+          : "");
+        refreshAgentAnswerMeta();
         answerEl.classList.remove("agent-answer--streaming");
         answerEl.classList.remove("agent-answer--chunk");
       }
@@ -2848,16 +3060,17 @@ function stepAnswerRender(state, now = performance.now()) {
   state.queue = state.queue.slice(chunk.length);
   state.rendered += chunk;
   const answerEl = $("agentAnswer");
-  if (answerEl) {
+  const answerBody = agentAnswerBodyEl();
+  if (answerEl && answerBody) {
     if (shouldRenderStreamingMarkdown(state.rendered)) {
       const revealClass = state.hasShownFirstChunk ? "" : " agent-answer-output--reveal";
-      answerEl.innerHTML = `<div class="agent-answer-output agent-answer-output--live${revealClass}">${renderMarkdown(state.rendered)}</div>`;
+      answerBody.innerHTML = `<div class="agent-answer-output agent-answer-output--live${revealClass}">${renderMarkdown(stripRouteMapPlaceholder(state.rendered))}</div>`;
       state.outputEl = null;
     } else {
-      if (!state.outputEl || !answerEl.contains(state.outputEl)) {
+      if (!state.outputEl || !answerBody.contains(state.outputEl)) {
         const revealClass = state.hasShownFirstChunk ? "" : " agent-answer-output--reveal";
-        answerEl.innerHTML = `<div class="agent-answer-output agent-answer-output--live agent-answer-output--stream-text${revealClass}"></div>`;
-        state.outputEl = answerEl.querySelector(".agent-answer-output");
+        answerBody.innerHTML = `<div class="agent-answer-output agent-answer-output--live agent-answer-output--stream-text${revealClass}"></div>`;
+        state.outputEl = answerBody.querySelector(".agent-answer-output");
       }
       const piece = document.createElement("span");
       piece.className = "agent-answer-fade-piece";
@@ -2960,16 +3173,18 @@ async function renderAnswerWithPacing(answer) {
 
 function renderLoadingAnswer(message) {
   cancelAnswerRender();
+  restoreRoutePreviewPlacement();
   clearRoutePreview();
   hideAgentActions();
   clearLatestAnswerModelLabel();
+  setAgentAnswerMetaHtml("");
   const loadingSessionId = ++loadingRenderSessionId;
   const answerEl = $("agentAnswer");
   if (answerEl) {
     answerEl.classList.remove("agent-answer--streaming");
     answerEl.classList.remove("agent-answer--chunk");
   }
-  $("agentAnswer").innerHTML = `
+  setAgentAnswerHtml(`
     <div class="thinking-panel" role="status" aria-live="polite" data-loading-session="${loadingSessionId}">
       <div class="thinking-header">
         <span class="thinking-orbit" aria-hidden="true"></span>
@@ -2978,7 +3193,7 @@ function renderLoadingAnswer(message) {
       </div>
       <div class="thinking-bar" aria-hidden="true"><span></span></div>
     </div>
-  `;
+  `);
   return loadingSessionId;
 }
 
@@ -3134,7 +3349,7 @@ function renderChatMessageContent(role, content) {
   if (role === "user") {
     return escapeHtml(text).replace(/\n+/g, "<br />");
   }
-  return renderMarkdown(text);
+  return renderMarkdown(stripRouteMapPlaceholder(text));
 }
 
 function sanitizeModelOutput(value) {
@@ -3144,6 +3359,12 @@ function sanitizeModelOutput(value) {
     .replace(/^[\s\S]*?<\/think>/gi, "")
     .replace(/^\s*(reasoning|thinking|thought process|analysis|scratchpad|chain of thought|思考过程|推理过程|思路|分析)\s*[:：][\s\S]*?(?:\n\s*\n|(?=final answer\s*[:：])|(?=最终答案\s*[:：])|$)/i, "")
     .replace(/^\s*(final answer|最终答案)\s*[:：]\s*/i, "")
+    .replace(/\bhere['’]s a map of the recommended (?:driving|walking|cycling|bicycling|transit|public transport) route\s*:/gi, "Here’s the route map:")
+    .replace(/\bbelow is a map of the recommended (?:driving|walking|cycling|bicycling|transit|public transport) route\s*:/gi, "Below is the route map:")
+    .replace(/这是推荐的(?:驾车|步行|骑行|公共交通)路线图[：:]/g, "这是路线地图：")
+    .replace(/以下是推荐的(?:驾车|步行|骑行|公共交通)路线图[：:]/g, "以下是路线地图：")
+    .replace(/[^.!?\n]*(?:no|not|doesn['’]t|does not|isn['’]t|is not|unavailable|applies only)[^.!?\n]*(?:imperial shuttle|campus shuttle|shuttle)[^.!?\n]*[.!?]?\s*/gi, "")
+    .replace(/[^。！？\n]*(?:不适用|不适合|无|没有|暂无|不提供)[^。！？\n]*(?:校车|班车|shuttle)[^。！？\n]*[。！？]?\s*/gi, "")
     .trim();
 }
 
@@ -3235,6 +3456,7 @@ function setAgentMode(mode) {
 function formatAgentTools(tools = []) {
   const labels = {
     navigate: currentLanguage === "zh" ? "导航" : "Navigation",
+    render_route_map: currentLanguage === "zh" ? "交互地图" : "Interactive map",
     route_matrix: currentLanguage === "zh" ? "路线对比" : "Route Comparison",
     weather_current: currentLanguage === "zh" ? "天气" : "Weather",
     web_search: currentLanguage === "zh" ? "联网搜索" : "Web Search",
@@ -3248,6 +3470,7 @@ function formatAgentTools(tools = []) {
 function formatLoadingTools(tools = []) {
   const labels = {
     navigate: currentLanguage === "zh" ? "导航" : "Navigation",
+    render_route_map: currentLanguage === "zh" ? "交互地图" : "Interactive map",
     route_matrix: currentLanguage === "zh" ? "路线对比" : "Route Comparison",
     weather_current: currentLanguage === "zh" ? "天气" : "Weather",
     web_search: currentLanguage === "zh" ? "联网搜索" : "Web Search",
@@ -3367,26 +3590,95 @@ function initStartPickerMap() {
 
 function renderRoutePreview(data) {
   const routes = routeOptionsForPreview(data);
-  const recommended = routes.find((route) => route.mode === data?.recommended?.mode) || routes[0];
+  const recommended = preferredRoutePreviewOption(routes);
   activeRoutePreview = data;
+  selectedRoutePreviewVariantKey = routePreviewOptionKey(recommended);
   renderRouteModeOptions(routes, recommended?.mode);
+  renderRouteVariantOptions(routes, recommended?.mode, selectedRoutePreviewVariantKey);
   drawRoutePreview(data, recommended);
 }
 
 function routeOptionsForPreview(data) {
-  return [data?.recommended, ...(data?.alternatives || [])].filter((route) => route?.polyline);
+  return [ ...(data?.mapRoutes || []), data?.recommended, ...(data?.alternatives || [])]
+    .filter((route) => route?.polyline)
+    .filter((route, index, items) => index === items.findIndex((item) => routePreviewOptionKey(item) === routePreviewOptionKey(route)))
+    .sort((left, right) => routePreviewModePriority(left) - routePreviewModePriority(right));
+}
+
+function preferredRoutePreviewOption(routes) {
+  return routes.find(Boolean) || null;
+}
+
+function routePreviewOptionKey(route) {
+  if (!route) return "";
+  return `${String(route.mode || "")}:${String(route.routeVariantIndex ?? 0)}`;
+}
+
+function routePreviewModeGroups(routes) {
+  const groups = [];
+  routes.forEach((route) => {
+    const mode = String(route?.mode || "").toUpperCase();
+    if (!mode) return;
+    let group = groups.find((item) => item.mode === mode);
+    if (!group) {
+      group = { mode, routes: [] };
+      groups.push(group);
+    }
+    group.routes.push(route);
+  });
+  groups.forEach((group) => {
+    group.routes.sort((left, right) => {
+      const leftIndex = Number.isFinite(left?.routeVariantIndex) ? left.routeVariantIndex : 999;
+      const rightIndex = Number.isFinite(right?.routeVariantIndex) ? right.routeVariantIndex : 999;
+      return leftIndex - rightIndex || (left?.durationMinutes || 10 ** 9) - (right?.durationMinutes || 10 ** 9);
+    });
+  });
+  return groups;
+}
+
+function routePreviewModePriority(route) {
+  const mode = String(route?.mode || "").toUpperCase();
+  const priority = {
+    TRANSIT: 0,
+    BICYCLE: 1,
+    TWO_WHEELER: 1,
+    WALK: 2,
+  };
+  return priority[mode] ?? 9;
 }
 
 function renderRouteModeOptions(routes, selectedMode) {
   const select = $("routeModeSelect");
-  select.innerHTML = routes
-    .map((route) => {
+  if (!select) return;
+  select.innerHTML = routePreviewModeGroups(routes)
+    .map((group) => {
+      const route = group.routes[0];
       // Only show transport mode in the select (no duration/distance)
       const label = routeModeDisplayLabel(route);
       return `<option value="${route.mode}" ${route.mode === selectedMode ? "selected" : ""}>${escapeHtml(label)}</option>`;
     })
     .join("");
-  $("routeUpdateButton").disabled = routes.length < 2;
+}
+
+function renderRouteVariantOptions(routes, selectedMode, selectedKey) {
+  const panel = $("routeVariantPanel");
+  const title = $("routeVariantTitle");
+  const optionsEl = $("routeVariantOptions");
+  if (!panel || !optionsEl || !title) return;
+  title.textContent = t("routeChoices");
+  const groups = routePreviewModeGroups(routes);
+  const currentGroup = groups.find((group) => group.mode === String(selectedMode || "").toUpperCase()) || null;
+  if (!currentGroup || currentGroup.routes.length < 2) {
+    optionsEl.innerHTML = "";
+    setElementHidden(panel, true);
+    return;
+  }
+  optionsEl.innerHTML = currentGroup.routes.map((route, index) => {
+    const key = routePreviewOptionKey(route);
+    const activeClass = key === selectedKey ? " is-active" : "";
+    return `<button type="button" class="route-variant-chip${activeClass}" data-route-variant-key="${escapeHtml(key)}">${escapeHtml(t("routeChoiceLabel", { index: index + 1 }))}</button>`;
+  }).join("");
+  setElementHidden(panel, false);
 }
 
 function routeModeDisplayLabel(route) {
@@ -3412,7 +3704,10 @@ function drawSelectedRoutePreview() {
   if (!activeRoutePreview) return;
   const routes = routeOptionsForPreview(activeRoutePreview);
   const selectedMode = $("routeModeSelect").value;
-  const route = routes.find((item) => item.mode === selectedMode) || routes[0];
+  const modeRoutes = routes.filter((item) => item.mode === selectedMode);
+  const route = modeRoutes.find((item) => routePreviewOptionKey(item) === selectedRoutePreviewVariantKey) || modeRoutes[0] || routes[0];
+  selectedRoutePreviewVariantKey = routePreviewOptionKey(route);
+  renderRouteVariantOptions(routes, selectedMode, selectedRoutePreviewVariantKey);
   drawRoutePreview(activeRoutePreview, route);
   updateGoogleMapsLink(activeRoutePreview, route);
 }
@@ -3437,8 +3732,9 @@ function setRouteMapFullscreen(enabled) {
   button.textContent = routeMapFullscreen ? t("exitFullScreen") : t("fullScreen");
   button.setAttribute("aria-label", routeMapFullscreen ? t("exitFullScreen") : t("fullScreen"));
   if (mapElement) {
-    mapElement.style.height = routeMapFullscreen ? "100%" : "360px";
-    mapElement.style.minHeight = routeMapFullscreen ? "100%" : "360px";
+    const defaultHeight = routePreviewDefaultHeight();
+    mapElement.style.height = routeMapFullscreen ? "100%" : defaultHeight;
+    mapElement.style.minHeight = routeMapFullscreen ? "100%" : defaultHeight;
   }
   window.setTimeout(() => {
     if (routeMap && window.google?.maps) {
@@ -3466,13 +3762,13 @@ function drawRoutePreview(data, recommended) {
 
   pendingRoutePreview = data;
   const preview = $("routePreview");
-  preview.hidden = false;
+  setElementHidden(preview, false);
   preview.classList.remove("route-preview--pop");
   void preview.offsetWidth;
   preview.classList.add("route-preview--pop");
-  $("routePreviewTitle").textContent = `${t("routeMap")}: ${routeModeDisplayLabel(recommended) || (currentLanguage === "zh" ? "路线" : "route")}`;
   const distance = Number.isFinite(recommended.distanceKm) ? `, ${recommended.distanceKm} km` : "";
-  $("routePreviewMeta").textContent = `${recommended.durationMinutes} min${distance}`;
+  const routeMetaBadge = $("routeMapMetaBadge");
+  if (routeMetaBadge) routeMetaBadge.textContent = `${recommended.durationMinutes} min${distance}`;
   $("routeOriginLabel").textContent = data.origin || "Origin";
   $("routeDestinationLabel").textContent = data.destination || "Destination";
   updateGoogleMapsLink(data, recommended);
@@ -3480,8 +3776,9 @@ function drawRoutePreview(data, recommended) {
   if (!window.google?.maps) return;
 
   const mapElement = $("routeMap");
-  mapElement.style.minHeight = "360px";
-  mapElement.style.height = "360px";
+  const defaultHeight = routePreviewDefaultHeight();
+  mapElement.style.minHeight = defaultHeight;
+  mapElement.style.height = defaultHeight;
   if (!routeMap) {
     routeMap = new google.maps.Map(mapElement, {
       center: path[0],
@@ -3903,10 +4200,17 @@ function transferMarkerTitle(segment) {
 function clearRoutePreview() {
   pendingRoutePreview = null;
   activeRoutePreview = null;
+  selectedRoutePreviewVariantKey = "";
+  const routeMetaBadge = $("routeMapMetaBadge");
+  if (routeMetaBadge) routeMetaBadge.textContent = "";
+  const routeVariantOptions = $("routeVariantOptions");
+  if (routeVariantOptions) routeVariantOptions.innerHTML = "";
+  setElementHidden("routeVariantPanel", true);
   const preview = $("routePreview");
+  restoreRoutePreviewPlacement();
   if (preview) {
     preview.classList.remove("route-preview--pop");
-    preview.hidden = true;
+    setElementHidden(preview, true);
   }
   setRouteMapFullscreen(false);
   routePolylines.forEach((polyline) => polyline.setMap(null));
@@ -3919,31 +4223,43 @@ function clearRoutePreview() {
 function renderAgentActions(data = null, route = data?.recommended) {
   const actions = $("agentActions");
   const googleLink = $("googleMapsLink");
-  actions.hidden = false;
+  if (!actions || !googleLink) return;
+  setElementHidden(actions, false);
   const hasRoute = Boolean(data?.origin && data?.destination);
-  googleLink.hidden = !hasRoute;
+  setElementHidden(googleLink, !hasRoute);
   if (hasRoute) updateGoogleMapsLink(data, route);
 }
 
 function hideAgentActions() {
-  $("agentActions").hidden = true;
+  setElementHidden("agentActions", true);
+}
+
+function googleMapsPlaceValue(place, fallbackText = "") {
+  if (isLatLngPlace(place)) {
+    return `${place.lat},${place.lng}`;
+  }
+  return String(fallbackText || "").trim();
+}
+
+function routePolylineEndpoint(route, kind = "origin") {
+  const encodedPolyline = String(route?.polyline || "").trim();
+  if (!encodedPolyline) return null;
+  const path = decodePolyline(encodedPolyline);
+  if (!path.length) return null;
+  return kind === "destination" ? path[path.length - 1] : path[0];
 }
 
 function updateGoogleMapsLink(data = latestNavigationData, route = data?.recommended) {
   const link = $("googleMapsLink");
-  if (!data?.origin || !data?.destination) {
-    link.hidden = true;
+  if (!link) return;
+  const href = buildGoogleMapsHref(data, route);
+  if (!href) {
+    setElementHidden(link, true);
     return;
   }
 
-  link.hidden = false;
-  const params = new URLSearchParams({
-    api: "1",
-    origin: data.origin,
-    destination: data.destination,
-    travelmode: googleMapsTravelMode(route?.mode),
-  });
-  link.href = `https://www.google.com/maps/dir/?${params.toString()}`;
+  setElementHidden(link, false);
+  link.href = href;
 }
 
 function googleMapsTravelMode(mode) {
@@ -3958,7 +4274,7 @@ function googleMapsTravelMode(mode) {
 
 function openChatModal() {
   const modal = $("chatModal");
-  modal.hidden = false;
+  setElementHidden(modal, false);
   // trigger animation
   void modal.offsetWidth;
   modal.classList.remove("closing");
@@ -3973,7 +4289,7 @@ function closeChatModal() {
   modal.classList.remove("visible");
   modal.classList.add("closing");
   modal.addEventListener("animationend", function handler() {
-    modal.hidden = true;
+    setElementHidden(modal, true);
     modal.classList.remove("closing");
     modal.removeEventListener("animationend", handler);
   });
@@ -4741,15 +5057,19 @@ document.querySelectorAll("[data-question]").forEach((button) => {
     answerQuestion(button.dataset.question);
   });
 });
-$("routeUpdateButton").addEventListener("click", drawSelectedRoutePreview);
-// Auto-update the route preview when the user changes transport mode
 const routeModeSelectEl = $("routeModeSelect");
 if (routeModeSelectEl) {
   routeModeSelectEl.addEventListener("change", () => {
-    // update immediately without requiring the Update button
+    selectedRoutePreviewVariantKey = "";
     drawSelectedRoutePreview();
   });
 }
+$("routeVariantOptions")?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-route-variant-key]");
+  if (!button) return;
+  selectedRoutePreviewVariantKey = button.dataset.routeVariantKey || "";
+  drawSelectedRoutePreview();
+});
 $("routeFullscreenButton").addEventListener("click", toggleRouteMapFullscreen);
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && routeMapFullscreen) setRouteMapFullscreen(false);
@@ -4878,7 +5198,7 @@ document.querySelectorAll('.useful-links a.link-cta, .footer-useful-links a.foot
 function showExternalConfirm(href) {
   pendingExternalHref = href;
   if (!externalConfirmModalEl) return;
-  externalConfirmModalEl.hidden = false;
+  setElementHidden(externalConfirmModalEl, false);
   void externalConfirmModalEl.offsetWidth;
   externalConfirmModalEl.classList.remove("closing");
   externalConfirmModalEl.classList.add("visible");
@@ -4893,7 +5213,7 @@ function hideExternalConfirm() {
   externalConfirmModalEl.classList.remove("visible");
   externalConfirmModalEl.classList.add("closing");
   externalConfirmModalEl.addEventListener("animationend", function handler() {
-    externalConfirmModalEl.hidden = true;
+    setElementHidden(externalConfirmModalEl, true);
     externalConfirmModalEl.classList.remove("closing");
     externalConfirmModalEl.removeEventListener("animationend", handler);
   });
@@ -4905,7 +5225,7 @@ function showToolInfo(kind, overrideContent = "") {
   activeToolInfoKind = kind;
   activeToolInfoOverrideContent = overrideContent;
   toolInfoTextEl.innerHTML = renderToolInfoContent(kind, overrideContent);
-  toolInfoModalEl.hidden = false;
+  setElementHidden(toolInfoModalEl, false);
   void toolInfoModalEl.offsetWidth;
   toolInfoModalEl.classList.remove("closing");
   toolInfoModalEl.classList.add("visible");
@@ -4956,7 +5276,7 @@ function renderLlmToolInfo() {
   const modelIdentity = `${activeModel?.id || ""} ${activeModel?.model || ""} ${activeModel?.label || ""}`.toLowerCase();
   const helperText = modelIdentity.includes("glm")
     ? t("chatModelHelperGlm")
-    : t("chatModelHelperQwen");
+    : t("chatModelHelperMiniMax");
   const modelButtons = getChatModelOptions().length
     ? `
       <div class="chat-model-switcher" role="group" aria-label="${escapeHtml(t("chatModelSectionTitle"))}">
@@ -5008,6 +5328,7 @@ function renderAgentToolInfo() {
         </div>
         <div class="tool-info-list">
           <div class="tool-info-item"><strong>导航</strong>：使用谷歌地图路线 API 获取实时出行时间、距离和路线。</div>
+          <div class="tool-info-item"><strong>交互地图</strong>：展示可嵌入回答区域的交互路线地图，支持全屏查看。</div>
           <div class="tool-info-item"><strong>路线对比</strong>： 用于比较不同目的地或交通方式的出行估计。</div>
           <div class="tool-info-item"><strong>天气</strong>：使用谷歌天气 API 获取出发点或目的地的当前天气。</div>
           <div class="tool-info-item"><strong>TfL 状态</strong>： 查询路线涉及的伦敦线路是否有延误或中断。</div>
@@ -5027,6 +5348,7 @@ function renderAgentToolInfo() {
       </div>
       <div class="tool-info-list">
         <div class="tool-info-item"><strong>Navigation</strong> uses Google Routes for live travel time, distance, and route geometry.</div>
+        <div class="tool-info-item"><strong>Interactive map</strong> turns navigation results into an embedded interactive route map with transport-mode switching and full-screen view.</div>
         <div class="tool-info-item"><strong>Route Comparison</strong> compares travel estimates to destinations based on candidates.</div>
         <div class="tool-info-item"><strong>Weather</strong> uses Google Weather API for current conditions at a start point or destination.</div>
         <div class="tool-info-item"><strong>TfL Status</strong> checks live disruption status for London lines used by a route.</div>
@@ -5063,7 +5385,7 @@ function hideToolInfo() {
   toolInfoModalEl.classList.remove("visible");
   toolInfoModalEl.classList.add("closing");
   toolInfoModalEl.addEventListener("animationend", function handler() {
-    toolInfoModalEl.hidden = true;
+    setElementHidden(toolInfoModalEl, true);
     toolInfoModalEl.classList.remove("closing");
     toolInfoModalEl.removeEventListener("animationend", handler);
   });
@@ -5078,21 +5400,21 @@ function resetStartupWaitLongHint() {
     startupWaitLongHintTimer = null;
   }
   if (startupWaitBodyTertiaryEl) {
-    startupWaitBodyTertiaryEl.hidden = true;
+    setElementHidden(startupWaitBodyTertiaryEl, true);
   }
 }
 
 function showStartupWaitModal() {
   if (!startupWaitModalEl) return;
   resetStartupWaitLongHint();
-  startupWaitModalEl.hidden = false;
+  setElementHidden(startupWaitModalEl, false);
   void startupWaitModalEl.offsetWidth;
   startupWaitModalEl.classList.remove("closing");
   startupWaitModalEl.classList.add("visible");
   startupWaitLongHintTimer = window.setTimeout(() => {
     startupWaitLongHintTimer = null;
     if (!startupWaitModalEl || startupWaitModalEl.hidden || !startupWaitBodyTertiaryEl) return;
-    startupWaitBodyTertiaryEl.hidden = false;
+    setElementHidden(startupWaitBodyTertiaryEl, false);
   }, 30000);
 }
 
@@ -5102,7 +5424,7 @@ function hideStartupWaitModal() {
   startupWaitModalEl.classList.remove("visible");
   startupWaitModalEl.classList.add("closing");
   startupWaitModalEl.addEventListener("animationend", function handler() {
-    startupWaitModalEl.hidden = true;
+    setElementHidden(startupWaitModalEl, true);
     startupWaitModalEl.classList.remove("closing");
     startupWaitModalEl.removeEventListener("animationend", handler);
   });

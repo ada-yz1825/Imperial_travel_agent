@@ -18,6 +18,7 @@ from navigator_core import (
     apply_context_start,
     attach_route_geometry,
     build_navigation_answer,
+    call_google_compute_route_variants,
     call_google_matrix_route,
     call_google_route_matrix,
     call_groq,
@@ -103,15 +104,18 @@ def compact_json(value, limit=5000):
 
 
 def agent_observation_payload(name, result):
-    if name == "navigate" and isinstance(result, dict):
+    if name in {"navigate", "render_route_map"} and isinstance(result, dict):
         summary = {
             "origin": result.get("origin"),
             "destination": result.get("destination"),
+            "originPlace": result.get("originPlace"),
             "destinationPlace": result.get("destinationPlace"),
+            "routeLink": result.get("routeLink"),
             "recommended": summarize_route_option(result.get("recommended")),
             "alternatives": [summarize_route_option(route) for route in result.get("alternatives", [])],
             "imperial_weekday_shuttle": result.get("imperial_weekday_shuttle"),
             "provider": result.get("provider"),
+            "inlineMapRequested": bool(result.get("inlineMapRequested")),
         }
         if result.get("details"):
             summary["details"] = result.get("details")
@@ -147,6 +151,32 @@ def summarize_route_option(route):
     return summary
 
 
+def google_maps_travel_mode(mode):
+    text = str(mode or "").strip().upper()
+    return {
+        "TRANSIT": "transit",
+        "WALK": "walking",
+        "BICYCLE": "bicycling",
+        "TWO_WHEELER": "bicycling",
+        "DRIVE": "driving",
+        "DRIVING": "driving",
+    }.get(text, "walking")
+
+
+def google_maps_route_link(origin_place, destination_place, route=None):
+    if not valid_lat_lng(origin_place) or not valid_lat_lng(destination_place):
+        return ""
+    params = urllib.parse.urlencode(
+        {
+            "api": "1",
+            "origin": f"{origin_place['lat']},{origin_place['lng']}",
+            "destination": f"{destination_place['lat']},{destination_place['lng']}",
+            "travelmode": google_maps_travel_mode((route or {}).get("mode")),
+        }
+    )
+    return f"https://www.google.com/maps/dir/?{params}"
+
+
 def agent_tool_schema_definitions():
     return [
         {
@@ -179,6 +209,28 @@ def agent_tool_schema_definitions():
             "function": {
                 "name": "navigate",
                 "description": "Calculate live travel routes, durations, distances, route geometry, and destination context using Google Routes.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "The user's route request, including origin/destination/mode when present.",
+                        },
+                        "contextStart": {
+                            "type": "object",
+                            "description": "Selected browser start point with name, lat, lng. Use when the user gives only a destination.",
+                        },
+                        "history": {"type": "array"},
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "render_route_map",
+                "description": "Prepare the inline route-map payload for the browser after a navigation request. Use this for directions so the browser can embed the map with the answer.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -274,8 +326,13 @@ def agent_system_prompt():
         "You may call multiple tools in sequence, observe the result, then decide whether another tool is needed. "
         "If navigate returns transitLines and the user asks for route advice, delay impact, or whether it is a good time to travel, "
         "call tfl_status with the provided statusQuery values, or the shortName for bus routes, before the final answer. "
+        "For navigation or directions requests, call render_route_map after navigate so the browser can embed the route map with your answer. If navigate succeeds and returns a usable route, you should normally call render_route_map in the same turn unless there is a concrete tool failure. "
+        "When you have called render_route_map, treat the embedded route map as part of your response context and refer to it only when that feels natural for the current answer, "
+        "instead of ignoring it or describing it like a separate system widget. When referring to the embedded map, keep the wording mode-neutral and do not label it as a driving, walking, cycling, or transit map unless the user explicitly asks for a specific mode. If the tool result includes routeLink, you may include a short natural Markdown link to Google Maps "
+        "as an optional next step, but do not force a fixed phrase or make the whole answer revolve around the link. "
+        "If you want the interactive route map to appear at a specific point in your answer, insert the standalone token [[ROUTE_MAP]] exactly where it should appear; the browser will replace that token with the embedded map. When the answer includes route advice plus other follow-up material such as weather, destination context, travel tips, or service reminders, it is usually more natural to place [[ROUTE_MAP]] soon after the main route explanation and before those secondary details, unless the context strongly suggests another position. A short context-setting phrase or sentence often helps the map feel naturally integrated with the surrounding explanation, but it is not mandatory and should vary with the situation. If you add such a lead-in, keep it brief, mode-neutral, and phrased in a fresh way that matches the nearby text rather than repeating a stock formula across answers. If you mention a Google Maps link, frame it mainly as a way to check live information or continue with turn-by-turn navigation, rather than as a generic extra link. If you do not include [[ROUTE_MAP]], the browser may place the map after the main text. Do not say above or below unless your wording matches where you place [[ROUTE_MAP]]. Avoid repeating the same stock sentence about the map across answers. "
         "Imperial runs a weekday campus shuttle connecting South Kensington, White City, and Hammersmith. "
-        "When a route request is between those campuses, mention the shuttle briefly as an option and include this Markdown link: "
+        "Only mention the shuttle when both the origin and destination are near those campuses and the tool context indicates it applies; when it does, mention it briefly as an option and include this Markdown link: "
         "[Imperial shuttle](https://www.imperial.ac.uk/admin-services/property/travel/shuttle-bus/). "
         "Only mention specific line names, stops, and statuses that tools provide. "
         "If navigate does not provide transitLines, say the route tool did not provide specific line details instead of guessing. "
@@ -305,7 +362,7 @@ def agent_user_prompt(payload):
     return (
         "Handle this browser request. Use the provided selected start point as contextStart when a route/weather request "
         "has no explicit origin. If the user asks about weather at the destination after a route tool call, use the "
-        "destinationPlace from the route result.\n"
+        "destinationPlace from the route result. For navigation answers, keep the route explanation primary, and weave any embedded map or optional route link in as a natural supporting detail when available. When mentioning the embedded map, use neutral wording rather than naming a specific transport mode unless the user asked for one. After a successful navigate call, you should normally also call render_route_map so the route is embedded with the answer. If render_route_map succeeds, place [[ROUTE_MAP]] where it fits naturally if you want the map embedded at a specific point. When the answer also includes weather, destination introduction, travel tips, or other extra material, prefer placing [[ROUTE_MAP]] right after the route explanation before moving on, unless another order reads more naturally. If you include a Google Maps link, present it mainly as useful for checking live updates or continuing navigation. A brief transition into the map is often helpful, but it should be optional, concise, and adapted to the exact context instead of sounding templated.\n"
         f"{compact_json(safe_payload, limit=6500)}"
     )
 
@@ -437,6 +494,12 @@ def normalize_agent_tool_arguments(name, arguments, payload):
         normalized.setdefault("contextStart", payload.get("contextStart"))
         normalized.setdefault("history", payload.get("history", [])[-6:])
         normalized["_agentTool"] = True
+    elif name == "render_route_map":
+        normalized.setdefault("query", payload.get("question", ""))
+        normalized.setdefault("contextStart", payload.get("contextStart"))
+        normalized.setdefault("history", payload.get("history", [])[-6:])
+        normalized["_agentTool"] = True
+        normalized["_renderRouteMap"] = True
     elif name == "route_matrix":
         context_start = payload.get("contextStart") or {}
         context = payload.get("context") or {}
@@ -483,6 +546,8 @@ def execute_agent_tool(name, arguments, payload):
         return mcp_tool_web_search(arguments)
     if name == "navigate":
         return mcp_tool_navigate(arguments)
+    if name == "render_route_map":
+        return mcp_tool_render_route_map(arguments)
     if name == "route_matrix":
         return mcp_tool_route_matrix(arguments)
     if name == "weather_current":
@@ -539,7 +604,7 @@ def extract_agent_result_fields(tool_calls):
         payload = item.get("_fullResult") or item.get("result")
         if not isinstance(payload, dict):
             continue
-        if item.get("name") == "navigate":
+        if item.get("name") in {"navigate", "render_route_map"}:
             public_payload = {key: value for key, value in payload.items() if key not in {"answer", "provider"}}
             result.update(public_payload)
             result["navigation"] = payload
@@ -1060,6 +1125,52 @@ def public_tool_trace(tool_trace):
     return public_items
 
 
+def has_successful_route_map_trace(tool_trace):
+    return any(
+        item.get("status") == "ok" and item.get("name") == "render_route_map"
+        for item in tool_trace
+    )
+
+
+def ensure_route_map_tool_trace(tool_trace, latest_navigation_tool_result):
+    items = list(tool_trace or [])
+    if not isinstance(latest_navigation_tool_result, dict):
+        return items
+    if not latest_navigation_tool_result.get("recommended"):
+        return items
+    if has_successful_route_map_trace(items):
+        return items
+
+    synthetic_result = dict(latest_navigation_tool_result)
+    synthetic_result["inlineMapRequested"] = True
+    items.append(
+        {
+            "name": "render_route_map",
+            "arguments": {
+                "_auto": True,
+                "reason": "auto-attached after successful navigate result",
+            },
+            "status": "ok",
+            "_fullResult": synthetic_result,
+            "result": agent_observation_payload("render_route_map", synthetic_result),
+        }
+    )
+    return items
+
+
+def build_agent_content_blocks(answer, tool_trace):
+    blocks = [{"type": "markdown", "text": str(answer or "")}]
+    for item in tool_trace:
+        if item.get("status") != "ok" or item.get("name") != "render_route_map":
+            continue
+        payload = item.get("_fullResult") or item.get("result")
+        if isinstance(payload, dict):
+            public_payload = {key: value for key, value in payload.items() if key not in {"answer", "provider"}}
+            blocks.append({"type": "route_map", "data": public_payload})
+            break
+    return blocks
+
+
 def resolve_chat_target(payload):
     provider = get_llm_provider()
     if provider != "together":
@@ -1115,6 +1226,7 @@ def mcp_tool_agent_answer(arguments):
     ]
     tools = agent_tool_schema_definitions()
     tool_trace = []
+    latest_navigation_tool_result = None
 
     try:
         for _ in range(AGENT_TOOL_CALL_LIMIT):
@@ -1125,15 +1237,17 @@ def mcp_tool_agent_answer(arguments):
                 if not answer:
                     fallback = mcp_tool_chat_complete({"payload": payload})
                     answer = fallback.get("answer", "") if isinstance(fallback, dict) else str(fallback or "")
+                finalized_tool_trace = ensure_route_map_tool_trace(tool_trace, latest_navigation_tool_result)
                 result = {
                     "answer": answer,
+                    "contentBlocks": build_agent_content_blocks(answer, finalized_tool_trace),
                     "model": chat_target["model"],
                     "provider": provider,
                     "chatModelId": chat_target["chatModelId"],
-                    "toolsUsed": [item["name"] for item in tool_trace if item.get("status") == "ok"],
-                    "toolCalls": public_tool_trace(tool_trace),
+                    "toolsUsed": [item["name"] for item in finalized_tool_trace if item.get("status") == "ok"],
+                    "toolCalls": public_tool_trace(finalized_tool_trace),
                 }
-                result.update(extract_agent_result_fields(tool_trace))
+                result.update(extract_agent_result_fields(finalized_tool_trace))
                 return result
 
             assistant_message = {
@@ -1153,8 +1267,14 @@ def mcp_tool_agent_answer(arguments):
                     if name not in agent_tool_names():
                         raise MCPToolError(f"Tool is not available to the agent: {name}", status=404)
                     emit_mcp_progress({"type": "tool", "name": name, "status": "started"})
-                    tool_result = execute_agent_tool(name, parsed_arguments, payload)
+                    if name == "render_route_map" and isinstance(latest_navigation_tool_result, dict):
+                        tool_result = dict(latest_navigation_tool_result)
+                        tool_result["inlineMapRequested"] = True
+                    else:
+                        tool_result = execute_agent_tool(name, parsed_arguments, payload)
                     extra_trace_item = maybe_attach_tfl_status(tool_result) if name == "navigate" else None
+                    if name == "navigate" and isinstance(tool_result, dict) and tool_result.get("recommended"):
+                        latest_navigation_tool_result = dict(tool_result)
                     trace_item["_fullResult"] = tool_result
                     trace_item["result"] = agent_observation_payload(name, tool_result)
                     messages.append(
@@ -1183,15 +1303,17 @@ def mcp_tool_agent_answer(arguments):
 
         final = mcp_tool_chat_complete({"payload": payload})
         answer = final.get("answer", "") if isinstance(final, dict) else str(final or "")
+        finalized_tool_trace = ensure_route_map_tool_trace(tool_trace, latest_navigation_tool_result)
         result = {
             "answer": answer,
+            "contentBlocks": build_agent_content_blocks(answer, finalized_tool_trace),
             "model": chat_target["model"],
             "provider": provider,
             "chatModelId": chat_target["chatModelId"],
-            "toolsUsed": [item["name"] for item in tool_trace if item.get("status") == "ok"],
-            "toolCalls": public_tool_trace(tool_trace),
+            "toolsUsed": [item["name"] for item in finalized_tool_trace if item.get("status") == "ok"],
+            "toolCalls": public_tool_trace(finalized_tool_trace),
         }
-        result.update(extract_agent_result_fields(tool_trace))
+        result.update(extract_agent_result_fields(finalized_tool_trace))
         return result
     except urllib.error.HTTPError as error:
         message = error.read().decode("utf-8", errors="replace")
@@ -1236,7 +1358,7 @@ def mcp_tool_health(arguments):
         "googleMapsBrowserConfigured": bool(get_google_maps_browser_key()),
         "googleMapsBrowserKey": get_google_maps_browser_key(),
         "mcpConnected": True,
-        "mcpTools": ["agent_answer", "chat_complete", "classify_intent", "web_search", "route_matrix", "navigate", "weather_current", "tfl_status"],
+        "mcpTools": ["agent_answer", "chat_complete", "classify_intent", "web_search", "route_matrix", "navigate", "render_route_map", "weather_current", "tfl_status"],
     }
 
 
@@ -1472,6 +1594,7 @@ def mcp_tool_navigate(arguments):
 
         modes = navigation_mode_candidates(route_request.get("mode"))
         route_options = []
+        map_routes = []
         route_errors = []
         for mode in modes:
             try:
@@ -1483,7 +1606,24 @@ def mcp_tool_navigate(arguments):
                     route_request["departureTime"],
                 )
                 if route:
-                    route_options.append(route)
+                    route_variants = call_google_compute_route_variants(
+                        api_key,
+                        route_request["origin"],
+                        route_request["destination"],
+                        mode,
+                        route_request["departureTime"],
+                        allow_alternatives=True,
+                    )
+                    if route_variants:
+                        route_variants.sort(key=lambda item: item.get("durationMinutes") or 10**9)
+                        for index, item in enumerate(route_variants):
+                            item["routeVariantIndex"] = index
+                            item["routeVariantCount"] = len(route_variants)
+                        route_options.append(route_variants[0])
+                        map_routes.extend(route_variants)
+                    else:
+                        route_options.append(route)
+                        map_routes.append(route)
                 else:
                     route_errors.append(f"{mode_label(mode)}: Google returned no route element.")
             except urllib.error.HTTPError as error:
@@ -1497,9 +1637,12 @@ def mcp_tool_navigate(arguments):
                 "answer": answer,
                 "origin": route_request["origin"]["name"],
                 "destination": route_request["destination"]["name"],
+                "originPlace": public_place_payload(route_request["origin"]),
                 "destinationPlace": public_place_payload(route_request["destination"]),
+                "routeLink": "",
                 "recommended": None,
                 "alternatives": [],
+                "mapRoutes": [],
                 "imperial_weekday_shuttle": imperial_shuttle_context(route_request),
                 "provider": "google_routes",
                 "details": route_errors[:4],
@@ -1510,19 +1653,29 @@ def mcp_tool_navigate(arguments):
             route_options.sort(key=lambda item: (0 if item["mode"] == requested_mode else 1, item["durationMinutes"]))
         else:
             route_options.sort(key=lambda item: item["durationMinutes"])
+        if requested_mode:
+            map_routes.sort(key=lambda item: (0 if item["mode"] == requested_mode else 1, item["durationMinutes"]))
+        else:
+            map_routes.sort(key=lambda item: item["durationMinutes"])
         stop_metadata_cache = {}
-        for route in route_options:
+        for route in map_routes:
             attach_route_geometry(api_key, route_request, route)
             enrich_route_stop_metadata(route, stop_metadata_cache)
         answer = "" if agent_tool_mode else build_navigation_answer(query, route_request, route_options, route_errors)
+        origin_place = public_place_payload(route_request["origin"])
+        destination_place = public_place_payload(route_request["destination"])
+        route_link = google_maps_route_link(origin_place, destination_place, route_options[0])
         return {
             "answer": answer,
             "origin": route_request["origin"]["name"],
             "destination": route_request["destination"]["name"],
-            "destinationPlace": public_place_payload(route_request["destination"]),
+            "originPlace": origin_place,
+            "destinationPlace": destination_place,
+            "routeLink": route_link,
             "recommended": route_options[0],
             "mapRoute": route_options[0],
             "alternatives": route_options[1:],
+            "mapRoutes": map_routes or [route_options[0], *route_options[1:]],
             "imperial_weekday_shuttle": imperial_shuttle_context(route_request),
             "provider": "google_routes",
         }
@@ -1531,6 +1684,15 @@ def mcp_tool_navigate(arguments):
     except urllib.error.HTTPError as error:
         message = error.read().decode("utf-8", errors="replace")
         raise MCPToolError(f"Google Routes API failed: {message}", status=error.code, payload={"error": f"Google Routes API failed: {message}"})
+
+
+def mcp_tool_render_route_map(arguments):
+    result = mcp_tool_navigate(arguments)
+    if isinstance(result, dict):
+        result["inlineMapRequested"] = True
+        if not result.get("answer"):
+            result["answer"] = ""
+    return result
 
 
 def mcp_tool_registry():
@@ -1542,6 +1704,7 @@ def mcp_tool_registry():
         "web_search": mcp_tool_web_search,
         "route_matrix": mcp_tool_route_matrix,
         "navigate": mcp_tool_navigate,
+        "render_route_map": mcp_tool_render_route_map,
         "weather_current": mcp_tool_weather_current,
         "tfl_status": mcp_tool_tfl_status,
     }
@@ -1590,6 +1753,11 @@ def mcp_tool_descriptions():
         {
             "name": "navigate",
             "description": "Parse a navigation request, call Google Routes tools, and return the browser navigation JSON.",
+            "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}, "contextStart": {"type": "object"}, "history": {"type": "array"}}},
+        },
+        {
+            "name": "render_route_map",
+            "description": "Prepare the browser inline route-map payload for a navigation request.",
             "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}, "contextStart": {"type": "object"}, "history": {"type": "array"}}},
         },
         {

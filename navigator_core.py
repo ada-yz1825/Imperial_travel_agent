@@ -25,17 +25,23 @@ OLLAMA_API_URL = os.environ.get("OLLAMA_API_URL", "http://localhost:11434/api/ch
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama").lower()
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5.2")
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "qwen/qwen3-32b")
-TOGETHER_MODEL = os.environ.get("TOGETHER_MODEL", "Qwen/Qwen3.5-9B")
-DEFAULT_TOGETHER_CHAT_MODEL = "Qwen/Qwen3-235B-A22B-Instruct-2507-tput"
-DEFAULT_TOGETHER_CHAT_MODEL_ID = "qwen235b"
+TOGETHER_MODEL = os.environ.get("TOGETHER_MODEL", "MiniMaxAI/MiniMax-M3")
+DEFAULT_TOGETHER_CHAT_MODEL = "MiniMaxAI/MiniMax-M3"
+DEFAULT_TOGETHER_CHAT_MODEL_ID = "minimaxm3"
 DEFAULT_WEATHER_SUMMARY_TOGETHER_MODEL = "Qwen/Qwen2.5-7B-Instruct-Turbo"
 DEFAULT_TOGETHER_CHAT_MODELS = [
         {
             "id": DEFAULT_TOGETHER_CHAT_MODEL_ID,
-            "label": "Qwen3 235B",
+            "label": "MiniMax M3",
             "model": DEFAULT_TOGETHER_CHAT_MODEL,
             "description": "Current default model",
-        }
+        },
+        {
+            "id": "glm52",
+            "label": "GLM-5.2",
+            "model": "zai-org/GLM-5.2",
+            "description": "Higher-capability model",
+        },
 ]
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3")
 OLLAMA_NUM_PREDICT = int(os.environ.get("OLLAMA_NUM_PREDICT", "1200"))
@@ -55,12 +61,19 @@ CHAT_STREAM_CHUNK_CHARS = int(os.environ.get("CHAT_STREAM_CHUNK_CHARS", "40"))
 # Delay between emitting chunks (seconds). Lower for faster streaming; zero disables throttling.
 CHAT_STREAM_CHUNK_DELAY_SECONDS = float(os.environ.get("CHAT_STREAM_CHUNK_DELAY_SECONDS", "0.005"))
 GOOGLE_TRAVEL_MODE = os.environ.get("GOOGLE_TRAVEL_MODE", "TRANSIT")
+GOOGLE_ROUTE_DEPARTURE_LEAD_SECONDS = int(os.environ.get("GOOGLE_ROUTE_DEPARTURE_LEAD_SECONDS", "120"))
 IMPERIAL_SHUTTLE_URL = "https://www.imperial.ac.uk/admin-services/property/travel/shuttle-bus/"
 IMPERIAL_SHUTTLE_CAMPUSES = {
     "south kensington": "South Kensington",
     "white city": "White City",
     "hammersmith": "Hammersmith",
 }
+IMPERIAL_SHUTTLE_CAMPUS_POINTS = {
+    "South Kensington": {"lat": 51.498356, "lng": -0.176894},
+    "White City": {"lat": 51.515768, "lng": -0.224009},
+    "Hammersmith": {"lat": 51.517420, "lng": -0.234721},
+}
+IMPERIAL_SHUTTLE_NEARBY_RADIUS_KM = 0.9
 COMMAND_PLACE_TEXTS = {
     "导航",
     "路线",
@@ -742,12 +755,36 @@ def compute_route_field_mask(mode):
     return ",".join(fields)
 
 
-def call_google_compute_route(api_key, origin, destination, mode, departure_time):
+def normalize_google_compute_route(mode, route, variant_index=0, variant_count=1):
+    if not isinstance(route, dict):
+        return None
+    duration_seconds = parse_duration_seconds(route.get("duration", ""))
+    distance_meters = route.get("distanceMeters")
+    result = {
+        "mode": mode,
+        "modeLabel": mode_label(mode),
+        "durationMinutes": max(1, round(duration_seconds / 60)) if duration_seconds else None,
+        "distanceKm": round(distance_meters / 1000, 2) if isinstance(distance_meters, (int, float)) else None,
+        "description": route.get("description", ""),
+        "polyline": route.get("polyline", {}).get("encodedPolyline", ""),
+        "routeVariantIndex": variant_index,
+        "routeVariantCount": variant_count,
+    }
+    if mode == "TRANSIT":
+        transit_steps = extract_transit_steps(route)
+        result["transitSteps"] = transit_steps
+        result["transitLines"] = dedupe_transit_lines(transit_steps)
+        result["routeSegments"] = extract_route_segments(route)
+        result["routeStops"] = extract_route_stops(route)
+    return result
+
+
+def call_google_compute_route_variants(api_key, origin, destination, mode, departure_time, allow_alternatives=True):
     body = {
         "origin": waypoint(origin),
         "destination": waypoint(destination),
         "travelMode": mode,
-        "computeAlternativeRoutes": False,
+        "computeAlternativeRoutes": bool(allow_alternatives),
         "languageCode": "en-GB",
         "units": "METRIC",
     }
@@ -772,29 +809,36 @@ def call_google_compute_route(api_key, origin, destination, mode, departure_time
 
     routes = data.get("routes", [])
     if not routes:
-        return None
+        return []
 
-    route = routes[0]
-    duration_seconds = parse_duration_seconds(route.get("duration", ""))
-    distance_meters = route.get("distanceMeters")
-    result = {
-        "mode": mode,
-        "modeLabel": mode_label(mode),
-        "durationMinutes": max(1, round(duration_seconds / 60)) if duration_seconds else None,
-        "distanceKm": round(distance_meters / 1000, 2) if isinstance(distance_meters, (int, float)) else None,
-        "description": route.get("description", ""),
-        "polyline": route.get("polyline", {}).get("encodedPolyline", ""),
-    }
-    if mode == "TRANSIT":
-        transit_steps = extract_transit_steps(route)
-        result["transitSteps"] = transit_steps
-        result["transitLines"] = dedupe_transit_lines(transit_steps)
-        result["routeSegments"] = extract_route_segments(route)
-        result["routeStops"] = extract_route_stops(route)
-    return result
+    normalized_routes = []
+    route_count = len(routes)
+    for index, route in enumerate(routes):
+        normalized = normalize_google_compute_route(mode, route, index, route_count)
+        if normalized and normalized.get("durationMinutes"):
+            normalized_routes.append(normalized)
+    return normalized_routes
+
+
+def call_google_compute_route(api_key, origin, destination, mode, departure_time):
+    variants = call_google_compute_route_variants(
+        api_key,
+        origin,
+        destination,
+        mode,
+        departure_time,
+        allow_alternatives=False,
+    )
+    return variants[0] if variants else None
 
 
 def attach_route_geometry(api_key, route_request, route):
+    if route.get("polyline"):
+        if route.get("mode") == "TRANSIT":
+            if route.get("routeSegments") or route.get("transitSteps") or route.get("routeStops"):
+                return
+        else:
+            return
     try:
         geometry = call_google_compute_route(
             api_key,
@@ -1587,13 +1631,18 @@ def parse_departure_time(query):
         if departure < now:
             departure += timedelta(days=1)
     else:
-        departure = now
+        departure = now + timedelta(seconds=GOOGLE_ROUTE_DEPARTURE_LEAD_SECONDS)
+
+    minimum_departure = now + timedelta(seconds=GOOGLE_ROUTE_DEPARTURE_LEAD_SECONDS)
+    if departure < minimum_departure:
+        departure = minimum_departure
 
     return departure.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def current_departure_time():
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    departure = datetime.now(timezone.utc) + timedelta(seconds=GOOGLE_ROUTE_DEPARTURE_LEAD_SECONDS)
+    return departure.isoformat().replace("+00:00", "Z")
 
 
 def waypoint(value):
@@ -1754,7 +1803,7 @@ def navigation_prompt(query, route_request, routes, errors, study_options):
             "If near_destination_study_options is empty, simply skip Imperial-specific study-space comments.",
             "If origin_source is 'context', avoid explicitly naming the origin; refer to it as the selected start point or omit it, focusing on the destination.",
             "If the user's query contains only one place, treat that place as the destination and phrase the answer as travel to that destination (do not invent or name an origin).",
-            f"If imperial_weekday_shuttle.applies is true, mention briefly that Imperial runs a weekday shuttle between the relevant campuses, and include this clickable Markdown link for the timetable: [Imperial shuttle]({IMPERIAL_SHUTTLE_URL}).",
+            f"If imperial_weekday_shuttle.applies is true, mention briefly that Imperial runs a weekday shuttle between the relevant campuses, and include this clickable Markdown link for the timetable: [Imperial shuttle]({IMPERIAL_SHUTTLE_URL}). Otherwise, do not mention the shuttle at all.",
             "If no routes are available, apologize gently, mention the origin/destination understood, and suggest checking Google Maps directly or trying a more specific place name.",
             "Use a natural conversational style. Avoid a fixed report template.",
             "Produce a complete, self-contained answer; do not end mid-sentence or insert a fixed source sentence."
@@ -2000,7 +2049,10 @@ def imperial_shuttle_context(route_request):
     origin_campus = campus_for_shuttle_place(route_request.get("origin"))
     destination_campus = campus_for_shuttle_place(route_request.get("destination"))
     applies = bool(origin_campus and destination_campus and origin_campus != destination_campus)
+    if not applies:
+        return None
     return {
+        "show_hint": True,
         "applies": applies,
         "operates": "weekdays",
         "campuses": ["South Kensington", "White City", "Hammersmith"],
@@ -2018,6 +2070,10 @@ def campus_for_shuttle_place(place):
     for key, label in IMPERIAL_SHUTTLE_CAMPUSES.items():
         if key in name:
             return label
+    if valid_lat_lng(place):
+        for label, campus_point in IMPERIAL_SHUTTLE_CAMPUS_POINTS.items():
+            if direct_distance_km(place, campus_point) <= IMPERIAL_SHUTTLE_NEARBY_RADIUS_KM:
+                return label
     return None
 
 
@@ -2771,13 +2827,13 @@ def build_weather_summary_prompt(payload):
             "task": "weather_card_summary",
             "weather": weather if isinstance(weather, dict) else {},
             "instructions": (
-                "Write one or two compact, natural sentences for a weather card. "
+                "Write two or three natural sentences for a weather card. Keep it concise, but allow a little more detail than a one-line summary. "
                 "Use only the provided weather data; do not invent forecasts. "
                 "Mention the practical takeaway for a student heading out, such as umbrella, layers, wind, UV, or walking comfort, only when supported by the data. "
                 "Avoid repeating a fixed template. Do not start with 'Current conditions', 'Weather details', or 'It is'. "
                 "You may use Markdown bold for a short lead phrase, for example **Sunny and hot - 33°C**. "
                 "Do not include bullets, coordinates, provider names, or labels. "
-                "Keep the total length under 30 English words or under 40 Chinese characters."
+                "Keep it compact enough for a weather card, but it may be a little fuller when the data supports a more useful practical summary."
             ),
         },
         ensure_ascii=False,
@@ -2809,7 +2865,7 @@ def build_agent_prompt(payload, no_think=False):
             "instructions": (
                 "Answer strictly in response_language. "
                 "If domain is general, answer the user's actual question normally and do not mention study spaces, libraries, campuses, candidate places, or Imperial recommendations unless the user asks for them. "
-                "The current_context may include imperialWeekdayShuttle. If the user asks about travelling between South Kensington, White City, and Hammersmith, mention briefly that Imperial runs a weekday campus shuttle and include the timetable URL from current_context. "
+                "The current_context may include imperialWeekdayShuttle. Mention it only when that shuttle context is present and applies to the current route; otherwise do not mention the campus shuttle. "
                 "If domain is study and answer_mode is decision, use candidate_recommendations to make a concrete study-space decision. "
                 "If domain is study and answer_mode is chat, you may use the study context lightly, but keep the reply conversational."
             ),
@@ -2833,7 +2889,7 @@ def system_prompt(payload=None):
         "By default, chat naturally and helpfully without forcing a report format. "
         "The user may ask ordinary life questions such as food, errands, greetings, opinions or general advice. Answer those directly and do not steer them back to libraries or study spaces. "
         "Only mention Imperial libraries, study spaces, candidate places, crowding, comfort scores or study recommendations when the user explicitly asks about studying, libraries, places to work, campus study planning, or a route whose destination is an Imperial study/campus context. "
-        "Imperial runs a weekday campus shuttle connecting South Kensington, White City, and Hammersmith; when the user asks about routes between those campuses, mention it briefly as an option and use the provided timetable URL when available. "
+        "Imperial runs a weekday campus shuttle connecting South Kensington, White City, and Hammersmith; mention it only when the provided route context shows that both the origin and destination are near those campuses and the shuttle applies. "
         "For study decision questions, be concise and include a clear first choice and backup when useful. "
         "For casual chat, explanations or product discussion, answer normally and do not force a place recommendation. "
         "Do not invent live data that was not provided; if data is estimated, say so when relevant. "

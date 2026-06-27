@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Imperial Travel Agent</title>
     <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=3" />
-    <link rel="stylesheet" href="./styles.css?v=weather-buttons-9" />
+    <link rel="stylesheet" href="./styles.css?v=quick-oxford-24" />
   </head>
   <body>
     <button id="languageToggle" class="language-toggle" type="button" aria-label="Switch language">中文</button>
@@ -146,43 +146,45 @@
               </div>
               <div class="quick-prompts" aria-label="quick questions">
                 <button type="button" data-question="How do I get to White City Campus from my current selected start point?">Go to White City</button>
+                <button type="button" data-question="How do I get to Oxford from my current selected start point?">Go to Oxford</button>
                 <button type="button" data-question="Which library is nearby from my selected starting point?">Nearby library</button>
                 <button type="button" data-question="What's the current weather at my selected start point right now?">Current weather</button>
                 <button type="button" data-question="What's the current TfL status, and are any lines disrupted right now?">TfL status</button>
               </div>
               <div class="agent-answer" id="agentAnswer">
-                <span class="agent-answer-placeholder-text">Ready when you are. Ask the agent a question to get started.</span>
-              </div>
-              <div class="route-preview" id="routePreview" hidden>
-                <div class="route-preview-header">
-                  <span id="routePreviewTitle">Route map</span>
-                  <strong id="routePreviewMeta"></strong>
+                <div class="agent-answer-body" id="agentAnswerBody">
+                  <span class="agent-answer-placeholder-text">Ready when you are. Ask the agent a question to get started.</span>
                 </div>
-                <div class="route-controls">
-                  <div class="route-endpoints" aria-label="Route endpoints">
-                    <div>
-                      <span>Start</span>
-                      <strong id="routeOriginLabel">Origin</strong>
-                    </div>
-                    <div>
-                      <span>Destination</span>
-                      <strong id="routeDestinationLabel">Destination</strong>
-                    </div>
-                  </div>
-                  <div class="route-control-divider" aria-hidden="true"></div>
-                  <div class="route-mode-controls">
-                    <label for="routeModeSelect">Transport mode</label>
-                    <div class="route-control-row">
-                      <select id="routeModeSelect"></select>
-                      <button id="routeUpdateButton" type="button">Update</button>
-                    </div>
+              <div class="agent-answer-route-slot" id="agentAnswerRouteSlot"></div>
+              <div class="agent-answer-meta-slot" id="agentAnswerMetaSlot"></div>
+            </div>
+            <div class="route-preview" id="routePreview" hidden>
+              <div class="route-controls">
+                <div class="route-heading">
+                  <span id="routePreviewTitle" class="route-preview-title">Route map</span>
+                  <div class="route-journey" aria-label="Route endpoints">
+                    <strong id="routeOriginLabel">Origin</strong>
+                    <span class="route-journey-arrow" aria-hidden="true">→</span>
+                    <strong id="routeDestinationLabel">Destination</strong>
                   </div>
                 </div>
-                <div class="route-map-shell" id="routeMapShell">
-                  <button id="routeFullscreenButton" class="route-fullscreen-button" type="button" aria-label="Open route map full screen">Full screen</button>
-                  <div class="route-map" id="routeMap" aria-label="Recommended route map"></div>
+                <div class="route-mode-controls">
+                  <label for="routeModeSelect">Transport mode</label>
+                  <div class="route-control-row">
+                    <select id="routeModeSelect"></select>
+                  </div>
                 </div>
               </div>
+              <div class="route-map-shell" id="routeMapShell">
+                <div id="routeMapMetaBadge" class="route-map-meta-badge" aria-live="polite"></div>
+                <div id="routeVariantPanel" class="route-variant-panel" hidden>
+                  <span id="routeVariantTitle" class="route-variant-title">Routes</span>
+                  <div id="routeVariantOptions" class="route-variant-options" aria-live="polite"></div>
+                </div>
+                <button id="routeFullscreenButton" class="route-fullscreen-button" type="button" aria-label="Open route map full screen">Full screen</button>
+                <div class="route-map" id="routeMap" aria-label="Recommended route map"></div>
+              </div>
+            </div>
               <div class="agent-actions" id="agentActions" hidden>
                 <a id="googleMapsLink" class="cta" href="https://www.google.com/maps/search/?api=1&query=Imperial%20College%20London" target="_blank" rel="noreferrer">Open Google maps for mode routes</a>
                 <button id="openChatButton" class="cta chat-cta" type="button">Continue in chat window</button>
@@ -369,6 +371,6 @@
       </footer>
     </div>
 
-    <script src="./app.js?v=weather-nearby-label-6"></script>
+    <script src="./app.js?v=quick-oxford-24"></script>
   </body>
 </html>

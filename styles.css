@@ -1087,7 +1087,7 @@ button:hover {
   gap: 0px;
   padding-top: 0px;
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid #c2cdda;
 }
 
 .agent-brief .eyebrow {
@@ -1116,16 +1116,19 @@ button:hover {
   flex-direction: column;
   align-items: flex-end;
   gap: 10px;
-  width: 100%;
+  width: auto;
+  flex: 0 1 46%;
+  min-width: 0;
 }
 
 .agent-tools {
   display: grid;
-  gap: 6px;
+  gap: 10px;
   min-width: 170px;
+  max-width: min(100%, 640px);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 14px 18px 16px;
   background: #fff;
   text-align: right;
 }
@@ -1146,13 +1149,20 @@ button:hover {
   color: var(--muted);
   font-size: 0.82rem;
   font-weight: 700;
+  line-height: 1.2;
   text-transform: uppercase;
 }
 
 .agent-tools strong {
-  display: inline-block;
+  display: block;
+  max-width: 32ch;
+  justify-self: end;
   color: var(--blue);
   font-size: 1.08rem;
+  line-height: 1.18;
+  white-space: normal;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
 }
 
 html[lang="zh-CN"] .agent-tools strong {
@@ -1220,6 +1230,23 @@ html[lang="zh-CN"] .agent-tools strong {
   max-height: none;
   overflow: visible;
   overflow-wrap: anywhere;
+}
+
+.agent-answer-body {
+  min-width: 0;
+}
+
+.agent-answer-route-slot {
+  min-width: 0;
+}
+
+.agent-answer-inline-route-slot {
+  min-width: 0;
+  margin: 14px 0 10px;
+}
+
+.agent-answer-meta-slot {
+  min-width: 0;
 }
 
 .agent-answer-placeholder-text {
@@ -1360,6 +1387,13 @@ html[lang="zh-CN"] #summaryTitle {
   background: #fff;
 }
 
+.route-preview.route-preview--inline {
+  margin-top: 16px;
+  margin-bottom: 18px;
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(22, 36, 52, 0.08);
+}
+
 .route-preview.route-preview--pop {
   animation: route-preview-pop 340ms var(--ease-out) both;
   transform-origin: top center;
@@ -1389,50 +1423,48 @@ html[lang="zh-CN"] #summaryTitle {
   }
 }
 
-.route-preview-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
-  color: #303946;
-  font-size: 0.86rem;
-  font-weight: 850;
-}
-
-.route-preview-header strong {
-  color: var(--blue);
-  text-align: right;
-}
-
 .route-controls {
   display: grid;
-  grid-template-columns: minmax(0, 0.94fr) auto minmax(270px, 1.06fr);
-  align-items: stretch;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, auto);
+  align-items: center;
+  gap: 18px;
   padding: 12px;
   border-bottom: 1px solid var(--line);
   background: #f8fafb;
 }
 
-.route-endpoints {
-  display: grid;
-  gap: 10px;
+.route-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   min-width: 0;
+  justify-content: flex-start;
 }
 
-.route-endpoints div {
-  display: grid;
-  grid-template-columns: 78px minmax(0, 1fr);
+.route-preview-title {
+  flex: 0 0 auto;
+  color: #617082;
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.route-journey {
+  display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  min-width: 0;
+  width: fit-content;
+  max-width: 100%;
+  justify-self: start;
   border: 1px solid #d8e2ea;
   border-radius: 10px;
   background: #eef4f9;
-  padding: 6px 11px;
+  padding: 8px 12px;
 }
 
-.route-endpoints span,
 .route-controls label {
   margin: 0; /* remove extra bottom margin so labels vertically center */
   align-self: center;
@@ -1442,14 +1474,19 @@ html[lang="zh-CN"] #summaryTitle {
   text-transform: uppercase;
 }
 
-.route-endpoints strong {
-  justify-self: end;
+.route-journey strong {
   min-width: 0;
   color: #263544;
   font-size: 0.92rem;
   line-height: 1.35;
   overflow-wrap: anywhere;
-  text-align: right;
+}
+
+.route-journey-arrow {
+  flex: 0 0 auto;
+  color: var(--blue);
+  font-size: 1rem;
+  font-weight: 900;
 }
 
 .route-control-divider {
@@ -1460,17 +1497,29 @@ html[lang="zh-CN"] #summaryTitle {
 
 .route-mode-controls {
   min-width: 0;
+  justify-self: end;
 }
 
 .route-control-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 96px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
 }
 
-/* Move the transport select down slightly for better separation from the header */
-.route-control-row {
-  margin-top: 10px;
+.route-mode-controls {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding-left: 8px;
+}
+
+.route-mode-controls label {
+  white-space: nowrap;
+}
+
+.route-mode-controls .route-control-row {
+  margin-top: 0;
 }
 
 .route-control-row button {
@@ -1480,6 +1529,145 @@ html[lang="zh-CN"] #summaryTitle {
 .route-map-shell {
   position: relative;
   height: 360px;
+}
+
+.route-map-meta-badge {
+  position: absolute;
+  z-index: 5;
+  bottom: 12px;
+  left: 12px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  max-width: min(calc(100% - 120px), 220px);
+  border: 1px solid rgba(29, 53, 87, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #213244;
+  box-shadow: 0 8px 20px rgba(24, 44, 64, 0.16);
+  font-size: 0.92rem;
+  font-weight: 850;
+  line-height: 1.15;
+  padding: 8px 11px;
+  backdrop-filter: blur(6px);
+}
+
+.route-map-meta-badge:empty {
+  display: none;
+}
+
+.route-variant-panel {
+  position: absolute;
+  z-index: 5;
+  top: 12px;
+  left: 12px;
+  display: grid;
+  gap: 8px;
+  max-width: min(calc(100% - 120px), 270px);
+  padding: 10px 11px;
+  border: 1px solid rgba(29, 53, 87, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 20px rgba(24, 44, 64, 0.16);
+  backdrop-filter: blur(6px);
+}
+
+.route-variant-title {
+  color: #617082;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.route-variant-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.route-variant-chip {
+  min-height: 30px;
+  width: 100%;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid #d4dde6;
+  border-radius: 999px;
+  background: #f4f8fb;
+  color: #264059;
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.route-variant-chip:hover,
+.route-variant-chip:focus-visible {
+  border-color: rgba(39, 103, 168, 0.45);
+  background: #e9f1f8;
+  outline: none;
+}
+
+.route-variant-chip.is-active {
+  border-color: rgba(39, 103, 168, 0.52);
+  background: rgba(39, 103, 168, 0.12);
+  color: #1d4f87;
+}
+
+.route-preview.route-preview--inline .route-controls {
+  grid-template-columns: minmax(0, 1fr) minmax(290px, auto);
+  gap: 14px;
+  padding: 10px;
+}
+
+.route-preview.route-preview--inline .route-heading {
+  gap: 6px;
+}
+
+.route-preview.route-preview--inline .route-journey {
+  padding: 7px 10px;
+}
+
+.route-preview.route-preview--inline .route-journey strong {
+  font-size: 0.86rem;
+}
+
+.route-preview.route-preview--inline .route-mode-controls {
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  padding-left: 6px;
+  justify-self: end;
+}
+
+.route-preview.route-preview--inline .route-controls {
+  align-items: center;
+}
+
+.route-preview.route-preview--inline .route-map-shell {
+  height: 280px;
+}
+
+.route-preview.route-preview--inline .route-variant-panel {
+  top: 10px;
+}
+
+.route-preview.route-preview--inline .route-map-meta-badge {
+  bottom: 10px;
+  left: 10px;
+  min-height: 34px;
+  max-width: min(calc(100% - 108px), 200px);
+  font-size: 0.84rem;
+  border-radius: 8px;
+  padding: 7px 9px;
+}
+
+.route-preview.route-preview--inline .route-fullscreen-button {
+  top: 10px;
+  right: 10px;
+  min-height: 40px;
+  padding: 9px 10px;
+  font-size: 0.84rem;
+  border-radius: 8px;
 }
 
 .route-map {
@@ -2293,7 +2481,7 @@ html[lang="zh-CN"] .startup-wait-panel .modal-copy-body p {
 
 .how-it-works-shell {
   margin-top: 12px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid #c2cdda;
   padding-top: 2px;
 }
 
@@ -4314,6 +4502,14 @@ select:focus {
   .agent-tools {
     text-align: left;
     width: 100%;
+    gap: 6px;
+    padding: 10px 16px;
+  }
+
+  .agent-tools strong {
+    justify-self: start;
+    max-width: 100%;
+    font-size: 1rem;
   }
 
   .weather-header {
