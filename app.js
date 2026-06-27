@@ -1176,12 +1176,6 @@ function buildNavigationAnswerSuffix(answer, data = latestNavigationData, route 
   if (shuttleHint && !lowerAnswer.includes("imperial.ac.uk/admin-services/property/travel/shuttle-bus/")) {
     extras.push(shuttleHint);
   }
-  const googleMapsHref = buildGoogleMapsHref(data, route);
-  if (googleMapsHref && !lowerAnswer.includes("google.com/maps/dir/")) {
-    extras.push(currentLanguage === "zh"
-      ? `如果你想查看实时信息或继续使用导航，也可以直接在 [Google Maps 中打开这条路线](${googleMapsHref})。`
-      : `If you'd like to check live updates or continue with navigation, you can also [open this route in Google Maps](${googleMapsHref}).`);
-  }
   return extras.length ? `\n\n${extras.join("\n\n")}` : "";
 }
 

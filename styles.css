@@ -1522,6 +1522,20 @@ html[lang="zh-CN"] #summaryTitle {
   margin-top: 0;
 }
 
+@media (min-width: 769px) {
+  .route-heading {
+    flex-wrap: nowrap;
+  }
+
+  .route-preview-title {
+    flex-shrink: 0;
+  }
+
+  .route-journey {
+    flex: 0 1 auto;
+  }
+}
+
 .route-control-row button {
   min-height: 42px;
 }
@@ -4283,6 +4297,128 @@ select:focus {
   }
 }
 
+@media (max-width: 768px) {
+  .route-controls {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    align-items: center;
+    justify-items: center;
+  }
+
+  .route-heading {
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    justify-items: center;
+  }
+
+  .route-preview-title {
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .route-journey {
+    width: min(100%, 680px);
+    max-width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    justify-self: center;
+  }
+
+  .route-journey strong {
+    min-width: 0;
+    max-width: calc(50% - 24px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    overflow-wrap: normal;
+    word-break: normal;
+    white-space: nowrap;
+    text-align: center;
+  }
+
+  .route-journey-arrow {
+    align-self: center;
+    transform: none;
+  }
+
+  .route-mode-controls {
+    width: auto;
+    max-width: 100%;
+    justify-self: center;
+    grid-template-columns: auto minmax(170px, 220px);
+    gap: 10px;
+    padding-left: 0;
+    align-items: center;
+    justify-items: center;
+  }
+
+  .route-mode-controls label {
+    white-space: nowrap;
+    justify-self: center;
+    text-align: center;
+  }
+
+  .route-mode-controls select {
+    max-width: 220px;
+    width: 100%;
+    justify-self: center;
+  }
+
+  /* Inline route maps use more specific desktop selectors; keep their mobile
+     controls in the same three centered rows as standalone route maps. */
+  .route-preview.route-preview--inline .route-controls {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    justify-items: center;
+    padding: 12px;
+  }
+
+  .route-preview.route-preview--inline .route-heading {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    justify-items: center;
+  }
+
+  .route-preview.route-preview--inline .route-preview-title {
+    justify-self: center;
+    text-align: center;
+  }
+
+  .route-preview.route-preview--inline .route-journey {
+    width: min(100%, 680px);
+    justify-self: center;
+    justify-content: center;
+    padding: 10px 12px;
+  }
+
+  .route-preview.route-preview--inline .route-journey strong {
+    max-width: calc(50% - 24px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    overflow-wrap: normal;
+    word-break: normal;
+    white-space: nowrap;
+    text-align: center;
+  }
+
+  .route-preview.route-preview--inline .route-mode-controls {
+    width: auto;
+    max-width: 100%;
+    grid-template-columns: auto minmax(170px, 220px);
+    gap: 10px;
+    padding-left: 0;
+    justify-self: center;
+    justify-items: center;
+  }
+}
+
 @media (max-width: 560px) {
   .recommendation-controls {
     grid-template-columns: 1fr;
@@ -4294,6 +4430,71 @@ select:focus {
 
   .route-controls {
     grid-template-columns: 1fr;
+    gap: 12px;
+    align-items: center;
+    padding: 12px;
+  }
+
+  .route-heading {
+    gap: 8px;
+  }
+
+  .route-preview-title {
+    font-size: 0.74rem;
+  }
+
+  .route-journey {
+    width: 100%;
+    max-width: 100%;
+    gap: 8px;
+    padding: 9px 10px;
+  }
+
+  .route-journey strong {
+    max-width: calc(50% - 18px);
+    font-size: 0.82rem;
+    line-height: 1.3;
+  }
+
+  .route-mode-controls {
+    width: auto;
+    max-width: 100%;
+    grid-template-columns: auto minmax(150px, 180px);
+    gap: 8px;
+  }
+
+  .route-mode-controls label {
+    font-size: 0.72rem;
+  }
+
+  .route-mode-controls select {
+    max-width: 180px;
+    min-width: 150px;
+  }
+
+  .route-preview.route-preview--inline .route-controls {
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .route-preview.route-preview--inline .route-heading {
+    gap: 8px;
+  }
+
+  .route-preview.route-preview--inline .route-journey {
+    width: 100%;
+    gap: 8px;
+    padding: 9px 10px;
+  }
+
+  .route-preview.route-preview--inline .route-journey strong {
+    max-width: calc(50% - 18px);
+    font-size: 0.82rem;
+  }
+
+  .route-preview.route-preview--inline .route-mode-controls {
+    grid-template-columns: auto minmax(150px, 180px);
+    gap: 8px;
   }
 
   .route-control-divider {
