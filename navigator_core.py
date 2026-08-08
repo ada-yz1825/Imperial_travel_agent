@@ -21,6 +21,7 @@ TOGETHER_API_URL = os.environ.get("TOGETHER_API_URL", "https://api.together.ai/v
 GOOGLE_ROUTES_API_URL = "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix"
 GOOGLE_COMPUTE_ROUTES_API_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
 GOOGLE_GEOCODING_API_URL = "https://maps.googleapis.com/maps/api/geocode/json"
+GOOGLE_PLACES_TEXT_SEARCH_API_URL = "https://places.googleapis.com/v1/places:searchText"
 OLLAMA_API_URL = os.environ.get("OLLAMA_API_URL", "http://localhost:11434/api/chat")
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama").lower()
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5.2")
@@ -46,9 +47,9 @@ DEFAULT_TOGETHER_CHAT_MODELS = [
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3")
 OLLAMA_NUM_PREDICT = int(os.environ.get("OLLAMA_NUM_PREDICT", "1200"))
 CHAT_HISTORY_LIMIT = int(os.environ.get("CHAT_HISTORY_LIMIT", "6"))
-LLM_MAX_COMPLETION_TOKENS = int(os.environ.get("LLM_MAX_COMPLETION_TOKENS", "1800"))
+LLM_MAX_COMPLETION_TOKENS = int(os.environ.get("LLM_MAX_COMPLETION_TOKENS", "3200"))
 LLM_JSON_MAX_COMPLETION_TOKENS = int(os.environ.get("LLM_JSON_MAX_COMPLETION_TOKENS", "2200"))
-LLM_NAVIGATION_MAX_COMPLETION_TOKENS = int(os.environ.get("LLM_NAVIGATION_MAX_COMPLETION_TOKENS", "2200"))
+LLM_NAVIGATION_MAX_COMPLETION_TOKENS = int(os.environ.get("LLM_NAVIGATION_MAX_COMPLETION_TOKENS", "3600"))
 GROQ_MAX_COMPLETION_TOKENS = int(os.environ.get("GROQ_MAX_COMPLETION_TOKENS", str(LLM_MAX_COMPLETION_TOKENS)))
 GROQ_JSON_MAX_COMPLETION_TOKENS = int(os.environ.get("GROQ_JSON_MAX_COMPLETION_TOKENS", str(LLM_JSON_MAX_COMPLETION_TOKENS)))
 GROQ_NAVIGATION_MAX_COMPLETION_TOKENS = int(os.environ.get("GROQ_NAVIGATION_MAX_COMPLETION_TOKENS", str(LLM_NAVIGATION_MAX_COMPLETION_TOKENS)))
@@ -95,6 +96,12 @@ COMMAND_PLACE_TEXTS = {
     "head",
 }
 CONTEXTUAL_PLACE_TEXTS = {"这里", "这儿", "那里", "那儿", "这个地方", "那个地方", "here", "there", "this place", "that place"}
+NEARBY_DESTINATION_PATTERNS = [
+    r"(?:最近的|最近一家|附近的|附近一家|周边的)\s*(?P<place>[\u4e00-\u9fffA-Za-z0-9&.' -]{1,60})",
+    r"(?P<place>[\u4e00-\u9fffA-Za-z0-9&.' -]{1,60})\s*(?:最近的|附近的)",
+    r"\b(?:nearest|closest|nearby)\s+(?P<place>[A-Za-z0-9&.' -]{1,60})\b",
+    r"\b(?P<place>[A-Za-z0-9&.' -]{1,60})\s+(?:nearby|near me|closest to me)\b",
+]
 
 
 def get_env_value(name):
@@ -731,6 +738,7 @@ def compute_route_field_mask(mode):
     if mode == "TRANSIT":
         fields.extend(
             [
+                "routes.localizedValues.transitFare",
                 "routes.legs.steps.travelMode",
                 "routes.legs.steps.staticDuration",
                 "routes.legs.steps.distanceMeters",
@@ -755,6 +763,51 @@ def compute_route_field_mask(mode):
     return ",".join(fields)
 
 
+def parse_gbp_fare(value, source="google_routes_transit_fare", confidence="provider"):
+    if isinstance(value, dict):
+        text = localized_text(value)
+        currency_code = str(value.get("currencyCode") or value.get("currency") or "").upper()
+        units = value.get("units")
+        nanos = value.get("nanos")
+        if currency_code == "GBP" and isinstance(units, (int, float)):
+            amount = float(units) + (float(nanos or 0) / 1_000_000_000)
+            amount_pence = int(round(amount * 100))
+            return {
+                "amountPence": amount_pence,
+                "currency": "GBP",
+                "display": f"£{amount_pence / 100:.2f}",
+                "source": source,
+                "confidence": confidence,
+            }
+    else:
+        text = str(value or "")
+
+    text = str(text or "").strip()
+    if not text:
+        return None
+    if "£" not in text and "gbp" not in text.lower():
+        return None
+    match = re.search(r"(?:£\s*|GBP\s*)?([0-9]+(?:[.,][0-9]{1,2})?)", text, flags=re.IGNORECASE)
+    if not match:
+        return None
+    amount = float(match.group(1).replace(",", "."))
+    amount_pence = int(round(amount * 100))
+    return {
+        "amountPence": amount_pence,
+        "currency": "GBP",
+        "display": f"£{amount_pence / 100:.2f}",
+        "source": source,
+        "confidence": confidence,
+    }
+
+
+def route_transit_fare(route):
+    localized = route.get("localizedValues") if isinstance(route, dict) else {}
+    if not isinstance(localized, dict):
+        return None
+    return parse_gbp_fare(localized.get("transitFare"))
+
+
 def normalize_google_compute_route(mode, route, variant_index=0, variant_count=1):
     if not isinstance(route, dict):
         return None
@@ -776,10 +829,14 @@ def normalize_google_compute_route(mode, route, variant_index=0, variant_count=1
         result["transitLines"] = dedupe_transit_lines(transit_steps)
         result["routeSegments"] = extract_route_segments(route)
         result["routeStops"] = extract_route_stops(route)
+        fare = route_transit_fare(route)
+        if fare:
+            result["fare"] = fare
+            result["fareBreakdown"] = []
     return result
 
 
-def call_google_compute_route_variants(api_key, origin, destination, mode, departure_time, allow_alternatives=True):
+def call_google_compute_route_variants(api_key, origin, destination, mode, departure_time, allow_alternatives=True, intermediates=None):
     body = {
         "origin": waypoint(origin),
         "destination": waypoint(destination),
@@ -788,6 +845,9 @@ def call_google_compute_route_variants(api_key, origin, destination, mode, depar
         "languageCode": "en-GB",
         "units": "METRIC",
     }
+    intermediate_waypoints = [waypoint(item) for item in (intermediates or []) if item]
+    if intermediate_waypoints:
+        body["intermediates"] = intermediate_waypoints
     if mode in {"TRANSIT", "DRIVE"}:
         body["departureTime"] = departure_time
     if mode == "DRIVE":
@@ -820,7 +880,7 @@ def call_google_compute_route_variants(api_key, origin, destination, mode, depar
     return normalized_routes
 
 
-def call_google_compute_route(api_key, origin, destination, mode, departure_time):
+def call_google_compute_route(api_key, origin, destination, mode, departure_time, intermediates=None):
     variants = call_google_compute_route_variants(
         api_key,
         origin,
@@ -828,6 +888,7 @@ def call_google_compute_route(api_key, origin, destination, mode, departure_time
         mode,
         departure_time,
         allow_alternatives=False,
+        intermediates=intermediates,
     )
     return variants[0] if variants else None
 
@@ -846,6 +907,7 @@ def attach_route_geometry(api_key, route_request, route):
             route_request["destination"],
             route["mode"],
             route_request.get("departureTime"),
+            route_request.get("waypoints"),
         )
     except Exception:
         return
@@ -864,6 +926,10 @@ def attach_route_geometry(api_key, route_request, route):
         route["routeSegments"] = geometry["routeSegments"]
     if geometry.get("routeStops"):
         route["routeStops"] = geometry["routeStops"]
+    if geometry.get("fare"):
+        route["fare"] = geometry["fare"]
+    if geometry.get("fareBreakdown"):
+        route["fareBreakdown"] = geometry["fareBreakdown"]
 
 
 def parse_navigation_query(query, history=None):
@@ -883,11 +949,14 @@ def parse_navigation_query(query, history=None):
     llm_says_not_navigation = llm_request and not llm_request.get("is_navigation")
     origin_text = None if llm_says_not_navigation else (llm_request.get("origin") if llm_request else None)
     destination_text = None if llm_says_not_navigation else (llm_request.get("destination") if llm_request else None)
+    waypoint_texts = [] if llm_says_not_navigation else (llm_request.get("waypoints") if llm_request else [])
 
     if not llm_says_not_navigation and not origin_text and not destination_text:
         origin_text, destination_text = extract_origin_destination(query)
         if not destination_text:
             destination_text = extract_destination_only(query)
+    if not llm_says_not_navigation:
+        waypoint_texts = [*waypoint_texts, *extract_waypoints(query)]
 
     if not llm_says_not_navigation and llm_request and llm_request.get("origin_is_context"):
         origin_text = None
@@ -909,6 +978,10 @@ def parse_navigation_query(query, history=None):
         "language": language,
         "origin": resolve_location(origin_text) if origin_text else None,
         "destination": resolve_location(destination_text) if destination_text else None,
+        "origin_text": origin_text,
+        "destination_text": destination_text,
+        "waypoints": [resolve_location(item) for item in dedupe_place_texts(waypoint_texts)],
+        "waypoint_texts": dedupe_place_texts(waypoint_texts),
         "origin_source": "query" if origin_text else None,
         "mode": mode,
         "departureTime": departure_time,
@@ -977,6 +1050,11 @@ def extract_navigation_request_with_llm(query, history=None):
         "is_navigation": bool(data.get("is_navigation")),
         "origin": clean_llm_place_text(data.get("origin")),
         "destination": clean_llm_place_text(data.get("destination")),
+        "waypoints": [
+            item
+            for item in (clean_llm_place_text(value) for value in (data.get("waypoints") or []))
+            if item
+        ][:5],
         "origin_is_context": bool(data.get("origin_is_context")),
         "destination_is_context": bool(data.get("destination_is_context")),
         "mode": normalize_travel_mode(data.get("mode")),
@@ -1011,6 +1089,7 @@ def build_navigation_extraction_prompt(query, history):
             "is_navigation": "boolean",
             "origin": "string or null",
             "destination": "string or null",
+            "waypoints": "array of place strings that the user explicitly wants to go via / pass through / 途经 / 经过, otherwise []",
             "origin_is_context": "boolean, true for here/这里/selected place/current location",
             "destination_is_context": "boolean, true for there/这里/这个地方/it when it means a place from recent conversation",
             "mode": "TRANSIT, WALK, BICYCLE, DRIVE, or null",
@@ -1024,6 +1103,7 @@ def build_navigation_extraction_prompt(query, history):
             "For '导航去牛津' or 'go to Oxford', origin is null and destination is 牛津/Oxford.",
             "For '那帮我导航去这里', '然后帮我导航去那里', or similar, words before the route command are conversational filler, not an origin.",
             "For '从南肯到白城' or 'from South Kensington to White City', extract both places.",
+            "For 'from A to B via C' or '从A到B途经C', extract C in waypoints and keep B as the destination.",
             "For '导航去这里', set destination to null and destination_is_context to true.",
             "For '从这里去白城', set origin to null, origin_is_context to true, destination to 白城.",
             "For '介绍牛津', '牛津是哪里', 'where is Oxford', or 'tell me about Oxford', set is_navigation false even though a place is mentioned.",
@@ -1061,6 +1141,7 @@ def classify_agent_intent(question, context_start=None, history=None):
         return intent_payload("study", 0.94, "destination information / attractions question", empty_route_request)
     route_request = parse_navigation_query(question, history or [])
     apply_context_start(route_request, context_start)
+    resolve_route_request_contextual_places(route_request, question)
     has_route_points = bool(route_request.get("origin") and route_request.get("destination"))
     has_destination_only = bool(route_request.get("destination") and valid_lat_lng(context_start or {}))
     route_words = has_navigation_language(question)
@@ -1358,15 +1439,15 @@ def extract_origin_destination(query):
     if english:
         return clean_place_text(english.group(1)), clean_place_text(english.group(2))
 
-    chinese = re.search(r"从\s*(.+?)\s*(?:到|去)\s*(.+?)(?:怎么去|怎么走|如何去|路线|导航|[，。？！?]|$)", text)
+    chinese = re.search(r"从\s*(.+?)\s*(?:到|去)\s*(.+?)(?:途经|途径|经过|路过|怎么去|怎么走|如何去|路线|导航|[，。？！?]|$)", text)
     if chinese:
         return clean_place_text(chinese.group(1)), clean_place_text(chinese.group(2))
 
-    chinese_at = re.search(r"(?:我)?(?:在|从)\s*(.+?)[，,\s]*(?:想|要|准备|打算)?\s*(?:去|到)\s*(.+?)(?:怎么去|怎么走|如何去|路线|导航|要多久|多久|多远|[，。？！?]|$)", text)
+    chinese_at = re.search(r"(?:我)?(?:在|从)\s*(.+?)[，,\s]*(?:想|要|准备|打算)?\s*(?:去|到)\s*(.+?)(?:途经|途径|经过|路过|怎么去|怎么走|如何去|路线|导航|要多久|多久|多远|[，。？！?]|$)", text)
     if chinese_at:
         return clean_place_text(chinese_at.group(1)), clean_place_text(chinese_at.group(2))
 
-    chinese_short = re.search(r"(.+?)\s*(?:到|去)\s*(.+?)(?:怎么去|怎么走|如何去|路线|导航|要多久|多久|多远|[，。？！?]|$)", text)
+    chinese_short = re.search(r"(.+?)\s*(?:到|去)\s*(.+?)(?:途经|途径|经过|路过|怎么去|怎么走|如何去|路线|导航|要多久|多久|多远|[，。？！?]|$)", text)
     if chinese_short and any("\u4e00" <= char <= "\u9fff" for char in text):
         return clean_place_text(chinese_short.group(1)), clean_place_text(chinese_short.group(2))
 
@@ -1375,6 +1456,48 @@ def extract_origin_destination(query):
         return known_origin, known_destination
 
     return None, None
+
+
+def extract_waypoints(query):
+    text = " ".join(str(query or "").strip().split())
+    candidates = []
+    patterns = [
+        r"\b(?:via|through|by way of|passing by|pass by)\s+(.+?)(?:\s+(?:to|then|and then|by|at|around|leaving|departing)\b|[?.!。？]|$)",
+        r"(?:途经|途径|经过|路过|中途去|先到|先去)\s*(.+?)(?:再(?:去|到)|然后(?:去|到)|最后(?:去|到)|[，。？！?]|$)",
+    ]
+    for pattern in patterns:
+        for match in re.finditer(pattern, text, flags=re.IGNORECASE):
+            raw = match.group(1)
+            parts = re.split(r"\s*(?:,|，|、|\band\b|和)\s*", raw, flags=re.IGNORECASE)
+            for part in parts:
+                candidate = clean_place_text(part)
+                if candidate and not is_command_place_text(candidate) and not is_contextual_place_text(candidate):
+                    candidates.append(candidate)
+
+    cleaned = []
+    seen = set()
+    for candidate in candidates:
+        key = normalize_place_match_text(candidate)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(candidate)
+    return cleaned[:5]
+
+
+def dedupe_place_texts(values):
+    cleaned = []
+    seen = set()
+    for value in values or []:
+        candidate = clean_llm_place_text(value)
+        if not candidate:
+            continue
+        key = normalize_place_match_text(candidate)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(candidate)
+    return cleaned
 
 
 def extract_known_location_pair(text):
@@ -1411,6 +1534,7 @@ def clean_place_text(value):
     )
     value = re.sub(r"\s*(想|要|准备|打算)$", "", value)
     value = re.sub(r"\b(by|via|at|around|leaving|departing)\b.*$", "", value, flags=re.IGNORECASE)
+    value = re.sub(r"(途经|途径|经过|路过).*$", "", value)
     value = re.sub(r"(坐地铁|坐公交|公交|地铁|步行|走路|骑车|开车|驾车).*$", "", value)
     return value.strip(" ,，。?？!！")
 
@@ -1555,6 +1679,104 @@ def geocode_location(text):
     }
 
 
+def extract_nearby_destination_query(query, destination_text=None):
+    candidates = [destination_text, query]
+    for candidate in candidates:
+        text = clean_place_text(candidate)
+        if not text:
+            continue
+        for pattern in NEARBY_DESTINATION_PATTERNS:
+            match = re.search(pattern, text, flags=re.IGNORECASE)
+            if not match:
+                continue
+            place = clean_place_text(match.group("place"))
+            place = re.sub(r"^(?:the|a|an)\s+", "", place, flags=re.IGNORECASE)
+            place = re.sub(r"^(?:去|到)\s*", "", place)
+            if place and not is_command_place_text(place) and not is_contextual_place_text(place):
+                return place[:80]
+    return None
+
+
+def resolve_route_request_contextual_places(route_request, query=None):
+    if not isinstance(route_request, dict):
+        return route_request
+    origin = route_request.get("origin")
+    destination_text = route_request.get("destination_text")
+    nearby_query = extract_nearby_destination_query(query, destination_text)
+    if nearby_query and valid_lat_lng(origin):
+        resolved = places_text_search_nearby(nearby_query, origin)
+        if resolved:
+            route_request["destination"] = resolved
+            route_request["destination_text"] = nearby_query
+            route_request["destination_resolution"] = {
+                "kind": "nearest_place",
+                "query": nearby_query,
+                "origin": public_place_payload(origin),
+            }
+    return route_request
+
+
+def places_text_search_nearby(place_query, origin, radius_meters=8000):
+    api_key = get_google_maps_api_key()
+    if not api_key or not valid_lat_lng(origin):
+        return None
+    query = clean_place_text(place_query)
+    if not query:
+        return None
+    body = {
+        "textQuery": query,
+        "languageCode": "en",
+        "locationBias": {
+            "circle": {
+                "center": {"latitude": origin["lat"], "longitude": origin["lng"]},
+                "radius": radius_meters,
+            }
+        },
+        "maxResultCount": 5,
+    }
+    request = urllib.request.Request(
+        GOOGLE_PLACES_TEXT_SEARCH_API_URL,
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": api_key,
+            "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.googleMapsUri,places.websiteUri,places.businessStatus",
+            "User-Agent": APP_NAME,
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            data = json.loads(response.read().decode("utf-8", errors="replace"))
+    except Exception:
+        return None
+
+    places = data.get("places") or []
+    if not places:
+        return None
+    place = places[0]
+    location = place.get("location") or {}
+    lat = location.get("latitude")
+    lng = location.get("longitude")
+    if not isinstance(lat, (int, float)) or not isinstance(lng, (int, float)):
+        return None
+    display_name = place.get("displayName") or {}
+    if isinstance(display_name, dict):
+        display_name = display_name.get("text")
+    name = clean_route_text(display_name or place.get("formattedAddress") or query, limit=140)
+    address = clean_route_text(place.get("formattedAddress") or name, limit=180)
+    return {
+        "name": name,
+        "address": address,
+        "lat": lat,
+        "lng": lng,
+        "placeId": place.get("id") or "",
+        "googleMapsUri": place.get("googleMapsUri") or "",
+        "websiteUri": place.get("websiteUri") or "",
+        "businessStatus": place.get("businessStatus") or "",
+    }
+
+
 def reverse_geocode_location(lat, lng):
     if not isinstance(lat, (int, float)) or not isinstance(lng, (int, float)):
         return None
@@ -1599,7 +1821,7 @@ def detect_travel_mode(query):
         return "BICYCLE"
     if any(word in text for word in ["drive", "driving", "car", "开车", "驾车"]):
         return "DRIVE"
-    if any(word in text for word in ["transit", "tube", "underground", "bus", "train", "地铁", "公交", "公共交通", "坐车", "搭车", "换乘"]):
+    if any(word in text for word in ["transit", "public transport", "tube", "underground", "bus", "train", "地铁", "公交", "公共交通", "坐车", "搭车", "换乘"]):
         return "TRANSIT"
     return None
 
@@ -1667,26 +1889,33 @@ def format_navigation_answer(query, route_request, routes):
     destination = route_request["destination"]["name"]
     language = route_request["language"]
     alternatives = routes[1:3]
+    fare_text = recommended.get("fare", {}).get("display") if isinstance(recommended.get("fare"), dict) else ""
 
     if language == "Chinese":
+        estimate = f"预计时间：**{recommended['durationMinutes']} 分钟**；距离：**{recommended['distanceKm']} km**"
+        if fare_text:
+            estimate += f"；总票价：**{fare_text}**"
         lines = [
             f"**推荐路线**：从 {origin} 到 {destination}，建议使用 **{recommended['modeLabel']}**。",
-            f"预计时间：**{recommended['durationMinutes']} 分钟**；距离：**{recommended['distanceKm']} km**。",
+            f"{estimate}。",
         ]
         if alternatives:
             alt_text = "；".join(f"{item['modeLabel']} 约 {item['durationMinutes']} 分钟" for item in alternatives)
             lines.append(f"备选：{alt_text}。")
-        lines.append("时间和距离来自 Google Routes API，按当前或你指定的出发时间计算。")
+        lines.append("时间、距离和可用票价来自 Google Routes API，按当前或你指定的出发时间计算。")
         return "\n".join(lines)
 
+    estimate = f"Estimated time: **{recommended['durationMinutes']} min**; distance: **{recommended['distanceKm']} km**"
+    if fare_text:
+        estimate += f"; total fare: **{fare_text}**"
     lines = [
         f"**Recommended route**: from {origin} to {destination}, use **{recommended['modeLabel']}**.",
-        f"Estimated time: **{recommended['durationMinutes']} min**; distance: **{recommended['distanceKm']} km**.",
+        f"{estimate}.",
     ]
     if alternatives:
         alt_text = "; ".join(f"{item['modeLabel']} about {item['durationMinutes']} min" for item in alternatives)
         lines.append(f"Alternatives: {alt_text}.")
-    lines.append("Time and distance come from Google Routes API for now or your specified departure time.")
+    lines.append("Time, distance, and available fare data come from Google Routes API for now or your specified departure time.")
     return "\n".join(lines)
 
 
@@ -1782,6 +2011,8 @@ def navigation_prompt(query, route_request, routes, errors, study_options):
         "tool_called": "Google Routes API",
         "origin": route_request["origin"],
         "destination": route_request["destination"],
+        "waypoints": route_request.get("waypoints") or [],
+        "destination_resolution": route_request.get("destination_resolution"),
         "origin_source": route_request.get("origin_source"),
         "requested_mode": mode_label(requested_mode) if requested_mode else None,
         "departure_time_utc": route_request.get("departureTime"),
@@ -1793,8 +2024,12 @@ def navigation_prompt(query, route_request, routes, errors, study_options):
         "instructions": [
             "Answer in response_language.",
             "Use the route_summary numbers directly when comparing options.",
-            "Compare each available mode using the exact duration and distance in route_summary.",
+            "Compare each available mode using the exact duration, distance, and total fare in route_summary when fare is present.",
+            "If a route includes fare, treat it as the total fare and make it the primary price information. Mention per-leg fare details only if fareBreakdown is provided in available_routes.",
+            "Do not invent fares. If fare is absent, do not mention price unless the user explicitly asked, and then say fare was not available from the tools.",
             "If you mention origin and destination in the first sentence, use exactly the origin and destination fields from this payload. If that would sound uncertain, skip the origin-destination opening and start directly with the route recommendation.",
+            "If waypoints is not empty, explicitly say that the route is planned via those waypoint names. Do not describe it as a direct route.",
+            "If destination_resolution.kind is nearest_place, say which concrete place was selected for the vague destination request.",
             "Never use sample or unrelated places such as 清华大学, 帝国理工学院, London, Oxford, or White City unless they appear in the origin/destination fields or the user's question.",
             "If the requested mode is available, discuss it first even if another mode is faster.",
             "Recommend the best practical option, not only the shortest number.",
@@ -1815,15 +2050,16 @@ def navigation_prompt(query, route_request, routes, errors, study_options):
 def summarize_routes_for_prompt(routes, language):
     if not routes:
         return []
+    def route_summary_text(route):
+        fare_text = route.get("fare", {}).get("display") if isinstance(route.get("fare"), dict) else ""
+        if language == "Chinese":
+            text = f"{mode_label_for_language(route['mode'], language)}：{route['durationMinutes']} 分钟，{route.get('distanceKm')} km"
+            return f"{text}，总票价 {fare_text}" if fare_text else text
+        text = f"{mode_label_for_language(route['mode'], language)}: {route['durationMinutes']} min, {route.get('distanceKm')} km"
+        return f"{text}, total fare {fare_text}" if fare_text else text
     if language == "Chinese":
-        return [
-            f"{mode_label_for_language(route['mode'], language)}：{route['durationMinutes']} 分钟，{route.get('distanceKm')} km"
-            for route in routes
-        ]
-    return [
-        f"{mode_label_for_language(route['mode'], language)}: {route['durationMinutes']} min, {route.get('distanceKm')} km"
-        for route in routes
-    ]
+        return [route_summary_text(route) for route in routes]
+    return [route_summary_text(route) for route in routes]
 
 
 def navigation_answer_uses_tool_data(answer, routes, route_request=None):
@@ -2215,6 +2451,11 @@ def format_natural_navigation_answer(route_request, routes):
     alternatives = routes[1:3]
     fastest = min(routes, key=lambda item: item["durationMinutes"])
     origin_source = route_request.get("origin_source")
+    waypoint_names = route_waypoint_names(route_request)
+    via_text_zh = f"（途经 {'、'.join(waypoint_names)}）" if waypoint_names else ""
+    via_text_en = f" via {', '.join(waypoint_names)}" if waypoint_names else ""
+    resolved_note_zh = nearest_destination_note(route_request, "Chinese")
+    resolved_note_en = nearest_destination_note(route_request, language)
 
     if language == "Chinese":
         requested_text = ""
@@ -2222,12 +2463,12 @@ def format_natural_navigation_answer(route_request, routes):
             requested_text = "你指定的方式可以走，"
         if origin_source == "context":
             opening = (
-                f"我查了一下 Google Routes：去 {destination}，"
+                f"我查了一下 Google Routes：去 {destination}{via_text_zh}，"
                 f"{requested_text}{mode_label_for_language(recommended['mode'], language)}大约 {recommended['durationMinutes']} 分钟"
             )
         else:
             opening = (
-                f"我查了一下 Google Routes：从 {origin} 到 {destination}，"
+                f"我查了一下 Google Routes：从 {origin} 到 {destination}{via_text_zh}，"
                 f"{requested_text}{mode_label_for_language(recommended['mode'], language)}大约 {recommended['durationMinutes']} 分钟"
             )
         if recommended.get("distanceKm") is not None:
@@ -2250,16 +2491,16 @@ def format_natural_navigation_answer(route_request, routes):
         else:
             advice = f"综合时间和可行性，我会优先建议{mode_label_for_language(recommended['mode'], language)}。"
 
-        return "\n".join(part for part in [opening, comparison, advice] if part)
+        return "\n".join(part for part in [resolved_note_zh, opening, comparison, advice] if part)
 
     if origin_source == "context":
         opening = (
-            f"I checked Google Routes for travel to {destination}. "
+            f"I checked Google Routes for travel to {destination}{via_text_en}. "
             f"{mode_label_for_language(recommended['mode'], language)} is about {recommended['durationMinutes']} min"
         )
     else:
         opening = (
-            f"I checked Google Routes for {origin} to {destination}. "
+            f"I checked Google Routes for {origin} to {destination}{via_text_en}. "
             f"{mode_label_for_language(recommended['mode'], language)} is about {recommended['durationMinutes']} min"
         )
     if recommended.get("distanceKm") is not None:
@@ -2282,7 +2523,29 @@ def format_natural_navigation_answer(route_request, routes):
     else:
         advice = f"I would choose {mode_label_for_language(recommended['mode'], language)} here."
 
-    return "\n".join(part for part in [opening, comparison, advice] if part)
+    return "\n".join(part for part in [resolved_note_en, opening, comparison, advice] if part)
+
+
+def route_waypoint_names(route_request):
+    return [
+        str(item.get("name") or item.get("address") or "").strip()
+        for item in (route_request.get("waypoints") or [])
+        if isinstance(item, dict) and str(item.get("name") or item.get("address") or "").strip()
+    ]
+
+
+def nearest_destination_note(route_request, language):
+    resolution = route_request.get("destination_resolution") or {}
+    if resolution.get("kind") != "nearest_place":
+        return ""
+    query = str(resolution.get("query") or "").strip()
+    destination = route_request.get("destination") or {}
+    name = str(destination.get("name") or destination.get("address") or "").strip()
+    if not query or not name:
+        return ""
+    if language == "Chinese":
+        return f"我把“最近的 {query}”解析为 {name}。"
+    return f"I interpreted “nearest {query}” as {name}."
 
 
 def mode_label_for_language(mode, language):
@@ -2654,11 +2917,15 @@ def valid_lat_lng(value):
 def public_place_payload(place):
     if not valid_lat_lng(place):
         return None
-    return {
+    payload = {
         "name": place.get("name") or "Destination",
         "lat": place["lat"],
         "lng": place["lng"],
     }
+    for key in ("placeId", "googleMapsUri", "websiteUri", "businessStatus", "address"):
+        if place.get(key):
+            payload[key] = place.get(key)
+    return payload
 
 
 def lat_lng(value):
@@ -2820,21 +3087,32 @@ def build_weather_summary_prompt(payload):
     response_language = detect_response_language(question)
     if response_language != "Chinese":
         response_language = "English"
+    if response_language == "Chinese":
+        instructions = (
+            "为天气卡片写一段自然、顺口的中文简报。控制在 2 句，约 45-90 个中文字符；不要超过 110 个中文字符。"
+            "第一句概括当前位置天气、温度或体感；第二句给一个有数据依据的出行提醒，例如带伞、加衣、防晒、注意风、步行舒适度。"
+            "只使用提供的天气数据，不要编造预报或未来变化。"
+            "不要机械罗列湿度、风速、UV 等字段；只有当它们影响出行建议时才提。"
+            "语气像应用里的卡片文案，简洁但完整，避免生硬短句、翻译腔和固定模板。"
+            "不要使用项目符号、坐标、数据来源、标签或 Markdown 标题；可以只把一个很短的重点词组加粗。"
+        )
+    else:
+        instructions = (
+            "Write two or three natural sentences for a weather card. Keep it concise, but allow a little more detail than a one-line summary. "
+            "Use only the provided weather data; do not invent forecasts. "
+            "Mention the practical takeaway for a student heading out, such as umbrella, layers, wind, UV, or walking comfort, only when supported by the data. "
+            "Avoid repeating a fixed template. Do not start with 'Current conditions', 'Weather details', or 'It is'. "
+            "You may use Markdown bold for a short lead phrase, for example **Sunny and hot - 33°C**. "
+            "Do not include bullets, coordinates, provider names, or labels. "
+            "Keep it compact enough for a weather card, but it may be a little fuller when the data supports a more useful practical summary."
+        )
 
     return json.dumps(
         {
             "response_language": response_language,
             "task": "weather_card_summary",
             "weather": weather if isinstance(weather, dict) else {},
-            "instructions": (
-                "Write two or three natural sentences for a weather card. Keep it concise, but allow a little more detail than a one-line summary. "
-                "Use only the provided weather data; do not invent forecasts. "
-                "Mention the practical takeaway for a student heading out, such as umbrella, layers, wind, UV, or walking comfort, only when supported by the data. "
-                "Avoid repeating a fixed template. Do not start with 'Current conditions', 'Weather details', or 'It is'. "
-                "You may use Markdown bold for a short lead phrase, for example **Sunny and hot - 33°C**. "
-                "Do not include bullets, coordinates, provider names, or labels. "
-                "Keep it compact enough for a weather card, but it may be a little fuller when the data supports a more useful practical summary."
-            ),
+            "instructions": instructions,
         },
         ensure_ascii=False,
     )

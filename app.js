@@ -1150,6 +1150,10 @@ function buildGoogleMapsHref(data = latestNavigationData, route = data?.recommen
     destination,
     travelmode: googleMapsTravelMode(route?.mode),
   });
+  const waypoints = routeWaypointPlaces(data)
+    .map((place) => googleMapsPlaceValue(place))
+    .filter(Boolean);
+  if (waypoints.length) params.set("waypoints", waypoints.join("|"));
   return `https://www.google.com/maps/dir/?${params.toString()}`;
 }
 
@@ -1168,6 +1172,62 @@ function buildImperialShuttleHint(shuttle) {
   return `Imperial's weekday campus shuttle can also be a useful option between ${originCampus} and ${destinationCampus}: [Imperial shuttle](${scheduleUrl}).`;
 }
 
+function relatedLinkLabel(link) {
+  const category = String(link?.category || "");
+  const title = String(link?.title || "").trim();
+  if (currentLanguage !== "zh") return title || "Related link";
+  if (category === "rail_tickets") return title.includes("Trainline") ? "Trainline 火车票" : "National Rail 火车票与班次";
+  if (category === "tickets") return title.includes("events") ? "活动/门票页面" : "目的地官网";
+  if (category === "reservations") return "预约页面";
+  if (category === "booking") return "预订页面";
+  if (category === "station_info") return "车站信息";
+  if (category === "airport") return "机场实时出发";
+  if (category === "destination") return title.includes("Maps") ? "Google Maps 目的地详情" : "目的地官网";
+  return title || "相关链接";
+}
+
+function relatedLinkSentence(link) {
+  const category = String(link?.category || "");
+  const label = relatedLinkLabel(link);
+  const markdown = `[${label}](${link.url})`;
+  if (currentLanguage === "zh") {
+    if (category === "rail_tickets") return `如果需要购买火车票或查看国铁班次，可以点击：${markdown}。`;
+    if (category === "tickets") return `如果需要购票、预约入场或查看活动余票，可以点击：${markdown}。`;
+    if (category === "reservations") return `如果需要预订座位，可以点击：${markdown}。`;
+    if (category === "booking") return `如果需要查看住宿预订，可以点击：${markdown}。`;
+    if (category === "airport") return `如果需要查看机场实时出发或航站楼信息，可以点击：${markdown}。`;
+    if (category === "station_info") return `如果需要查看车站设施和无障碍信息，可以点击：${markdown}。`;
+    return `如果需要查看目的地详情，可以点击：${markdown}。`;
+  }
+  if (category === "rail_tickets") return `For train tickets or National Rail services, use: ${markdown}.`;
+  if (category === "tickets") return `For tickets, timed entry, or event availability, use: ${markdown}.`;
+  if (category === "reservations") return `For reservations, use: ${markdown}.`;
+  if (category === "booking") return `For accommodation booking, use: ${markdown}.`;
+  if (category === "airport") return `For live departures or terminal information, use: ${markdown}.`;
+  if (category === "station_info") return `For station facilities and accessibility, use: ${markdown}.`;
+  return `For destination details, use: ${markdown}.`;
+}
+
+function buildRelatedLinksHint(answer, data = latestNavigationData) {
+  const links = Array.isArray(data?.relatedLinks) ? data.relatedLinks : [];
+  if (!links.length) return "";
+  const lowerAnswer = String(answer || "").toLowerCase();
+  const selected = [];
+  const seenCategories = new Set();
+  const sorted = [...links].sort((a, b) => Number(a?.priority || 99) - Number(b?.priority || 99));
+  for (const link of sorted) {
+    const url = String(link?.url || "").trim();
+    if (!url || lowerAnswer.includes(url.toLowerCase())) continue;
+    const category = String(link?.category || "related");
+    if (seenCategories.has(category) && selected.length >= 2) continue;
+    selected.push({ ...link, url });
+    seenCategories.add(category);
+    if (selected.length >= 3) break;
+  }
+  if (!selected.length) return "";
+  return selected.map(relatedLinkSentence).join("\n");
+}
+
 function buildNavigationAnswerSuffix(answer, data = latestNavigationData, route = data?.recommended) {
   if (!data?.origin || !data?.destination) return "";
   const extras = [];
@@ -1176,7 +1236,27 @@ function buildNavigationAnswerSuffix(answer, data = latestNavigationData, route 
   if (shuttleHint && !lowerAnswer.includes("imperial.ac.uk/admin-services/property/travel/shuttle-bus/")) {
     extras.push(shuttleHint);
   }
+  const relatedLinksHint = buildRelatedLinksHint(answer, data);
+  if (relatedLinksHint) extras.push(relatedLinksHint);
   return extras.length ? `\n\n${extras.join("\n\n")}` : "";
+}
+
+function routeLinkForAnswer(data = latestNavigationData, route = data?.recommended) {
+  return String(data?.routeLink || buildGoogleMapsHref(data, route) || "").trim();
+}
+
+function repairGoogleMapsRouteLinks(answer, data = latestNavigationData, route = data?.recommended) {
+  const routeLink = routeLinkForAnswer(data, route);
+  if (!routeLink) return String(answer || "");
+  return String(answer || "")
+    .replace(
+      /(\[[^\]]+\]\()https:\/\/www\.google\.com\/maps\/dir\/\?[^)\s。！？,，]*\)?/gi,
+      `$1${routeLink})`,
+    )
+    .replace(
+      /https:\/\/www\.google\.com\/maps\/dir\/\?[^)\s。！？,，]*/gi,
+      routeLink,
+    );
 }
 
 function ensureRouteMapPlaceholder(answer, data = latestNavigationData) {
@@ -1187,7 +1267,8 @@ function ensureRouteMapPlaceholder(answer, data = latestNavigationData) {
 }
 
 function finalizeAgentAnswer(answer, data = latestNavigationData, route = data?.recommended) {
-  const base = ensureRouteMapPlaceholder(sanitizeModelOutput(answer || ""), data);
+  const repaired = repairGoogleMapsRouteLinks(sanitizeModelOutput(answer || ""), data, route);
+  const base = ensureRouteMapPlaceholder(repaired, data);
   if (!data?.origin || !data?.destination) return base;
   return `${base}${buildNavigationAnswerSuffix(base, data, route)}`.trim();
 }
@@ -1201,6 +1282,29 @@ function weatherApiUrl(start, apiKey) {
     languageCode: "en",
   });
   return `https://weather.googleapis.com/v1/currentConditions:lookup?${params.toString()}`;
+}
+
+function buildGoogleWeatherLink(start) {
+  if (!start || !Number.isFinite(start.lat) || !Number.isFinite(start.lng)) return "";
+  const isLondonCoordinate = start.lat >= 51.28 && start.lat <= 51.70 && start.lng >= -0.55 && start.lng <= 0.35;
+  const rawLabel = String(start.nearbyFeatureName || start.weatherScopeLabel || start.label || start.name || "").trim();
+  const lowerLabel = rawLabel.toLowerCase();
+  const isPlaceholder = [
+    "current location",
+    "map selection",
+    "selected start point",
+    "selected location",
+    "navigation destination",
+    "当前位置",
+    "地图选点",
+    "已选出发点",
+    "当前选择的位置",
+    "导航目的地",
+  ].includes(lowerLabel);
+  const queryPlace = isLondonCoordinate || isPlaceholder || !rawLabel ? "London" : rawLabel.replace(/\s+nearby$/i, "");
+  const query = `weather ${queryPlace}`;
+  const params = new URLSearchParams({ q: query });
+  return `https://www.google.com/search?${params.toString()}`;
 }
 
 const controls = {
@@ -1604,6 +1708,21 @@ function setWeatherLoading(message = currentLanguage === "zh" ? "正在加载天
   $("weatherMeta").textContent = currentLanguage === "zh" ? "正在从 Google Weather API 获取当前天气。" : "Fetching current conditions from Google Weather API.";
 }
 
+function renderWeatherMeta(text, link = "") {
+  const metaEl = $("weatherMeta");
+  if (!metaEl) return;
+  metaEl.textContent = text;
+  if (!link) return;
+  metaEl.append(" · ");
+  const linkEl = document.createElement("a");
+  linkEl.className = "weather-meta-link";
+  linkEl.href = link;
+  linkEl.target = "_blank";
+  linkEl.rel = "noreferrer";
+  linkEl.textContent = currentLanguage === "zh" ? "查看 Google 天气预报" : "View Google forecast";
+  metaEl.append(linkEl);
+}
+
 function setWeatherButtonReady() {
   const currentButton = $("updateWeatherCurrentButton");
   const mapButton = $("updateWeatherMapButton");
@@ -1708,9 +1827,10 @@ function renderWeatherData(data, start) {
   $("weatherUv").textContent = Number.isFinite(data?.uvIndex) ? String(data.uvIndex) : "--";
   $("weatherPrecipitation").textContent = formatPrecipitationProbability(data);
   const time = data?.currentTime ? new Date(data.currentTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : (currentLanguage === "zh" ? "刚刚" : "just now");
-  $("weatherMeta").textContent = currentLanguage === "zh"
+  const metaText = currentLanguage === "zh"
     ? `${start.label || "已选出发点"} · ${start.lat.toFixed(4)}, ${start.lng.toFixed(4)} · 更新于 ${time}`
     : `${start.label || "Selected start point"} · ${start.lat.toFixed(4)}, ${start.lng.toFixed(4)} · Updated ${time}`;
+  renderWeatherMeta(metaText, buildGoogleWeatherLink(start));
   setWeatherSummaryLoading(currentLanguage === "zh" ? "正在生成天气简报" : "Generating a short weather summary");
   void refreshWeatherSummary(data, start);
 }
@@ -1754,29 +1874,51 @@ function buildWeatherFallbackSummary(data, start, errorMessage = "") {
   const temp = Number(data?.temperature?.degrees);
   const feelsLike = Number(data?.feelsLikeTemperature?.degrees);
   const windSpeed = Number(data?.wind?.speed?.value);
-  const pieces = [];
+  const uvIndex = Number(data?.uvIndex);
+  const rainChanceText = formatPrecipitationProbability(data);
+  const rainChance = Number(String(rainChanceText || "").replace(/[^\d.]/g, ""));
+  const location = start?.label ? String(start.label).trim() : "";
+  const isRainy = condition.includes("rain") || condition.includes("drizzle") || Number.isFinite(rainChance) && rainChance >= 40;
+  const isCloudy = condition.includes("cloud") || condition.includes("overcast");
+  const isBright = condition.includes("sun") || condition.includes("clear");
+  const isSnowy = condition.includes("snow");
+  const isLowVisibility = condition.includes("fog") || condition.includes("mist") || condition.includes("haze");
+  const conditionZh = isRainy ? "有雨或降雨概率偏高" : isCloudy ? "云量较多" : isBright ? "天气比较明亮" : isSnowy ? "天气寒冷，可能有雪" : isLowVisibility ? "能见度偏低" : "天气状况较平稳";
+  const conditionEn = isRainy ? "Wet conditions are likely" : isCloudy ? "Skies are mostly cloudy" : isBright ? "Conditions look bright" : isSnowy ? "Cold, wintry conditions are possible" : isLowVisibility ? "Visibility may be reduced" : "Conditions look steady";
 
-  if (condition.includes("rain") || condition.includes("drizzle")) pieces.push(zh ? "有雨，路面可能湿滑" : "Wet conditions");
-  else if (condition.includes("cloud")) pieces.push(zh ? "云量较多" : "Cloudy skies");
-  else if (condition.includes("sun") || condition.includes("clear")) pieces.push(zh ? "天气明亮" : "Bright weather");
-  else if (condition.includes("snow")) pieces.push(zh ? "天气寒冷并可能有雪" : "Cold, wintry weather");
-  else if (condition.includes("fog") || condition.includes("mist") || condition.includes("haze")) pieces.push(zh ? "能见度偏低" : "Low visibility");
-  else pieces.push(zh ? "当前天气状况" : "Current conditions");
+  if (zh) {
+    const place = location ? `${location} 附近` : "当前地点";
+    const tempText = Number.isFinite(temp) ? `，气温约 ${Math.round(temp)}°C` : "";
+    const feelsText = Number.isFinite(feelsLike) && Number.isFinite(temp) && Math.abs(feelsLike - temp) >= 2 ? `，体感约 ${Math.round(feelsLike)}°C` : "";
+    const first = `${place}现在${conditionZh}${tempText}${feelsText}。`;
+    let tip = "";
+    if (isRainy) tip = "出门建议带伞，并给步行换乘多留一点时间。";
+    else if (Number.isFinite(uvIndex) && uvIndex >= 6) tip = "日间紫外线偏强，长时间在户外最好注意防晒。";
+    else if (Number.isFinite(windSpeed) && windSpeed >= 20) tip = `风速约 ${Math.round(windSpeed)} km/h，体感可能更凉，外套会更稳妥。`;
+    else if (Number.isFinite(feelsLike) && feelsLike <= 8) tip = "体感偏冷，出门多加一层会舒服一些。";
+    else if (Number.isFinite(temp) && temp >= 27) tip = "体感可能偏热，步行时注意补水。";
+    else tip = "整体适合正常出行，按平时节奏安排即可。";
+    return `${first}${tip}`;
+  }
 
-  if (Number.isFinite(temp)) pieces.push(zh ? `约 ${Math.round(temp)}°C` : `around ${Math.round(temp)}°C`);
-  if (Number.isFinite(feelsLike) && Math.abs(feelsLike - temp) >= 2) pieces.push(zh ? `体感 ${Math.round(feelsLike)}°C` : `feels like ${Math.round(feelsLike)}°C`);
-  if (Number.isFinite(windSpeed)) pieces.push(zh ? `风速约 ${Math.round(windSpeed)} km/h` : `with a ${Math.round(windSpeed)} km/h breeze`);
-
-  const location = start?.label ? (zh ? `，位置在 ${start.label} 附近` : ` near ${start.label}`) : "";
-  return zh ? `${pieces.join("，")}${location}。` : `${pieces.join(", ")}${location}.`;
+  const pieces = [conditionEn];
+  if (Number.isFinite(temp)) pieces.push(`around ${Math.round(temp)}°C`);
+  if (Number.isFinite(feelsLike) && Math.abs(feelsLike - temp) >= 2) pieces.push(`feels like ${Math.round(feelsLike)}°C`);
+  if (Number.isFinite(windSpeed)) pieces.push(`with a ${Math.round(windSpeed)} km/h breeze`);
+  const locationText = location ? ` near ${location}` : "";
+  return `${pieces.join(", ")}${locationText}.`;
 }
 
 function normalizeWeatherSummary(value) {
   const clean = sanitizeModelOutput(value).replace(/\s+/g, " ").trim();
   if (!clean) return "";
   const sentences = clean.match(/[^.!?。！？]+[.!?。！？]?/g) || [];
-  if (sentences.length <= 2) return clean;
-  return sentences.slice(0, 2).join(" ").trim();
+  const joiner = currentLanguage === "zh" ? "" : " ";
+  const compact = sentences.length <= 2 ? clean : sentences.slice(0, 2).join(joiner).trim();
+  if (currentLanguage !== "zh" || compact.length <= 120) return compact;
+  const zhSentences = compact.match(/[^。！？]+[。！？]?/g) || [];
+  if (zhSentences.length > 1 && zhSentences[0].length <= 90) return zhSentences[0].trim();
+  return `${compact.slice(0, 116).replace(/[，、；：,.!?。！？\s]+$/g, "")}。`;
 }
 
 function renderWeatherSummaryMarkdown(value) {
@@ -1850,7 +1992,7 @@ async function refreshWeatherSummary(data, start) {
       body: JSON.stringify({
         stream: false,
         question: currentLanguage === "zh"
-          ? "请用自然、简短但可以稍微展开的中文，为天气卡片写 2-3 句话天气简报。不要使用 Markdown 标题。"
+          ? "请为天气卡片写一段自然、顺口的中文简报，控制在 2 句、约 45-90 个中文字符。第一句概括天气和温度/体感，第二句给一个有数据依据的出行提醒。不要堆砌字段，不要使用 Markdown 标题。"
           : "Write a natural weather summary for the weather card in 2-3 sentences. Keep it concise, but it can be a little fuller than a one-line summary. Do not use Markdown headings.",
         context: {
           task: "weather_summary",
@@ -3504,8 +3646,12 @@ function updateAgentModeSignal(mode, animate = true) {
   if (!signal) return;
   const displayMode = translateStatusText(mode);
   const changed = signal.textContent !== displayMode;
+  const toolCount = typeof displayMode === "string" && displayMode.includes(" + ")
+    ? displayMode.split(" + ").length
+    : 0;
   signal.textContent = displayMode;
   signal.dataset.mode = mode.toLowerCase().replace(/\s+/g, "-");
+  signal.dataset.toolCount = String(toolCount);
   if (!animate || !changed) return;
   signal.classList.remove("mode-changed");
   void signal.offsetWidth;
@@ -3596,6 +3742,7 @@ function routeOptionsForPreview(data) {
   return [ ...(data?.mapRoutes || []), data?.recommended, ...(data?.alternatives || [])]
     .filter((route) => route?.polyline)
     .filter((route, index, items) => index === items.findIndex((item) => routePreviewOptionKey(item) === routePreviewOptionKey(route)))
+    .filter((route, index, items) => index === items.findIndex((item) => routeDiversityKey(item) === routeDiversityKey(route)))
     .sort((left, right) => routePreviewModePriority(left) - routePreviewModePriority(right));
 }
 
@@ -3606,6 +3753,34 @@ function preferredRoutePreviewOption(routes) {
 function routePreviewOptionKey(route) {
   if (!route) return "";
   return `${String(route.mode || "")}:${String(route.routeVariantIndex ?? 0)}`;
+}
+
+function routeDiversityKey(route) {
+  const mode = String(route?.mode || "").toUpperCase();
+  const steps = Array.isArray(route?.transitSteps) ? route.transitSteps : [];
+  const stepKey = steps
+    .map((step) => [
+      step?.lineShortName || step?.lineName || step?.vehicleType || "",
+      normalizeRouteChoiceText(step?.departureStop),
+      normalizeRouteChoiceText(step?.arrivalStop),
+    ].join(":"))
+    .filter(Boolean)
+    .join("|");
+  if (stepKey) return `${mode}:${stepKey}`;
+  const lineKey = (Array.isArray(route?.transitLines) ? route.transitLines : [])
+    .map((line) => String(line?.shortName || line?.name || "").toLowerCase())
+    .filter(Boolean)
+    .join("|");
+  return `${mode}:${lineKey || `${route?.durationMinutes || ""}:${route?.distanceKm || ""}`}`;
+}
+
+function normalizeRouteChoiceText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\s*\([^)]*\)/g, "")
+    .replace(/\b(stop|station)\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function routePreviewModeGroups(routes) {
@@ -3741,6 +3916,22 @@ function toggleRouteMapFullscreen() {
   setRouteMapFullscreen(!routeMapFullscreen);
 }
 
+function renderRouteMetaBadge(route) {
+  const routeMetaBadge = $("routeMapMetaBadge");
+  if (!routeMetaBadge) return;
+  routeMetaBadge.textContent = "";
+  if (!route?.durationMinutes) return;
+  const distance = Number.isFinite(route.distanceKm) ? `, ${route.distanceKm} km` : "";
+  routeMetaBadge.append(`${route.durationMinutes} min${distance}`);
+  const fareDisplay = String(route?.fare?.display || "").trim();
+  if (!fareDisplay || !fareDisplay.startsWith("£")) return;
+  routeMetaBadge.append(" · ");
+  const fareEl = document.createElement("span");
+  fareEl.className = "route-fare-badge";
+  fareEl.textContent = fareDisplay;
+  routeMetaBadge.append(fareEl);
+}
+
 function drawRoutePreview(data, recommended) {
   const encodedPolyline = recommended?.polyline;
   if (!encodedPolyline) {
@@ -3760,9 +3951,7 @@ function drawRoutePreview(data, recommended) {
   preview.classList.remove("route-preview--pop");
   void preview.offsetWidth;
   preview.classList.add("route-preview--pop");
-  const distance = Number.isFinite(recommended.distanceKm) ? `, ${recommended.distanceKm} km` : "";
-  const routeMetaBadge = $("routeMapMetaBadge");
-  if (routeMetaBadge) routeMetaBadge.textContent = `${recommended.durationMinutes} min${distance}`;
+  renderRouteMetaBadge(recommended);
   $("routeOriginLabel").textContent = data.origin || "Origin";
   $("routeDestinationLabel").textContent = data.destination || "Destination";
   updateGoogleMapsLink(data, recommended);
@@ -3792,16 +3981,30 @@ function drawRoutePreview(data, recommended) {
   closeRouteStopInfo({ immediate: true });
 
   routePolylines = drawRoutePolylines(recommended, path);
+  const waypointMarkers = routeWaypointPlaces(data).map((place, index) => new google.maps.Marker({
+    map: routeMap,
+    position: { lat: place.lat, lng: place.lng },
+    label: String(index + 1),
+    title: place.name || `Waypoint ${index + 1}`,
+    zIndex: 7,
+  }));
 
   routeMarkers = [
     new google.maps.Marker({ map: routeMap, position: path[0], label: "A", title: data.origin || "Origin" }),
     new google.maps.Marker({ map: routeMap, position: path[path.length - 1], label: "B", title: data.destination || "Destination" }),
+    ...waypointMarkers,
     ...routeStopMarkersForRoute(recommended),
   ];
 
   const bounds = new google.maps.LatLngBounds();
   path.forEach((point) => bounds.extend(point));
+  routeWaypointPlaces(data).forEach((place) => bounds.extend({ lat: place.lat, lng: place.lng }));
   routeMap.fitBounds(bounds, 32);
+}
+
+function routeWaypointPlaces(data) {
+  return (Array.isArray(data?.waypointPlaces) ? data.waypointPlaces : [])
+    .filter((place) => isLatLngPlace(place));
 }
 
 function drawRoutePolylines(route, fallbackPath) {

@@ -12,6 +12,7 @@ from navigator_core import (
     APP_NAME,
     GROQ_API_URL,
     GOOGLE_TRAVEL_MODE,
+    GOOGLE_PLACES_TEXT_SEARCH_API_URL,
     LLM_MAX_COMPLETION_TOKENS,
     TOGETHER_API_URL,
     TOGETHER_MAX_COMPLETION_TOKENS,
@@ -50,13 +51,19 @@ from navigator_core import (
     read_http_error,
     resolve_together_chat_model,
     resolve_location,
+    resolve_route_request_contextual_places,
     strip_reasoning_text,
     valid_lat_lng,
 )
 
 OPENAI_CHAT_COMPLETIONS_API_URL = "https://api.openai.com/v1/chat/completions"
 AGENT_TOOL_CALL_LIMIT = int(get_env_value("AGENT_TOOL_CALL_LIMIT") or "7")
-AGENT_MAX_COMPLETION_TOKENS = int(get_env_value("AGENT_MAX_COMPLETION_TOKENS") or str(LLM_MAX_COMPLETION_TOKENS))
+AGENT_MIN_COMPLETION_TOKENS = int(get_env_value("AGENT_MIN_COMPLETION_TOKENS") or "4096")
+AGENT_MAX_COMPLETION_TOKENS = max(
+    AGENT_MIN_COMPLETION_TOKENS,
+    int(get_env_value("AGENT_MAX_COMPLETION_TOKENS") or str(max(AGENT_MIN_COMPLETION_TOKENS, LLM_MAX_COMPLETION_TOKENS))),
+)
+AGENT_CONTINUATION_LIMIT = int(get_env_value("AGENT_CONTINUATION_LIMIT") or "2")
 TFL_LINE_STATUS_MODES = "tube,overground,dlr,elizabeth-line,tram"
 TFL_LINE_STATUS_URL = f"https://api.tfl.gov.uk/line/mode/{TFL_LINE_STATUS_MODES}/status"
 TFL_STOP_POINT_MODES = "bus,tube,dlr,elizabeth-line,overground,tram,national-rail"
@@ -110,9 +117,16 @@ def agent_observation_payload(name, result):
             "destination": result.get("destination"),
             "originPlace": result.get("originPlace"),
             "destinationPlace": result.get("destinationPlace"),
+            "waypoints": result.get("waypoints") or [],
+            "waypointPlaces": result.get("waypointPlaces") or [],
+            "destinationResolution": result.get("destinationResolution"),
             "routeLink": result.get("routeLink"),
+            "relatedLinks": result.get("relatedLinks") or [],
             "recommended": summarize_route_option(result.get("recommended")),
             "alternatives": [summarize_route_option(route) for route in result.get("alternatives", [])],
+            "modeComparison": summarize_mode_comparison(result.get("mapRoutes") or []),
+            "publicTransportChoices": summarize_route_choices(result.get("mapRoutes") or [], preferred_mode="TRANSIT"),
+            "routeChoices": summarize_route_choices(result.get("mapRoutes") or [], preferred_mode="TRANSIT"),
             "imperial_weekday_shuttle": result.get("imperial_weekday_shuttle"),
             "provider": result.get("provider"),
             "inlineMapRequested": bool(result.get("inlineMapRequested")),
@@ -133,6 +147,177 @@ def agent_observation_payload(name, result):
     return result
 
 
+def summarize_mode_comparison(routes):
+    if not isinstance(routes, list):
+        return []
+    best_by_mode = {}
+    mode_order = {"TRANSIT": 0, "WALK": 1, "BICYCLE": 2, "TWO_WHEELER": 2, "DRIVE": 3}
+    for route in routes:
+        if not isinstance(route, dict):
+            continue
+        mode = str(route.get("mode") or "").upper()
+        if not mode:
+            continue
+        current = best_by_mode.get(mode)
+        if current is None or mode_comparison_sort_key(route) < mode_comparison_sort_key(current):
+            best_by_mode[mode] = route
+    summaries = []
+    for mode, route in sorted(best_by_mode.items(), key=lambda item: mode_order.get(item[0], 99)):
+        fare = route.get("fare") if isinstance(route.get("fare"), dict) else {}
+        summary = {
+            "mode": route.get("mode"),
+            "modeLabel": route.get("modeLabel"),
+            "durationMinutes": route.get("durationMinutes"),
+            "distanceKm": route.get("distanceKm"),
+            "fareDisplay": fare.get("display"),
+        }
+        if route.get("mode") == "TRANSIT":
+            summary["lines"] = route_line_labels(route)
+            summary["transferCount"] = max(0, len(route.get("transitSteps") or []) - 1)
+        summaries.append({key: value for key, value in summary.items() if value not in (None, "", [])})
+    return summaries
+
+
+def mode_comparison_sort_key(route):
+    return (
+        route.get("durationMinutes") or 10**9,
+        route.get("fare", {}).get("amountPence") if isinstance(route.get("fare"), dict) else 10**9,
+    )
+
+
+def summarize_route_choices(routes, limit=6, preferred_mode=None):
+    if not isinstance(routes, list):
+        return []
+    preferred_mode = str(preferred_mode or "").upper()
+    preferred_routes = [route for route in routes if str(route.get("mode") or "").upper() == preferred_mode] if preferred_mode else []
+    source_routes = preferred_routes or routes
+    choices = []
+    seen = set()
+    for route in diverse_route_options(source_routes):
+        if not isinstance(route, dict):
+            continue
+        key = route_diversity_key(route)
+        if key in seen:
+            continue
+        seen.add(key)
+        fare = route.get("fare") if isinstance(route.get("fare"), dict) else {}
+        choice = {
+            "choiceId": len(choices) + 1,
+            "mode": route.get("mode"),
+            "modeLabel": route.get("modeLabel"),
+            "durationMinutes": route.get("durationMinutes"),
+            "distanceKm": route.get("distanceKm"),
+            "fareDisplay": fare.get("display"),
+            "lines": route_line_labels(route),
+            "routeVariantIndex": route.get("routeVariantIndex"),
+            "routeVariantCount": route.get("routeVariantCount"),
+            "transferCount": max(0, len(route.get("transitSteps") or []) - 1) if route.get("mode") == "TRANSIT" else 0,
+        }
+        choice = {key: value for key, value in choice.items() if value not in (None, "", [])}
+        step_summary = summarize_transit_steps_for_choice(route.get("transitSteps") or [])
+        if step_summary:
+            choice["transitStepSummary"] = step_summary
+        walk_minutes, walk_distance_text = route_walking_summary(route)
+        if walk_minutes is not None:
+            choice["walkingMinutesApprox"] = walk_minutes
+        if walk_distance_text:
+            choice["walkingDistanceText"] = walk_distance_text
+        choices.append(choice)
+        if len(choices) >= limit:
+            break
+    return choices
+
+
+def route_diversity_key(route):
+    mode = str(route.get("mode") or "").upper()
+    line_key = tuple(label.lower() for label in route_line_labels(route))
+    stop_pairs = []
+    for step in route.get("transitSteps") or []:
+        if not isinstance(step, dict):
+            continue
+        line = str(step.get("lineShortName") or step.get("lineName") or step.get("vehicleType") or "").lower()
+        departure = normalize_route_choice_text(step.get("departureStop"))
+        arrival = normalize_route_choice_text(step.get("arrivalStop"))
+        stop_pairs.append((line, departure, arrival))
+    if stop_pairs:
+        return mode, tuple(stop_pairs)
+    if line_key:
+        return mode, line_key
+    return mode, route.get("durationMinutes"), route.get("distanceKm")
+
+
+def normalize_route_choice_text(value):
+    text = re.sub(r"\s+", " ", str(value or "").strip().lower())
+    text = re.sub(r"\s*\([^)]*\)", "", text)
+    text = re.sub(r"\b(stop|station)\b", "", text)
+    return text.strip(" ,")
+
+
+def diverse_route_options(routes, limit=None):
+    if not isinstance(routes, list):
+        return []
+    ordered = [route for route in routes if isinstance(route, dict)]
+    selected = []
+    seen = set()
+    for route in ordered:
+        key = route_diversity_key(route)
+        if key in seen:
+            continue
+        seen.add(key)
+        selected.append(route)
+        if limit and len(selected) >= limit:
+            break
+    return selected
+
+
+def route_line_labels(route):
+    labels = []
+    for line in route.get("transitLines") or []:
+        if not isinstance(line, dict):
+            continue
+        label = line.get("shortName") or line.get("name")
+        if label and label not in labels:
+            labels.append(label)
+    return labels
+
+
+def summarize_transit_steps_for_choice(steps, limit=5):
+    summary = []
+    for step in steps[:limit]:
+        if not isinstance(step, dict):
+            continue
+        line = step.get("lineShortName") or step.get("lineName") or step.get("vehicleType")
+        item = {
+            "line": line,
+            "vehicleType": step.get("vehicleType"),
+            "from": step.get("departureStop"),
+            "to": step.get("arrivalStop"),
+            "durationText": step.get("durationText"),
+        }
+        summary.append({key: value for key, value in item.items() if value})
+    return summary
+
+
+def route_walking_summary(route):
+    walk_seconds = 0
+    walk_distance_texts = []
+    for step in route.get("routeSegments") or []:
+        if not isinstance(step, dict):
+            continue
+        if str(step.get("travelMode") or "").upper() != "WALK":
+            continue
+        duration = str(step.get("duration") or "")
+        match = re.fullmatch(r"(\d+(?:\.\d+)?)s", duration)
+        if match:
+            walk_seconds += float(match.group(1))
+        if step.get("distanceText"):
+            walk_distance_texts.append(str(step["distanceText"]))
+    if not walk_seconds and not walk_distance_texts:
+        return None, ""
+    walk_minutes = max(1, round(walk_seconds / 60)) if walk_seconds else None
+    return walk_minutes, ", ".join(walk_distance_texts[:3])
+
+
 def summarize_route_option(route):
     if not isinstance(route, dict):
         return route
@@ -144,10 +329,14 @@ def summarize_route_option(route):
         "description": route.get("description"),
         "condition": route.get("condition"),
     }
+    if route.get("fare"):
+        summary["fare"] = route.get("fare")
+    if route.get("fareBreakdown"):
+        summary["fareBreakdown"] = route.get("fareBreakdown")
     if route.get("transitLines"):
         summary["transitLines"] = route.get("transitLines")
     if route.get("transitSteps"):
-        summary["transitSteps"] = route.get("transitSteps")[:8]
+        summary["transitStepSummary"] = summarize_transit_steps_for_choice(route.get("transitSteps") or [])
     return summary
 
 
@@ -163,18 +352,390 @@ def google_maps_travel_mode(mode):
     }.get(text, "walking")
 
 
-def google_maps_route_link(origin_place, destination_place, route=None):
+def google_maps_route_link(origin_place, destination_place, route=None, waypoint_places=None):
     if not valid_lat_lng(origin_place) or not valid_lat_lng(destination_place):
         return ""
-    params = urllib.parse.urlencode(
-        {
-            "api": "1",
-            "origin": f"{origin_place['lat']},{origin_place['lng']}",
-            "destination": f"{destination_place['lat']},{destination_place['lng']}",
-            "travelmode": google_maps_travel_mode((route or {}).get("mode")),
-        }
-    )
+    params = {
+        "api": "1",
+        "origin": f"{origin_place['lat']},{origin_place['lng']}",
+        "destination": f"{destination_place['lat']},{destination_place['lng']}",
+        "travelmode": google_maps_travel_mode((route or {}).get("mode")),
+    }
+    valid_waypoints = [item for item in (waypoint_places or []) if valid_lat_lng(item)]
+    if valid_waypoints:
+        params["waypoints"] = "|".join(f"{item['lat']},{item['lng']}" for item in valid_waypoints)
+    params = urllib.parse.urlencode(params)
     return f"https://www.google.com/maps/dir/?{params}"
+
+
+def google_maps_place_link(place):
+    if not isinstance(place, dict):
+        return ""
+    if place.get("googleMapsUri"):
+        return str(place.get("googleMapsUri") or "").strip()
+    name = str(place.get("name") or "").strip()
+    if valid_lat_lng(place):
+        query = f"{name} {place['lat']},{place['lng']}".strip()
+    else:
+        query = name
+    if not query:
+        return ""
+    return f"https://www.google.com/maps/search/?{urllib.parse.urlencode({'api': '1', 'query': query})}"
+
+
+def safe_external_url(value):
+    url = str(value or "").strip()
+    if not re.match(r"^https://", url, flags=re.IGNORECASE):
+        return ""
+    return url
+
+
+def fetch_google_place_direct_info(place):
+    if not isinstance(place, dict):
+        return {}
+    name = str(place.get("name") or "").strip()
+    if not name:
+        return {}
+    api_key = get_google_maps_api_key()
+    if not api_key:
+        return {}
+    body = {
+        "textQuery": name,
+        "languageCode": "en",
+        "maxResultCount": 3,
+    }
+    if valid_lat_lng(place):
+        body["locationBias"] = {
+            "circle": {
+                "center": {"latitude": place["lat"], "longitude": place["lng"]},
+                "radius": 1000,
+            }
+        }
+    request = urllib.request.Request(
+        GOOGLE_PLACES_TEXT_SEARCH_API_URL,
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": api_key,
+            "X-Goog-FieldMask": "places.displayName,places.websiteUri,places.googleMapsUri,places.types,places.businessStatus",
+            "User-Agent": APP_NAME,
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            data = json.loads(response.read().decode("utf-8", errors="replace"))
+    except Exception:
+        return {}
+    places = data.get("places") or []
+    if not places:
+        return {}
+    selected = places[0] if isinstance(places[0], dict) else {}
+    return {
+        "websiteUri": safe_external_url(selected.get("websiteUri")),
+        "googleMapsUri": safe_external_url(selected.get("googleMapsUri")),
+        "types": selected.get("types") if isinstance(selected.get("types"), list) else [],
+        "businessStatus": selected.get("businessStatus") or "",
+    }
+
+
+def merge_place_type_flags(flags, place_info):
+    types = {str(value or "").lower() for value in (place_info or {}).get("types") or []}
+    if types.intersection({"museum", "art_gallery", "tourist_attraction", "amusement_park", "zoo", "aquarium", "park"}):
+        flags["attraction"] = True
+    if types.intersection({"stadium", "performing_arts_theater", "movie_theater", "event_venue"}):
+        flags["venue"] = True
+    if types.intersection({"restaurant", "cafe", "bar", "pub"}):
+        flags["food"] = True
+    if types.intersection({"lodging", "hotel", "motel", "hostel"}):
+        flags["hotel"] = True
+    if types.intersection({"airport"}):
+        flags["airport"] = True
+    if types.intersection({"train_station"}):
+        flags["railStation"] = True
+        flags["station"] = True
+    return flags
+
+
+def compact_link_title(value, fallback="Link"):
+    text = re.sub(r"\s+", " ", str(value or "").strip())
+    return text[:80] or fallback
+
+
+def add_related_link(links, link_id, title, url, category, source, description="", priority=50):
+    if not url:
+        return
+    seen = {item.get("url") for item in links if isinstance(item, dict)}
+    if url in seen:
+        return
+    item = {
+        "id": link_id,
+        "title": compact_link_title(title),
+        "url": url,
+        "category": category,
+        "source": source,
+        "priority": priority,
+    }
+    if description:
+        item["description"] = compact_link_title(description, "")
+    links.append(item)
+
+
+def destination_keyword_flags(name):
+    text = str(name or "").lower()
+    attraction_terms = [
+        "museum",
+        "gallery",
+        "palace",
+        "castle",
+        "tower",
+        "zoo",
+        "aquarium",
+        "garden",
+        "park",
+        "cathedral",
+        "abbey",
+        "theatre",
+        "theater",
+        "stadium",
+        "arena",
+        "exhibition",
+        "attraction",
+        "景点",
+        "博物馆",
+        "美术馆",
+        "画廊",
+        "宫",
+        "城堡",
+        "塔",
+        "动物园",
+        "水族馆",
+        "剧院",
+        "体育馆",
+        "展览",
+    ]
+    station_terms = [
+        "station",
+        "火车站",
+        "车站",
+    ]
+    rail_station_terms = [
+        "railway station",
+        "train station",
+        "rail station",
+        "national rail",
+        "火车站",
+        "铁路站",
+    ]
+    uk_rail_terminal_terms = [
+        "paddington",
+        "king's cross",
+        "kings cross",
+        "st pancras",
+        "euston",
+        "victoria station",
+        "waterloo",
+        "london bridge",
+        "liverpool street",
+        "marylebone",
+        "charing cross",
+        "cannon street",
+        "fenchurch street",
+        "blackfriars",
+        "clapham junction",
+    ]
+    airport_terms = ["airport", "terminal", "机场", "航站楼"]
+    venue_terms = ["theatre", "theater", "stadium", "arena", "cinema", "concert", "venue", "剧院", "影院", "场馆", "演唱会"]
+    food_terms = ["restaurant", "cafe", "café", "bar", "pub", "餐厅", "咖啡", "酒吧"]
+    hotel_terms = ["hotel", "hostel", "inn", "accommodation", "酒店", "宾馆", "旅馆", "住宿"]
+    return {
+        "attraction": any(term in text for term in attraction_terms),
+        "station": any(term in text for term in station_terms),
+        "railStation": any(term in text for term in rail_station_terms) or any(term in text for term in uk_rail_terminal_terms),
+        "airport": any(term in text for term in airport_terms),
+        "venue": any(term in text for term in venue_terms),
+        "food": any(term in text for term in food_terms),
+        "hotel": any(term in text for term in hotel_terms),
+    }
+
+
+def route_has_national_rail(route):
+    if not isinstance(route, dict):
+        return False
+    for stop in route.get("routeStops") or []:
+        if not isinstance(stop, dict):
+            continue
+        modes = [str(value or "").lower() for value in stop.get("servedModes") or []]
+        if "national-rail" in modes:
+            return True
+    rail_terms = ("national rail", "heavy_rail", "commuter_train", "high_speed_train", "intercity", "great western", "southern", "thameslink", "lner", "avanti", "铁路", "火车")
+    excluded_london_terms = ("overground", "elizabeth", "underground", "tube", "dlr", "tram", "subway")
+    for step in route.get("transitSteps") or []:
+        if not isinstance(step, dict):
+            continue
+        values = [
+            step.get("vehicleType"),
+            step.get("lineName"),
+            step.get("lineShortName"),
+            step.get("agencyName"),
+            step.get("departureStop"),
+            step.get("arrivalStop"),
+        ]
+        text = " ".join(str(value or "").lower() for value in values)
+        if any(term in text for term in rail_terms) and not any(term in text for term in excluded_london_terms):
+            return True
+    return False
+
+
+def is_london_coordinate(place):
+    if not valid_lat_lng(place):
+        return False
+    return 51.28 <= place["lat"] <= 51.70 and -0.55 <= place["lng"] <= 0.35
+
+
+def station_search_name(place):
+    name = re.sub(r"\s+", " ", str((place or {}).get("name") or "").strip())
+    if not name:
+        return ""
+    cleaned = re.sub(r"\b(?:railway|train|rail)\s+station\b", "station", name, flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def route_related_links(origin_place, destination_place, route=None, waypoint_places=None):
+    links = []
+    destination_name = str((destination_place or {}).get("name") or "").strip()
+    flags = destination_keyword_flags(destination_name)
+    if flags["station"] and valid_lat_lng(destination_place) and not is_london_coordinate(destination_place):
+        flags["railStation"] = True
+    direct_info = {}
+    official_website = safe_external_url((destination_place or {}).get("websiteUri"))
+    google_maps_uri = safe_external_url((destination_place or {}).get("googleMapsUri"))
+    if destination_name and (not official_website or not google_maps_uri):
+        direct_info = fetch_google_place_direct_info(destination_place)
+        official_website = official_website or direct_info.get("websiteUri") or ""
+        google_maps_uri = google_maps_uri or direct_info.get("googleMapsUri") or ""
+        flags = merge_place_type_flags(flags, direct_info)
+    destination_link_place = dict(destination_place or {})
+    if google_maps_uri:
+        destination_link_place["googleMapsUri"] = google_maps_uri
+
+    add_related_link(
+        links,
+        "destination_maps",
+        "Open destination in Google Maps",
+        google_maps_place_link(destination_link_place),
+        "destination",
+        "google_maps_place",
+        "Destination details, photos, opening hours, and nearby context.",
+        18,
+    )
+    if official_website and (flags["attraction"] or flags["venue"]):
+        add_related_link(
+            links,
+            "destination_tickets",
+            "Check tickets on the destination website",
+            official_website,
+            "tickets",
+            "google_places_website",
+            "Open the destination website and check its tickets, visit, or booking section.",
+            8,
+        )
+    if official_website and flags["venue"]:
+        add_related_link(
+            links,
+            "destination_events",
+            "Check events and availability",
+            official_website,
+            "tickets",
+            "google_places_website",
+            "Open the venue website for timed entry, performances, events, or availability.",
+            16,
+        )
+
+    if destination_name and flags["food"]:
+        add_related_link(
+            links,
+            "destination_reservations",
+            "Book a table",
+            official_website or "https://www.opentable.co.uk/",
+            "reservations",
+            "destination_website" if official_website else "opentable",
+            "Open the restaurant website when available, otherwise use OpenTable for reservation search.",
+            17,
+        )
+
+    if destination_name and flags["hotel"]:
+        add_related_link(
+            links,
+            "destination_booking",
+            "Check hotel booking options",
+            official_website or "https://www.booking.com/",
+            "booking",
+            "destination_website" if official_website else "booking_com",
+            "Open the accommodation website when available, otherwise use Booking.com.",
+            17,
+        )
+
+    if official_website:
+        add_related_link(
+            links,
+            "destination_official",
+            "Open the destination website",
+            official_website,
+            "destination",
+            "google_places_website",
+            "Direct website from Google Places; use it for opening hours, visitor information, tickets, or booking details.",
+            12,
+        )
+
+    needs_rail = bool(flags["railStation"] or route_has_national_rail(route))
+    if needs_rail:
+        add_related_link(
+            links,
+            "national_rail",
+            "National Rail tickets and live services",
+            "https://www.nationalrail.co.uk/journey-planner/",
+            "rail_tickets",
+            "national_rail",
+            "Use for UK train times, service details, fares, and retailer handoff.",
+            8,
+        )
+        add_related_link(
+            links,
+            "trainline",
+            "Trainline train tickets",
+            "https://www.thetrainline.com/",
+            "rail_tickets",
+            "trainline",
+            "Alternative retailer for UK train tickets.",
+            22,
+        )
+        if flags["railStation"]:
+            add_related_link(
+                links,
+                "station_info",
+                "Station information",
+                "https://www.nationalrail.co.uk/stations/",
+                "station_info",
+                "national_rail",
+                f"Facilities, accessibility, and live information for stations such as {station_search_name(destination_place)}.",
+                28,
+            )
+
+    if official_website and flags["airport"]:
+        add_related_link(
+            links,
+            "airport_flights",
+            "Check airport live departures",
+            official_website,
+            "airport",
+            "google_places_website",
+            "Open the airport website for live departures and terminal information.",
+            20,
+        )
+
+    links.sort(key=lambda item: (item.get("priority", 99), item.get("title", "")))
+    return links[:6]
 
 
 def agent_tool_schema_definitions():
@@ -208,13 +769,13 @@ def agent_tool_schema_definitions():
             "type": "function",
             "function": {
                 "name": "navigate",
-                "description": "Calculate live travel routes, durations, distances, route geometry, and destination context using Google Routes.",
+                "description": "Calculate live travel routes, durations, distances, route geometry, waypoints/via stops, nearest-place destinations such as nearest KFC, and destination context using Google Routes and Places.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "The user's route request, including origin/destination/mode when present.",
+                            "description": "The user's route request, including origin/destination/mode, via/waypoint constraints, or nearest/nearby destination wording when present.",
                         },
                         "contextStart": {
                             "type": "object",
@@ -230,13 +791,13 @@ def agent_tool_schema_definitions():
             "type": "function",
             "function": {
                 "name": "render_route_map",
-                "description": "Prepare the inline route-map payload for the browser after a navigation request. Use this for directions so the browser can embed the map with the answer.",
+                "description": "Prepare the inline route-map payload for the browser after a navigation request, including route geometry, waypoints/via stops, and nearest-place destinations. Use this for directions so the browser can embed the map with the answer.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "The user's route request, including origin/destination/mode when present.",
+                            "description": "The user's route request, including origin/destination/mode, via/waypoint constraints, or nearest/nearby destination wording when present.",
                         },
                         "contextStart": {
                             "type": "object",
@@ -264,6 +825,25 @@ def agent_tool_schema_definitions():
                         },
                     },
                     "required": ["start", "destinations"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "fare_quote",
+                "description": "Return UK public-transport fare information for a route when available. Use existing routeSummary fare data first; future providers can supplement TfL or National Rail fares.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "originPlace": {"type": "object", "description": "Route origin with lat and lng."},
+                        "destinationPlace": {"type": "object", "description": "Route destination with lat and lng."},
+                        "waypointPlaces": {"type": "array", "items": {"type": "object"}},
+                        "departureTime": {"type": "string"},
+                        "transitSteps": {"type": "array", "items": {"type": "object"}},
+                        "routeSummary": {"type": "object", "description": "A route object, ideally from navigate or render_route_map."},
+                    },
+                    "required": ["originPlace", "destinationPlace", "routeSummary"],
                 },
             },
         },
@@ -322,6 +902,7 @@ def agent_system_prompt():
         "candidate destinations, and recent chat history. Decide for yourself whether a tool is needed. "
         "Use tools when they materially improve factual accuracy: web_search for encyclopedia-style or public factual questions, "
         "navigate for routes/directions, route_matrix for live travel estimates to destinations, weather_current for current weather, "
+        "fare_quote for UK public-transport fares when a route exists but fare details are missing or the user specifically asks about price, "
         "and tfl_status for live London line disruption/status checks. "
         "You may call multiple tools in sequence, observe the result, then decide whether another tool is needed. "
         "If navigate returns transitLines and the user asks for route advice, delay impact, or whether it is a good time to travel, "
@@ -329,7 +910,11 @@ def agent_system_prompt():
         "For navigation or directions requests, call render_route_map after navigate so the browser can embed the route map with your answer. If navigate succeeds and returns a usable route, you should normally call render_route_map in the same turn unless there is a concrete tool failure. "
         "When you have called render_route_map, treat the embedded route map as part of your response context and refer to it only when that feels natural for the current answer, "
         "instead of ignoring it or describing it like a separate system widget. When referring to the embedded map, keep the wording mode-neutral and do not label it as a driving, walking, cycling, or transit map unless the user explicitly asks for a specific mode. If the tool result includes routeLink, you may include a short natural Markdown link to Google Maps "
-        "as an optional next step. Make it clear, in wording that fits the surrounding answer, that clicking the link opens this route directly in Google Maps so the user can check real-time route updates or continue navigation. Do not describe this purpose as checking live traffic or traffic conditions. Do not force a fixed phrase or make the whole answer revolve around the link. "
+        "as an optional next step. Use the exact routeLink value returned by the tool; do not construct, shorten, re-encode, wrap, or partially copy the URL. If you cannot include the exact full URL, omit the Markdown link from the text because the browser has its own Google Maps action. Make it clear, in wording that fits the surrounding answer, that clicking the link opens this route directly in Google Maps so the user can check real-time route updates or continue navigation. Do not describe this purpose as checking live traffic or traffic conditions. Do not force a fixed phrase or make the whole answer revolve around the link. "
+        "When you call weather_current and the tool result includes weatherLink, you should usually include one short, natural Markdown link so the user can open Google to check weather details and forecast data. Use only the provided weatherLink for this purpose; never expose or invent weather.googleapis.com API URLs or API keys. Keep the link phrasing concise and varied so it fits the surrounding answer. "
+        "When route results include fare, treat fare.display as the total fare and make it the primary price information in your answer. If fareBreakdown exists, you may briefly mention per-leg prices after the total, but do not let segment prices dominate. Never invent fares; if fare is absent, do not mention price unless the user explicitly asked, and then say it was not available from the tools. "
+        "When navigate or render_route_map returns relatedLinks, you may include a small number of the most useful links naturally near the end of the answer. Prefer direct destination ticket/website links for attractions or venues, National Rail or Trainline links when the destination is a station or a public-transport route includes National Rail, reservation links for restaurants, booking links for hotels, airport official links for airports, and Google Maps destination links for place details. Use the exact URLs from relatedLinks; do not invent ticket links, booking links, or deep checkout URLs. Explain the purpose briefly, for example: '如果需要购买火车票，可以点击：...' or 'For tickets, use: ...'. If no relevant relatedLinks are returned, do not add this section. "
+        "Keep transport-mode comparison separate from public-transport route comparison. Use modeComparison only to compare broad modes such as public transport, walking, cycling, and driving. Use publicTransportChoices or routeChoices only inside a public-transport section to compare specific bus, Tube, rail, tram, or mixed transit options. Do not mix driving or cycling into the public-transport route-choice analysis. When publicTransportChoices are present, compare them according to the user's stated priority, such as fastest, cheapest, fewest transfers, least walking, accessibility, weather comfort, or overall convenience. If the user gives no priority, recommend the best overall public-transport trade-off using duration, total fare, transferCount, walkingMinutesApprox, and line simplicity. Refer to choices by their actual lines, time, fare, and trade-offs, not by hidden IDs alone. "
         "If you want the interactive route map to appear at a specific point in your answer, insert the standalone token [[ROUTE_MAP]] exactly where it should appear; the browser will replace that token with the embedded map. When the answer includes route advice plus other follow-up material such as weather, destination context, travel tips, or service reminders, it is usually more natural to place [[ROUTE_MAP]] soon after the main route explanation and before those secondary details, unless the context strongly suggests another position. A short context-setting phrase or sentence often helps the map feel naturally integrated with the surrounding explanation, but it is not mandatory and should vary with the situation. If you add such a lead-in, keep it brief, mode-neutral, and phrased in a fresh way that matches the nearby text rather than repeating a stock formula across answers. If you do not include [[ROUTE_MAP]], the browser may place the map after the main text. Do not say above or below unless your wording matches where you place [[ROUTE_MAP]]. Avoid repeating the same stock sentence about the map across answers. "
         "Imperial runs a weekday campus shuttle connecting South Kensington, White City, and Hammersmith. "
         "Only mention the shuttle when both the origin and destination are near those campuses and the tool context indicates it applies; when it does, mention it briefly as an option and include this Markdown link: "
@@ -362,7 +947,7 @@ def agent_user_prompt(payload):
     return (
         "Handle this browser request. Use the provided selected start point as contextStart when a route/weather request "
         "has no explicit origin. If the user asks about weather at the destination after a route tool call, use the "
-        "destinationPlace from the route result. For navigation answers, keep the route explanation primary, and weave any embedded map or optional route link in as a natural supporting detail when available. When mentioning the embedded map, use neutral wording rather than naming a specific transport mode unless the user asked for one. After a successful navigate call, you should normally also call render_route_map so the route is embedded with the answer. If render_route_map succeeds, place [[ROUTE_MAP]] where it fits naturally if you want the map embedded at a specific point. When the answer also includes weather, destination introduction, travel tips, or other extra material, prefer placing [[ROUTE_MAP]] right after the route explanation before moving on, unless another order reads more naturally. If you include routeLink, naturally explain that clicking it opens this route directly in Google Maps for real-time route updates or continued navigation; do not call this live traffic information. Choose your own concise wording to fit the answer rather than using a stock sentence. A brief transition into the map is often helpful, but it should be optional, concise, and adapted to the exact context instead of sounding templated.\n"
+        "destinationPlace from the route result. For navigation answers, keep the route explanation primary, and weave any embedded map or optional route link in as a natural supporting detail when available. When mentioning the embedded map, use neutral wording rather than naming a specific transport mode unless the user asked for one. After a successful navigate call, you should normally also call render_route_map so the route is embedded with the answer. If render_route_map succeeds, place [[ROUTE_MAP]] where it fits naturally if you want the map embedded at a specific point. First compare broad transport modes using modeComparison when useful. Then, in a separate public-transport discussion, compare publicTransportChoices/routeChoices according to the user's priority; if no priority is stated, recommend the best public-transport trade-off across time, total fare, transfers, walking, and simplicity. Do not include driving or cycling inside that public-transport route-choice comparison. When the answer also includes weather, destination introduction, travel tips, or other extra material, prefer placing [[ROUTE_MAP]] right after the route explanation before moving on, unless another order reads more naturally. If route results include fare, prioritize the total fare.display in the answer; mention fareBreakdown only as a brief supporting detail when present. If relatedLinks are present, pick only the most context-relevant direct links: destination ticket/website links for attractions and venues, National Rail or Trainline for train journeys/stations, reservation links for restaurants, booking links for hotels, airport live-departure links for airports, and Google Maps destination links when useful. Use exact URLs from relatedLinks; do not make up ticket pages or checkout deep links. Add a brief explanation before each important link, such as '如果需要购买火车票，可以点击：...' rather than dumping bare links. If you include routeLink, use the exact full routeLink value from the tool in Markdown and do not modify or manually compose the URL; naturally explain that clicking it opens this route directly in Google Maps for real-time route updates or continued navigation; do not call this live traffic information. If weather_current returns weatherLink, use that exact link if you include a Google weather or forecast link; do not write raw Weather API URLs or any API key-bearing URL. Choose your own concise wording to fit the answer rather than using a stock sentence. A brief transition into the map is often helpful, but it should be optional, concise, and adapted to the exact context instead of sounding templated.\n"
         f"{compact_json(safe_payload, limit=6500)}"
     )
 
@@ -469,7 +1054,111 @@ def call_chat_completion_tools(url, api_key, model, messages, tools, provider):
     choices = data.get("choices") or []
     if not choices:
         return {"role": "assistant", "content": "模型没有返回文本结果。"}
-    return choices[0].get("message") or {"role": "assistant", "content": ""}
+    choice = choices[0]
+    message = choice.get("message") or {"role": "assistant", "content": ""}
+    if isinstance(message, dict):
+        message["_finishReason"] = choice.get("finish_reason") or choice.get("finishReason") or ""
+    return message
+
+
+def call_chat_completion_text_only(url, api_key, model, messages, provider, max_tokens=None):
+    body = {
+        "model": model,
+        "messages": messages,
+    }
+    if provider in {"groq", "together"}:
+        body["temperature"] = 0.2
+    if provider == "groq":
+        body["max_completion_tokens"] = max_tokens or AGENT_MAX_COMPLETION_TOKENS
+    elif provider == "together":
+        body["max_tokens"] = max_tokens or AGENT_MAX_COMPLETION_TOKENS
+    else:
+        body["max_completion_tokens"] = max_tokens or AGENT_MAX_COMPLETION_TOKENS
+
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": f"{APP_NAME}/1.0",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=90) as response:
+        data = json.loads(response.read().decode("utf-8", errors="replace"))
+    choices = data.get("choices") or []
+    if not choices:
+        return "", ""
+    choice = choices[0]
+    message = choice.get("message") or {}
+    return strip_reasoning_text(message.get("content") or ""), choice.get("finish_reason") or choice.get("finishReason") or ""
+
+
+def agent_text_endpoint(provider):
+    if provider == "groq":
+        return GROQ_API_URL, get_groq_api_key()
+    if provider == "together":
+        return TOGETHER_API_URL, get_together_api_key()
+    if provider == "openai":
+        return OPENAI_CHAT_COMPLETIONS_API_URL, get_openai_api_key()
+    return "", ""
+
+
+def continue_truncated_agent_answer(messages, partial_answer, provider, model):
+    answer = str(partial_answer or "")
+    if not answer:
+        return answer
+    url, api_key = agent_text_endpoint(provider)
+    if not url or not api_key:
+        return answer
+    finish_reason = "length"
+    continuation_messages = [
+        *messages,
+        {"role": "assistant", "content": answer},
+    ]
+    for _ in range(max(0, AGENT_CONTINUATION_LIMIT)):
+        if str(finish_reason or "").lower() not in {"length", "max_tokens", "max_completion_tokens"}:
+            break
+        continuation_messages.append(
+            {
+                "role": "user",
+                "content": (
+                    "Continue the previous answer exactly from where it stopped. "
+                    "Do not restart, summarize, repeat earlier paragraphs, or add a new heading unless the previous answer was already starting one. "
+                    "Finish the response naturally."
+                ),
+            }
+        )
+        continuation, finish_reason = call_chat_completion_text_only(
+            url,
+            api_key,
+            model,
+            continuation_messages,
+            provider,
+            max_tokens=max(1200, AGENT_MAX_COMPLETION_TOKENS // 2),
+        )
+        continuation = strip_reasoning_text(continuation).strip()
+        if not continuation:
+            break
+        answer = merge_answer_continuation(answer, continuation)
+        continuation_messages.append({"role": "assistant", "content": continuation})
+    return answer
+
+
+def merge_answer_continuation(answer, continuation):
+    base = str(answer or "").rstrip()
+    extra = str(continuation or "").lstrip()
+    if not base:
+        return extra
+    if not extra:
+        return base
+    if base.endswith(("-", "–", "—", "/", "(", "[", "£", "=", "?", "&", "%", ",", ".")):
+        return f"{base}{extra}"
+    if re.search(r"\[[^\]]*\]\([^)]*$", base) or re.search(r"https?://\S*$", base):
+        return f"{base}{extra}"
+    return f"{base}\n{extra}"
 
 
 def parse_tool_arguments(raw_arguments):
@@ -550,6 +1239,8 @@ def execute_agent_tool(name, arguments, payload):
         return mcp_tool_render_route_map(arguments)
     if name == "route_matrix":
         return mcp_tool_route_matrix(arguments)
+    if name == "fare_quote":
+        return mcp_tool_fare_quote(arguments)
     if name == "weather_current":
         return mcp_tool_weather_current(arguments)
     if name == "tfl_status":
@@ -610,6 +1301,8 @@ def extract_agent_result_fields(tool_calls):
             result["navigation"] = payload
         elif item.get("name") == "weather_current":
             result["weather"] = payload
+        elif item.get("name") == "fare_quote":
+            result["fareQuote"] = payload
         elif item.get("name") == "tfl_status":
             result["tflStatus"] = payload
     return result
@@ -1237,6 +1930,8 @@ def mcp_tool_agent_answer(arguments):
                 if not answer:
                     fallback = mcp_tool_chat_complete({"payload": payload})
                     answer = fallback.get("answer", "") if isinstance(fallback, dict) else str(fallback or "")
+                elif str(message.get("_finishReason") or "").lower() in {"length", "max_tokens", "max_completion_tokens"}:
+                    answer = continue_truncated_agent_answer(messages, answer, provider, chat_target["model"])
                 finalized_tool_trace = ensure_route_map_tool_trace(tool_trace, latest_navigation_tool_result)
                 result = {
                     "answer": answer,
@@ -1282,7 +1977,7 @@ def mcp_tool_agent_answer(arguments):
                             "role": "tool",
                             "tool_call_id": call.get("id"),
                             "name": name,
-                            "content": compact_json(trace_item["result"], limit=2800),
+                            "content": compact_json(trace_item["result"], limit=5200 if name in {"navigate", "render_route_map"} else 2800),
                         }
                     )
                 except Exception as error:
@@ -1358,7 +2053,7 @@ def mcp_tool_health(arguments):
         "googleMapsBrowserConfigured": bool(get_google_maps_browser_key()),
         "googleMapsBrowserKey": get_google_maps_browser_key(),
         "mcpConnected": True,
-        "mcpTools": ["agent_answer", "chat_complete", "classify_intent", "web_search", "route_matrix", "navigate", "render_route_map", "weather_current", "tfl_status"],
+        "mcpTools": ["agent_answer", "chat_complete", "classify_intent", "web_search", "route_matrix", "fare_quote", "navigate", "render_route_map", "weather_current", "tfl_status"],
     }
 
 
@@ -1516,6 +2211,157 @@ def weather_api_url(location, api_key):
     return f"https://weather.googleapis.com/v1/currentConditions:lookup?{params}"
 
 
+def google_weather_search_link(location):
+    if not valid_lat_lng(location):
+        return ""
+    lat = float(location["lat"])
+    lng = float(location["lng"])
+    is_london_coordinate = 51.28 <= lat <= 51.70 and -0.55 <= lng <= 0.35
+    label = str(location.get("name") or location.get("label") or "").strip()
+    placeholder_labels = {
+        "current location",
+        "map selection",
+        "selected start point",
+        "selected location",
+        "navigation destination",
+        "当前位置",
+        "地图选点",
+        "已选出发点",
+        "当前选择的位置",
+        "导航目的地",
+    }
+    query_place = "London" if is_london_coordinate or not label or label.lower() in placeholder_labels else re.sub(r"\s+nearby$", "", label, flags=re.IGNORECASE)
+    query = f"weather {query_place}"
+    return f"https://www.google.com/search?{urllib.parse.urlencode({'q': query})}"
+
+
+def is_uk_coordinate(place):
+    if not valid_lat_lng(place):
+        return False
+    lat = float(place["lat"])
+    lng = float(place["lng"])
+    return 49.75 <= lat <= 61.2 and -8.8 <= lng <= 2.2
+
+
+def route_is_uk(route_context):
+    if not isinstance(route_context, dict):
+        return False
+    points = [
+        route_context.get("originPlace") or route_context.get("origin"),
+        route_context.get("destinationPlace") or route_context.get("destination"),
+        *route_context.get("waypointPlaces", []),
+    ]
+    valid_points = [point for point in points if valid_lat_lng(point)]
+    return bool(valid_points) and all(is_uk_coordinate(point) for point in valid_points)
+
+
+def normalize_route_fare(fare):
+    if not isinstance(fare, dict):
+        return None
+    currency = str(fare.get("currency") or "").upper()
+    amount_pence = fare.get("amountPence")
+    display = str(fare.get("display") or "").strip()
+    if currency != "GBP" or not isinstance(amount_pence, int) or amount_pence < 0:
+        return None
+    if not display.startswith("£"):
+        display = f"£{amount_pence / 100:.2f}"
+    normalized = {
+        "amountPence": amount_pence,
+        "currency": "GBP",
+        "display": display,
+        "source": fare.get("source") or "unknown",
+        "confidence": fare.get("confidence") or "provider",
+    }
+    if fare.get("notes"):
+        normalized["notes"] = fare.get("notes")
+    return normalized
+
+
+def tfl_fare_quote(arguments):
+    return None
+
+
+def national_rail_fare_quote(arguments):
+    return None
+
+
+def mcp_tool_fare_quote(arguments):
+    route_summary = (arguments or {}).get("routeSummary") or (arguments or {}).get("route") or {}
+    route_context = {
+        "originPlace": (arguments or {}).get("originPlace"),
+        "destinationPlace": (arguments or {}).get("destinationPlace"),
+        "waypointPlaces": (arguments or {}).get("waypointPlaces") or [],
+    }
+    if not route_is_uk(route_context):
+        return {
+            "fare": None,
+            "fareBreakdown": [],
+            "bookableServices": [],
+            "providerWarnings": [],
+        }
+
+    fare = normalize_route_fare(route_summary.get("fare"))
+    fare_breakdown = route_summary.get("fareBreakdown") if isinstance(route_summary.get("fareBreakdown"), list) else []
+    source = "google_routes_transit_fare" if fare else ""
+
+    for provider in (tfl_fare_quote, national_rail_fare_quote):
+        provider_result = provider(arguments)
+        if not isinstance(provider_result, dict):
+            continue
+        provider_fare = normalize_route_fare(provider_result.get("fare"))
+        if provider_fare:
+            fare = provider_fare
+            source = provider_fare.get("source") or source
+        if isinstance(provider_result.get("fareBreakdown"), list):
+            fare_breakdown = provider_result["fareBreakdown"]
+
+    return {
+        "fare": fare,
+        "fareBreakdown": fare_breakdown if fare else [],
+        "bookableServices": [],
+        "providerWarnings": [],
+        "source": source,
+    }
+
+
+def enrich_route_fares(route_request, routes):
+    if not routes:
+        return
+    route_context = {
+        "originPlace": public_place_payload(route_request.get("origin")),
+        "destinationPlace": public_place_payload(route_request.get("destination")),
+        "waypointPlaces": [public_place_payload(item) for item in route_request.get("waypoints", []) if public_place_payload(item)],
+    }
+    if not route_is_uk(route_context):
+        for route in routes:
+            route.pop("fare", None)
+            route.pop("fareBreakdown", None)
+        return
+    for route in routes:
+        if route.get("mode") != "TRANSIT":
+            route.pop("fare", None)
+            route.pop("fareBreakdown", None)
+            continue
+        quote = mcp_tool_fare_quote(
+            {
+                **route_context,
+                "departureTime": route_request.get("departureTime"),
+                "transitSteps": route.get("transitSteps") or [],
+                "routeSummary": route,
+            }
+        )
+        fare = quote.get("fare") if isinstance(quote, dict) else None
+        if fare:
+            route["fare"] = fare
+            if quote.get("fareBreakdown"):
+                route["fareBreakdown"] = quote["fareBreakdown"]
+            else:
+                route.setdefault("fareBreakdown", [])
+        else:
+            route.pop("fare", None)
+            route.pop("fareBreakdown", None)
+
+
 def mcp_tool_weather_current(arguments):
     api_key = get_google_maps_browser_key() or get_google_maps_api_key()
     if not api_key:
@@ -1553,6 +2399,7 @@ def mcp_tool_weather_current(arguments):
     return {
         "location": location,
         "provider": "google_weather",
+        "weatherLink": google_weather_search_link(location),
         "current": {
             "time": data.get("currentTime"),
             "condition": data.get("weatherCondition", {}).get("description", {}).get("text")
@@ -1583,6 +2430,7 @@ def mcp_tool_navigate(arguments):
         agent_tool_mode = bool((arguments or {}).get("_agentTool"))
         route_request = parse_navigation_query(query, (arguments or {}).get("history", []))
         apply_context_start(route_request, (arguments or {}).get("contextStart"))
+        resolve_route_request_contextual_places(route_request, query)
         if not route_request.get("origin") or not route_request.get("destination"):
             raise MCPToolError(
                 "Please ask with an origin and destination, for example: from South Kensington to Hammersmith Campus.",
@@ -1596,16 +2444,12 @@ def mcp_tool_navigate(arguments):
         route_options = []
         map_routes = []
         route_errors = []
+        has_waypoints = bool(route_request.get("waypoints"))
         for mode in modes:
             try:
-                route = call_google_matrix_route(
-                    api_key,
-                    route_request["origin"],
-                    route_request["destination"],
-                    mode,
-                    route_request["departureTime"],
-                )
-                if route:
+                route = None
+                route_variants = []
+                if has_waypoints:
                     route_variants = call_google_compute_route_variants(
                         api_key,
                         route_request["origin"],
@@ -1613,17 +2457,35 @@ def mcp_tool_navigate(arguments):
                         mode,
                         route_request["departureTime"],
                         allow_alternatives=True,
+                        intermediates=route_request.get("waypoints"),
                     )
-                    if route_variants:
-                        route_variants.sort(key=lambda item: item.get("durationMinutes") or 10**9)
-                        for index, item in enumerate(route_variants):
-                            item["routeVariantIndex"] = index
-                            item["routeVariantCount"] = len(route_variants)
-                        route_options.append(route_variants[0])
-                        map_routes.extend(route_variants)
-                    else:
-                        route_options.append(route)
-                        map_routes.append(route)
+                else:
+                    route = call_google_matrix_route(
+                        api_key,
+                        route_request["origin"],
+                        route_request["destination"],
+                        mode,
+                        route_request["departureTime"],
+                    )
+                    if route:
+                        route_variants = call_google_compute_route_variants(
+                            api_key,
+                            route_request["origin"],
+                            route_request["destination"],
+                            mode,
+                            route_request["departureTime"],
+                            allow_alternatives=True,
+                        )
+                if route_variants:
+                    route_variants.sort(key=lambda item: item.get("durationMinutes") or 10**9)
+                    for index, item in enumerate(route_variants):
+                        item["routeVariantIndex"] = index
+                        item["routeVariantCount"] = len(route_variants)
+                    route_options.append(route_variants[0])
+                    map_routes.extend(route_variants)
+                elif route:
+                    route_options.append(route)
+                    map_routes.append(route)
                 else:
                     route_errors.append(f"{mode_label(mode)}: Google returned no route element.")
             except urllib.error.HTTPError as error:
@@ -1633,13 +2495,20 @@ def mcp_tool_navigate(arguments):
 
         if not route_options:
             answer = "" if agent_tool_mode else build_navigation_answer(query, route_request, [], route_errors)
+            origin_place = public_place_payload(route_request["origin"])
+            destination_place = public_place_payload(route_request["destination"])
+            waypoint_places = [public_place_payload(item) for item in route_request.get("waypoints", []) if public_place_payload(item)]
             return {
                 "answer": answer,
                 "origin": route_request["origin"]["name"],
                 "destination": route_request["destination"]["name"],
-                "originPlace": public_place_payload(route_request["origin"]),
-                "destinationPlace": public_place_payload(route_request["destination"]),
+                "originPlace": origin_place,
+                "destinationPlace": destination_place,
+                "waypoints": [item.get("name") for item in route_request.get("waypoints", []) if isinstance(item, dict) and item.get("name")],
+                "waypointPlaces": waypoint_places,
+                "destinationResolution": route_request.get("destination_resolution"),
                 "routeLink": "",
+                "relatedLinks": route_related_links(origin_place, destination_place, None, waypoint_places),
                 "recommended": None,
                 "alternatives": [],
                 "mapRoutes": [],
@@ -1661,20 +2530,34 @@ def mcp_tool_navigate(arguments):
         for route in map_routes:
             attach_route_geometry(api_key, route_request, route)
             enrich_route_stop_metadata(route, stop_metadata_cache)
+        enrich_route_fares(route_request, map_routes)
+        route_options_by_key = {id(route): route for route in map_routes}
+        for route in route_options:
+            if id(route) not in route_options_by_key:
+                enrich_route_fares(route_request, [route])
+        map_routes = diverse_route_options(map_routes)
+        route_options = diverse_route_options(route_options)
         answer = "" if agent_tool_mode else build_navigation_answer(query, route_request, route_options, route_errors)
         origin_place = public_place_payload(route_request["origin"])
         destination_place = public_place_payload(route_request["destination"])
-        route_link = google_maps_route_link(origin_place, destination_place, route_options[0])
+        waypoint_places = [public_place_payload(item) for item in route_request.get("waypoints", []) if public_place_payload(item)]
+        route_link = google_maps_route_link(origin_place, destination_place, route_options[0], waypoint_places)
+        route_alternatives = [route for route in map_routes if route is not route_options[0]]
+        related_links = route_related_links(origin_place, destination_place, route_options[0], waypoint_places)
         return {
             "answer": answer,
             "origin": route_request["origin"]["name"],
             "destination": route_request["destination"]["name"],
             "originPlace": origin_place,
             "destinationPlace": destination_place,
+            "waypoints": [item.get("name") for item in route_request.get("waypoints", []) if isinstance(item, dict) and item.get("name")],
+            "waypointPlaces": waypoint_places,
+            "destinationResolution": route_request.get("destination_resolution"),
             "routeLink": route_link,
+            "relatedLinks": related_links,
             "recommended": route_options[0],
             "mapRoute": route_options[0],
-            "alternatives": route_options[1:],
+            "alternatives": route_alternatives,
             "mapRoutes": map_routes or [route_options[0], *route_options[1:]],
             "imperial_weekday_shuttle": imperial_shuttle_context(route_request),
             "provider": "google_routes",
@@ -1703,6 +2586,7 @@ def mcp_tool_registry():
         "classify_intent": mcp_tool_classify_intent,
         "web_search": mcp_tool_web_search,
         "route_matrix": mcp_tool_route_matrix,
+        "fare_quote": mcp_tool_fare_quote,
         "navigate": mcp_tool_navigate,
         "render_route_map": mcp_tool_render_route_map,
         "weather_current": mcp_tool_weather_current,
@@ -1749,6 +2633,21 @@ def mcp_tool_descriptions():
             "name": "route_matrix",
             "description": "Call Google Routes matrix for travel estimates to destinations.",
             "inputSchema": {"type": "object", "properties": {"start": {"type": "object"}, "destinations": {"type": "array"}}},
+        },
+        {
+            "name": "fare_quote",
+            "description": "Return UK public-transport total fare and optional per-leg fare details for a route when available.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "originPlace": {"type": "object"},
+                    "destinationPlace": {"type": "object"},
+                    "waypointPlaces": {"type": "array"},
+                    "departureTime": {"type": "string"},
+                    "transitSteps": {"type": "array"},
+                    "routeSummary": {"type": "object"},
+                },
+            },
         },
         {
             "name": "navigate",

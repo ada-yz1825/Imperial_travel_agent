@@ -1155,7 +1155,7 @@ button:hover {
 
 .agent-tools strong {
   display: block;
-  max-width: 32ch;
+  max-width: 100%;
   justify-self: end;
   color: var(--blue);
   font-size: 1.08rem;
@@ -1163,6 +1163,15 @@ button:hover {
   white-space: normal;
   text-wrap: balance;
   overflow-wrap: anywhere;
+}
+
+html[lang="en"] .agent-tools strong[data-tool-count="3"],
+html:not([lang]) .agent-tools strong[data-tool-count="3"] {
+  font-size: 0.96rem;
+  line-height: 1.12;
+  white-space: nowrap;
+  text-wrap: nowrap;
+  letter-spacing: -0.01em;
 }
 
 html[lang="zh-CN"] .agent-tools strong {
@@ -1553,7 +1562,7 @@ html[lang="zh-CN"] #summaryTitle {
   display: inline-flex;
   align-items: center;
   min-height: 38px;
-  max-width: min(calc(100% - 120px), 220px);
+  max-width: min(calc(100% - 120px), 280px);
   border: 1px solid rgba(29, 53, 87, 0.14);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.94);
@@ -1568,6 +1577,13 @@ html[lang="zh-CN"] #summaryTitle {
 
 .route-map-meta-badge:empty {
   display: none;
+}
+
+.route-fare-badge {
+  display: inline-flex;
+  align-items: center;
+  color: #047857;
+  font-weight: 950;
 }
 
 .route-variant-panel {
@@ -3003,6 +3019,18 @@ html[lang="zh-CN"] .weather-header .weather-choice-button {
 
 .weather-meta {
   margin: 0;
+}
+
+.weather-meta-link {
+  color: var(--blue);
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.weather-meta-link:hover,
+.weather-meta-link:focus-visible {
+  text-decoration: underline;
+  outline: none;
 }
 
 .weather-summary--reveal {
