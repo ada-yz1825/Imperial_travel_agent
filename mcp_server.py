@@ -995,6 +995,7 @@ def agent_system_prompt():
         "Only mention specific line names, stops, and statuses that tools provide. "
         "If navigate does not provide transitLines, say the route tool did not provide specific line details instead of guessing. "
         "When using web_search, ground the answer in the returned sources and include a concise Markdown source link when useful. "
+        "For requests to explore or wander near the selected start point, recommend a short, varied list of nearby attractions, streets, parks, markets, or cultural venues suited to a casual visit. Use the selected start point as the centre, explain why each option is worth visiting, and use web_search when current opening information would materially help. Do not invent distances, opening hours, or availability. "
         "Only discuss candidate study-space recommendations, libraries, comfort scores, or ranked places when the current user question explicitly asks for study spaces, libraries, places to work, quiet places, or similar study planning. "
         "For greetings or ordinary chat, do not proactively recommend libraries or study spaces even if location context is available. "
         "If no tool is needed, answer directly. Match the user's language. Use at most one blank line between "

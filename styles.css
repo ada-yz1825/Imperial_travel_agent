@@ -1175,7 +1175,8 @@ html:not([lang]) .agent-tools strong[data-tool-count="3"] {
 }
 
 html[lang="zh-CN"] .agent-tools strong {
-  font-family: var(--zh-title-font);
+  font-family: inherit;
+  font-weight: 600;
   letter-spacing: 0;
 }
 
@@ -1229,6 +1230,7 @@ html[lang="zh-CN"] .agent-tools strong {
 }
 
 .agent-answer {
+  position: relative;
   margin-top: 12px;
   border-left: 4px solid var(--blue);
   border-radius: 6px;
@@ -1255,6 +1257,18 @@ html[lang="zh-CN"] .agent-tools strong {
 }
 
 .agent-answer-meta-slot {
+  min-width: 0;
+}
+
+.agent-answer-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 36px;
+  margin-top: 12px;
+}
+
+.agent-answer-model-note-slot {
   min-width: 0;
 }
 
@@ -1602,6 +1616,10 @@ html[lang="zh-CN"] #summaryTitle {
   backdrop-filter: blur(6px);
 }
 
+.route-variant-panel[hidden] {
+  display: none;
+}
+
 .route-variant-title {
   color: #617082;
   font-size: 0.72rem;
@@ -1780,6 +1798,65 @@ html[lang="zh-CN"] #summaryTitle {
   height: 100vh;
 }
 
+.route-map-options {
+  display: contents;
+}
+
+.route-fullscreen-mode-control {
+  display: none;
+}
+
+.route-map-shell.is-fullscreen .route-map-options {
+  position: absolute;
+  z-index: 6;
+  top: 12px;
+  left: 12px;
+  display: grid;
+  gap: 0;
+  width: min(270px, calc(100vw - 150px));
+  padding: 11px;
+  border: 1px solid rgba(39, 103, 168, 0.24);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #1f4268;
+  box-shadow: 0 8px 20px rgba(24, 44, 64, 0.16);
+}
+
+.route-map-shell.is-fullscreen .route-fullscreen-mode-control {
+  display: grid;
+  gap: 5px;
+}
+
+.route-fullscreen-mode-control label {
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.route-fullscreen-mode-control select {
+  min-height: 36px;
+  font-size: 0.86rem;
+}
+
+.route-map-shell.is-fullscreen .route-map-options .route-variant-panel {
+  position: static;
+  max-width: none;
+  margin-top: 12px;
+  padding: 12px 0 0;
+  border: 0;
+  border-top: 1px solid #d9e1e8;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+@media (max-width: 560px) {
+  .route-map-shell.is-fullscreen .route-map-options {
+    top: 72px;
+    width: min(270px, calc(100vw - 24px));
+  }
+}
+
 .route-map-shell.is-fullscreen .route-map {
   width: 100vw !important;
   height: 100vh !important;
@@ -1937,7 +2014,7 @@ body.route-map-fullscreen-open {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 14px;
+  margin: 0 0 0 auto;
 }
 
 .agent-actions[hidden] {
@@ -1965,29 +2042,99 @@ body.route-map-fullscreen-open {
 /* Prominent CTA styling for the Google Maps link and Chat button */
 .agent-actions a.cta,
 .agent-actions button.cta {
-  min-height: 48px;
-  padding: 10px 14px;
-  font-size: 0.95rem;
-  border-radius: 8px;
-  background: linear-gradient(180deg, var(--cta), var(--cta-hover));
-  color: var(--cta-contrast);
-  border: 0;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  min-height: 36px;
+  padding: 8px 11px;
+  font-size: 0.8rem;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #347fbc, #1d5f9a);
+  color: #ffffff;
+  border: 1px solid rgba(20, 82, 137, 0.56);
+  box-shadow: 0 6px 16px rgba(33, 100, 156, 0.22);
 }
 
-/* Push chat button to the right and make it wider */
-.agent-actions button.chat-cta {
-  margin-left: auto;
-  min-width: 180px;
-  padding-left: 18px;
-  padding-right: 18px;
+/* Both route and chat actions match the current-location control. */
+.agent-actions button.chat-cta,
+.agent-actions a.cta {
+  margin-left: 0;
+  min-width: 0;
+  min-height: 42px;
+  padding: 9px 16px;
+  font-size: 0.88rem;
+  border: 1px solid #cbd7e2;
+  background: #eef3f7;
+  color: #263544;
+  box-shadow: none;
+}
+
+.agent-actions--idle {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  margin: 0;
+  transform: translateY(-50%);
+}
+
+.agent-answer:has(.agent-actions--idle:not([hidden])) .agent-answer-meta-row {
+  min-height: 0;
+  margin-top: 0;
+}
+
+.agent-answer:has(.agent-actions--idle:not([hidden])) .agent-answer-body {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  padding-right: 170px;
+}
+
+/* Nudge only the completed-answer actions, without moving the model note. */
+.agent-answer:not(:has(.thinking-panel)) .agent-actions:not(.agent-actions--idle):not([hidden]) {
+  position: relative;
+  top: 6px;
+}
+
+/* The loading view is intentionally compact: no empty metadata or route area. */
+.agent-answer:has(.thinking-panel) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 16px;
+  min-height: 0;
+  padding-bottom: 24px;
+}
+
+.agent-answer:has(.thinking-panel) .agent-answer-route-slot {
+  display: none;
+}
+
+.agent-answer:has(.thinking-panel) .agent-answer-meta-row {
+  margin-top: 0;
+}
+
+.thinking-panel {
+  min-height: 0;
+  align-content: start;
 }
 
 .agent-actions a.cta:hover,
 .agent-actions button.cta:hover {
-  background: linear-gradient(180deg, var(--cta), var(--cta-hover));
-  background-color: var(--cta);
-  filter: brightness(1.04);
+  background: linear-gradient(135deg, #3d8bc9, #226da9);
+  border-color: rgba(20, 82, 137, 0.7);
+  filter: brightness(1.02);
+}
+
+/* The question send controls use the same calm blue treatment as the actions. */
+#askButton,
+#modalAskButton {
+  background: linear-gradient(135deg, #347fbc, #1d5f9a);
+  color: #ffffff;
+  border: 1px solid rgba(20, 82, 137, 0.56);
+  box-shadow: 0 6px 16px rgba(33, 100, 156, 0.22);
+}
+
+#askButton:hover,
+#modalAskButton:hover {
+  background: linear-gradient(135deg, #3d8bc9, #226da9);
+  border-color: rgba(20, 82, 137, 0.7);
 }
 
 .agent-actions a[hidden] {
@@ -2014,13 +2161,14 @@ body.route-map-fullscreen-open {
 }
 
 .chat-modal-panel {
-  width: min(720px, 100%);
-  max-height: min(760px, calc(100vh - 36px));
+  width: min(940px, 100%);
+  height: min(760px, calc(100vh - 36px));
+  max-height: calc(100vh - 36px);
   display: grid;
   grid-template-rows: auto minmax(220px, 1fr) auto;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 18px;
   background: #fff;
   box-shadow: var(--shadow);
 }
@@ -2492,6 +2640,44 @@ html[lang="zh-CN"] .startup-copy {
   .startup-wait-visual { margin: 0 0 20px; }
   .startup-status { margin-top: 9px; }
 }
+
+/* Present the minimal start indicator as a focused floating dialog. */
+.startup-wait-modal {
+  padding: 24px;
+  background: rgba(18, 33, 52, 0.28);
+  backdrop-filter: blur(5px);
+}
+
+.startup-wait-panel {
+  width: min(640px, 100%);
+  min-height: 0;
+  padding: 30px 48px 48px;
+  overflow: visible;
+  border: 1px solid rgba(214, 223, 234, 0.9);
+  border-radius: 20px;
+  background: #f8fafc;
+  box-shadow: 0 24px 70px rgba(20, 37, 57, 0.2);
+}
+
+.startup-wait-card {
+  max-width: 100%;
+}
+
+.startup-wait-delayed-hint {
+  top: auto;
+  bottom: 12px;
+  left: 50%;
+  width: min(540px, calc(100% - 40px));
+  margin: 0;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+@media (max-width: 560px) {
+  .startup-wait-modal { padding: 18px; }
+  .startup-wait-panel { padding: 24px 24px 58px; border-radius: 16px; }
+  .startup-wait-delayed-hint { bottom: 12px; }
+}
 .tool-info-text {
   display: grid;
   white-space: normal;
@@ -2714,6 +2900,31 @@ html[lang="zh-CN"] .startup-copy {
   min-height: 42px;
   padding: 0 16px;
   align-self: center;
+  border-radius: 12px;
+}
+
+.chat-modal-header .chat-close-button {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #5d6670;
+  box-shadow: none;
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.chat-modal-header .chat-close-button:hover,
+.chat-modal-header .chat-close-button:focus-visible {
+  background: #eef3f7;
+  color: #1f2d3a;
+  transform: none;
 }
 
 .chat-modal-history {
@@ -2781,10 +2992,18 @@ html[lang="zh-CN"] .startup-copy {
   transform: rotate(-7deg);
 }
 
-.chat-route-map-button {
-  display: block;
-  width: auto;
+.chat-route-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: 12px;
+}
+
+.chat-route-map-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
   min-height: 34px;
   border: 1px solid #cbd7e2;
   border-radius: 6px;
@@ -2794,6 +3013,7 @@ html[lang="zh-CN"] .startup-copy {
   font-size: 0.82rem;
   font-weight: 850;
   text-align: center;
+  text-decoration: none;
 }
 
 .chat-route-map-button:hover {
@@ -2896,6 +3116,11 @@ html[lang="zh-CN"] .startup-copy {
 
 .chat-modal-form button {
   min-height: 46px;
+  border-radius: 12px;
+}
+
+.chat-modal-form input[type="text"] {
+  border-radius: 12px;
 }
 
 .how-it-works-shell {
@@ -4396,6 +4621,11 @@ select:focus {
   animation: soft-reveal 300ms var(--ease-out) both;
 }
 
+/* The reveal animation sets transform and would override vertical centering. */
+.agent-actions--idle {
+  animation: none;
+}
+
 .route-preview:not(.scroll-reveal) {
   animation: expand-in 320ms var(--ease-out) both;
 }
@@ -4406,11 +4636,21 @@ select:focus {
 
 .agent-actions a.cta:hover,
 .agent-actions button.cta:hover {
-  background: linear-gradient(180deg, var(--cta), var(--cta-hover));
-  background-color: var(--cta);
-  filter: brightness(1.04);
+  background: linear-gradient(135deg, #3d8bc9, #226da9);
+  background-color: #226da9;
+  border-color: rgba(20, 82, 137, 0.7);
+  filter: brightness(1.02);
   transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 10px 22px rgba(33, 100, 156, 0.28);
+}
+
+.agent-actions button.chat-cta:hover,
+.agent-actions a.cta:hover {
+  background: #dfe9f1;
+  border-color: #cbd7e2;
+  color: #263544;
+  filter: none;
+  box-shadow: none;
 }
 
 .chat-message.user.chat-message--pop {
@@ -5183,26 +5423,36 @@ select:focus {
   }
 
   .agent-actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-    align-items: stretch;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
   }
 
   .agent-actions a.cta,
   .agent-actions button.cta {
-    width: 100%;
+    width: auto;
     min-width: 0;
-    min-height: 46px;
-    padding: 9px 10px;
-    font-size: clamp(0.73rem, 3.15vw, 0.88rem);
+    min-height: 34px;
+    padding: 7px 9px;
+    font-size: clamp(0.71rem, 3vw, 0.8rem);
     line-height: 1.16;
   }
 
-  .agent-actions button.chat-cta {
+  .agent-actions button.chat-cta,
+  .agent-actions a.cta {
     margin-left: 0;
     min-width: 0;
-    padding-left: 10px;
-    padding-right: 10px;
+    min-height: 40px;
+    padding: 9px 13px;
+    font-size: 0.8rem;
   }
+
+  .agent-answer-meta-row { gap: 8px; }
+
+  .agent-answer:has(.thinking-panel) { column-gap: 8px; }
+
+  .agent-actions--idle { right: 12px; }
+
+  .agent-answer:has(.agent-actions--idle:not([hidden])) .agent-answer-body { padding-right: 158px; }
 }

@@ -148,17 +148,26 @@
                 <button type="button" data-question="How do I get to White City Campus from my current selected start point?">Go to White City</button>
                 <button type="button" data-question="How do I get to Oxford from my current selected start point?">Go to Oxford</button>
                 <button type="button" data-question="Which library is nearby from my selected starting point?">Nearby library</button>
-                <button type="button" data-question="What's the current weather at my selected start point right now?">Current weather</button>
+                <button type="button" data-question="I want to explore near my current selected start point. Please suggest a few places worth visiting nearby.">Explore nearby</button>
+                <button type="button" data-question="What's the current weather at my selected start point right now?">Weather</button>
                 <button type="button" data-question="What's the current TfL status, and are any lines disrupted right now?">TfL status</button>
               </div>
               <div class="agent-answer" id="agentAnswer">
                 <div class="agent-answer-body" id="agentAnswerBody">
-                  <span class="agent-answer-placeholder-text">Ready when you are. Ask the agent a question to get started.</span>
+                  <span class="agent-answer-placeholder-text">Ask the agent a question to see the answer here.</span>
                 </div>
-              <div class="agent-answer-route-slot" id="agentAnswerRouteSlot"></div>
-              <div class="agent-answer-meta-slot" id="agentAnswerMetaSlot"></div>
-            </div>
-            <div class="route-preview" id="routePreview" hidden>
+                <div class="agent-answer-route-slot" id="agentAnswerRouteSlot"></div>
+                <div class="agent-answer-meta-slot" id="agentAnswerMetaSlot">
+                  <div class="agent-answer-meta-row">
+                    <div class="agent-answer-model-note-slot" id="agentAnswerModelNoteSlot"></div>
+                    <div class="agent-actions agent-actions--idle" id="agentActions">
+                      <a id="googleMapsLink" class="cta" href="https://www.google.com/maps/search/?api=1&query=Imperial%20College%20London" target="_blank" rel="noreferrer" hidden>Open Google maps for mode routes</a>
+                      <button id="openChatButton" class="cta chat-cta" type="button">Chat window mode</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="route-preview" id="routePreview" hidden>
               <div class="route-controls">
                 <div class="route-heading">
                   <span id="routePreviewTitle" class="route-preview-title">Route map</span>
@@ -176,19 +185,21 @@
                 </div>
               </div>
               <div class="route-map-shell" id="routeMapShell">
-                <div id="routeMapMetaBadge" class="route-map-meta-badge" aria-live="polite"></div>
-                <div id="routeVariantPanel" class="route-variant-panel" hidden>
-                  <span id="routeVariantTitle" class="route-variant-title">Routes</span>
-                  <div id="routeVariantOptions" class="route-variant-options" aria-live="polite"></div>
+                <div class="route-map-options">
+                  <div class="route-fullscreen-mode-control">
+                    <label for="routeFullscreenModeSelect">Transport mode</label>
+                    <select id="routeFullscreenModeSelect"></select>
+                  </div>
+                  <div id="routeVariantPanel" class="route-variant-panel" hidden>
+                    <span id="routeVariantTitle" class="route-variant-title">Routes</span>
+                    <div id="routeVariantOptions" class="route-variant-options" aria-live="polite"></div>
+                  </div>
                 </div>
+                <div id="routeMapMetaBadge" class="route-map-meta-badge" aria-live="polite"></div>
                 <button id="routeFullscreenButton" class="route-fullscreen-button" type="button" aria-label="Open route map full screen">Full screen</button>
                 <div class="route-map" id="routeMap" aria-label="Recommended route map"></div>
               </div>
             </div>
-              <div class="agent-actions" id="agentActions" hidden>
-                <a id="googleMapsLink" class="cta" href="https://www.google.com/maps/search/?api=1&query=Imperial%20College%20London" target="_blank" rel="noreferrer">Open Google maps for mode routes</a>
-                <button id="openChatButton" class="cta chat-cta" type="button">Continue in chat window</button>
-              </div>
             </form>
 
             <div class="how-it-works-shell">
@@ -290,9 +301,9 @@
         <div class="chat-modal-header">
           <div>
             <p class="eyebrow">Conversation</p>
-            <h2 id="chatModalTitle">Agent chat</h2>
+            <h2 id="chatModalTitle">Chat with your travel agent</h2>
           </div>
-          <button id="closeChatButton" type="button" aria-label="Close chat">Close</button>
+          <button id="closeChatButton" class="chat-close-button" type="button" aria-label="Close chat" title="Close">×</button>
         </div>
         <div class="chat-modal-history" id="chatModalHistory"></div>
         <form class="chat-modal-form" id="modalChatForm">
@@ -346,8 +357,8 @@
           </div>
           <p id="startupWaitBodyPrimary" class="startup-wait-accessible">The backend server is hosted on Render, so it may take around 30 seconds to wake up after a quiet period.</p>
           <p id="startupWaitBodySecondary" class="startup-wait-accessible">Please give it a moment while the service comes back online.</p>
-          <p id="startupWaitBodyTertiary" class="startup-wait-delayed-hint" hidden>This should not take this long. Please try refreshing the page.</p>
         </section>
+        <p id="startupWaitBodyTertiary" class="startup-wait-delayed-hint" hidden>This should not take this long. Please try refreshing the page.</p>
       </div>
     </div>
 

@@ -383,18 +383,20 @@ const I18N = {
     quickWhiteCity: "Go to White City",
     quickOxford: "Go to Oxford",
     quickLibrary: "Nearby library",
-    quickWeather: "Current weather",
+    quickExplore: "Explore nearby",
+    quickWeather: "Weather",
     quickTfl: "TfL status",
     quickWhiteCityQuestion: "How do I get to White City Campus from my current selected start point?",
     quickOxfordQuestion: "How do I get to Oxford from my current selected start point?",
     quickLibraryQuestion: "Which library is nearby from my selected starting point?",
+    quickExploreQuestion: "I want to explore near my current selected start point. Please suggest a few places worth visiting nearby.",
     quickWeatherQuestion: "What's the current weather at my selected start point right now?",
     quickTflQuestion: "What's the current TfL status, and are any lines disrupted right now?",
-    agentPlaceholder: "Ready when you are. Ask the agent a question to get started.",
+    agentPlaceholder: "Ask the agent a question to see the answer here.",
     routeMap: "Route map",
     routeChoices: "Routes",
     routeChoiceLabel: "Route {index}",
-    routeMapButton: "Close to view route map",
+    routeMapButton: "View route map",
     weatherDestinationRequired: "Please ask the agent for a navigation route first, then update weather at the parsed destination.",
     start: "Start",
     destination: "Destination",
@@ -403,7 +405,7 @@ const I18N = {
     fullScreen: "Full screen",
     exitFullScreen: "Exit full screen",
     openGoogleMaps: "Open Google Maps for route",
-    continueChat: "Continue in chat window",
+    continueChat: "Chat window mode",
     expandIntro: "Expand introductions to the agent",
     collapseIntro: "Collapse introductions to the agent",
     howItWorks: "How it works?",
@@ -440,7 +442,8 @@ const I18N = {
     refresh: "Refresh",
     tflMeta: "Live status from Transport for London.",
     conversation: "Conversation",
-    agentChat: "Agent chat",
+    agentChat: "Chat with your travel assistant",
+    chatEmpty: "Ask the agent something to start.",
     close: "Close",
     modalPlaceholder: "Continue the conversation...",
     send: "Send",
@@ -498,12 +501,12 @@ const I18N = {
     walkEstimateLabel: "Walk est.",
     minuteUnitShort: "min",
     usingTool: "Using {tool} tool",
-    navigationLoading: "Running navigation. This may take some time.",
-    routeComparisonLoading: "Comparing route options.",
-    interactiveMapLoading: "Generating the interactive map.",
-    weatherLoading: "Fetching current weather information.",
-    webSearchLoading: "Searching for relevant information.",
-    tflStatusLoading: "Fetching TfL service status.",
+    navigationLoading: "Running navigation. This may take some time",
+    routeComparisonLoading: "Comparing route options",
+    interactiveMapLoading: "Generating the interactive map",
+    weatherLoading: "Fetching current weather information",
+    webSearchLoading: "Searching for relevant information",
+    tflStatusLoading: "Fetching TfL service status",
     understandingRequest: "Understanding your request",
   },
   zh: {
@@ -555,18 +558,20 @@ const I18N = {
     quickWhiteCity: "去白城校区",
     quickOxford: "去牛津",
     quickLibrary: "附近图书馆",
+    quickExplore: "附近逛逛",
     quickWeather: "当前天气",
     quickTfl: "伦敦地铁实时状态",
     quickWhiteCityQuestion: "从我当前选择的出发点怎么去 White City Campus？",
     quickOxfordQuestion: "从我当前选择的出发点怎么去牛津？",
     quickLibraryQuestion: "从我当前选择的出发点附近有哪些图书馆？",
+    quickExploreQuestion: "我想在当前选择的出发点附近逛逛，请推荐几个值得去的地方。",
     quickWeatherQuestion: "我当前选择的出发点现在天气怎么样？",
     quickTflQuestion: "现在 TfL 线路状态如何？有没有线路延误或中断？",
-    agentPlaceholder: "向 Agent 提问后答案会在此处显示，交互式地图将在导航工具被调用后显示。",
+    agentPlaceholder: "向 Agent 提问后，答案会在此处显示。",
     routeMap: "路线地图",
     routeChoices: "路线选择",
     routeChoiceLabel: "路线 {index}",
-    routeMapButton: "关闭以查看路线图",
+    routeMapButton: "查看路线图",
     weatherDestinationRequired: "请先向 Agent 提问以生成一条导航路线，然后再更新目的地天气。",
     start: "起点",
     destination: "目的地",
@@ -575,7 +580,7 @@ const I18N = {
     fullScreen: "全屏地图",
     exitFullScreen: "退出全屏",
     openGoogleMaps: "在 Google Maps 中导航",
-    continueChat: "打开聊天窗口继续对话",
+    continueChat: "对话窗模式",
     expandIntro: "展开 Agent 使用指南",
     collapseIntro: "收起 Agent 使用指南",
     howItWorks: "「 使用指南 」",
@@ -612,7 +617,8 @@ const I18N = {
     refresh: "刷新",
     tflMeta: "数据来自 Transport for London 实时状态。",
     conversation: "对话",
-    agentChat: "Agent",
+    agentChat: "与出行助手交谈",
+    chatEmpty: "向助手提问以开始对话。想去哪？可以尝试询问路线、天气或其他出行问题",
     close: "关闭",
     modalPlaceholder: "继续对话...",
     send: "发送",
@@ -748,6 +754,7 @@ function applyLanguage() {
     [".route-endpoints div:first-child span", "start"],
     [".route-endpoints div:last-child span", "destination"],
     ["label[for='routeModeSelect']", "transportMode"],
+    ["label[for='routeFullscreenModeSelect']", "transportMode"],
     ["#routeFullscreenButton", routeMapFullscreen ? "exitFullScreen" : "fullScreen"],
     ["#googleMapsLink", "openGoogleMaps"],
     ["#openChatButton", "continueChat"],
@@ -772,7 +779,6 @@ function applyLanguage() {
     ["#refreshTflStatus", "refresh"],
     [".chat-modal-header .eyebrow", "conversation"],
     ["#chatModalTitle", "agentChat"],
-    ["#closeChatButton", "close"],
     ["#modalAskButton", "send"],
     ["#confirmOpenLink", "openNewTab"],
     ["#cancelOpenLink", "cancel"],
@@ -834,6 +840,7 @@ function applyLanguage() {
     ["quickWhiteCity", "quickWhiteCityQuestion"],
     ["quickOxford", "quickOxfordQuestion"],
     ["quickLibrary", "quickLibraryQuestion"],
+    ["quickExplore", "quickExploreQuestion"],
     ["quickWeather", "quickWeatherQuestion"],
     ["quickTfl", "quickTflQuestion"],
   ];
@@ -1050,8 +1057,8 @@ function setAgentAnswerHtml(html) {
 }
 
 function setAgentAnswerMetaHtml(html = "") {
-  const meta = agentAnswerMetaSlotEl();
-  if (meta) meta.innerHTML = html;
+  const note = $("agentAnswerModelNoteSlot");
+  if (note) note.innerHTML = html;
 }
 
 function setElementHidden(target, hidden) {
@@ -1126,11 +1133,11 @@ function refreshAgentAnswerMeta() {
 
 function restoreRoutePreviewPlacement() {
   const preview = $("routePreview");
-  const actions = $("agentActions");
-  if (!preview || !actions?.parentNode) return;
+  const answer = $("agentAnswer");
+  if (!preview || !answer?.parentNode) return;
   preview.classList.remove("route-preview--inline");
-  if (preview.parentNode !== actions.parentNode || preview.nextElementSibling !== actions) {
-    actions.parentNode.insertBefore(preview, actions);
+  if (preview.parentNode !== answer.parentNode || preview.previousElementSibling !== answer) {
+    answer.insertAdjacentElement("afterend", preview);
   }
 }
 
@@ -1412,6 +1419,7 @@ let routeStopOverlayCloseTimer = null;
 let pendingRoutePreview = null;
 let activeRoutePreview = null;
 let routeMapFullscreen = false;
+let routeMapOpenedFromChat = false;
 let routeMapPlaceholder = null;
 let selectedRoutePreviewVariantKey = "";
 let googleMapsLoading = false;
@@ -1435,6 +1443,7 @@ let latestNavigationData = null;
 const chatHistory = [];
 let lastAnimatedChatMessageKey = "";
 let chatLoadingMessage = "";
+let agentAnswerPending = false;
 let startupWaitModalShown = false;
 let startupWaitModalTimer = null;
 let startupWaitLongHintTimer = null;
@@ -2934,7 +2943,8 @@ async function answerQuestion(question, options = {}) {
 
   collapseHowItWorks();
   setAgentMode("Pending");
-  renderLoadingAnswer(t("understandingRequest"));
+  agentAnswerPending = true;
+  updateChatLoadingAnswer(t("understandingRequest"));
   const minLoadingReadyAt = Date.now() + MIN_LOADING_MS;
   setAsking(true);
   const loadingSessionId = renderLoadingAnswer(t("understandingRequest"));
@@ -2976,7 +2986,7 @@ async function answerQuestion(question, options = {}) {
     const isStreamingResponse = contentType.includes("application/x-ndjson");
     if (!isStreamingResponse) await waitForMinimumLoading(minLoadingReadyAt);
     const agentResult = isStreamingResponse
-      ? await readStreamingAnswer(response, { loadingSessionId, showChatLoading: Boolean(options.skipUserPush) })
+      ? await readStreamingAnswer(response, { loadingSessionId })
       : await readJsonAnswer(response);
     const rawAnswer = agentResult.answer || "";
     setLatestAnswerModelLabel(agentResult.model || "");
@@ -3007,6 +3017,7 @@ async function answerQuestion(question, options = {}) {
 
     chatHistory.push({ role: "assistant", content: answer });
     trimChatHistory();
+    agentAnswerPending = false;
     chatLoadingMessage = "";
     renderChatModalHistory();
     collapseHowItWorks();
@@ -3027,6 +3038,12 @@ async function answerQuestion(question, options = {}) {
       renderChatModalHistory();
     }
   } finally {
+    agentAnswerPending = false;
+    chatLoadingMessage = "";
+    if (!$('chatModal')?.hidden) {
+      $('chatModalHistory')?.querySelector('.chat-message.typing')?.remove();
+      if (!chatHistory.length) renderChatModalHistory(false);
+    }
     setAsking(false);
   }
 }
@@ -3120,7 +3137,7 @@ async function readStreamingAnswer(response, options = {}) {
         setAgentMode(formatAgentTools(toolsUsed));
         const loadingMessage = formatLoadingTools(toolsUsed);
         updateLoadingAnswer(options.loadingSessionId, loadingMessage);
-        if (options.showChatLoading) updateChatLoadingAnswer(loadingMessage);
+        updateChatLoadingAnswer(loadingMessage);
       }
       if (event.delta) {
         answer += event.delta;
@@ -3345,7 +3362,7 @@ function renderLoadingAnswer(message) {
   cancelAnswerRender();
   restoreRoutePreviewPlacement();
   clearRoutePreview();
-  hideAgentActions();
+  renderAgentActions();
   clearLatestAnswerModelLabel();
   setAgentAnswerMetaHtml("");
   const loadingSessionId = ++loadingRenderSessionId;
@@ -3862,7 +3879,7 @@ function routePreviewModePriority(route) {
 function renderRouteModeOptions(routes, selectedMode) {
   const select = $("routeModeSelect");
   if (!select) return;
-  select.innerHTML = routePreviewModeGroups(routes)
+  const optionsHtml = routePreviewModeGroups(routes)
     .map((group) => {
       const route = group.routes[0];
       // Only show transport mode in the select (no duration/distance)
@@ -3870,6 +3887,9 @@ function renderRouteModeOptions(routes, selectedMode) {
       return `<option value="${route.mode}" ${route.mode === selectedMode ? "selected" : ""}>${escapeHtml(label)}</option>`;
     })
     .join("");
+  select.innerHTML = optionsHtml;
+  const fullscreenSelect = $("routeFullscreenModeSelect");
+  if (fullscreenSelect) fullscreenSelect.innerHTML = optionsHtml;
 }
 
 function renderRouteVariantOptions(routes, selectedMode, selectedKey) {
@@ -3916,6 +3936,8 @@ function drawSelectedRoutePreview() {
   if (!activeRoutePreview) return;
   const routes = routeOptionsForPreview(activeRoutePreview);
   const selectedMode = $("routeModeSelect").value;
+  const fullscreenSelect = $("routeFullscreenModeSelect");
+  if (fullscreenSelect) fullscreenSelect.value = selectedMode;
   const modeRoutes = routes.filter((item) => item.mode === selectedMode);
   const route = modeRoutes.find((item) => routePreviewOptionKey(item) === selectedRoutePreviewVariantKey) || modeRoutes[0] || routes[0];
   selectedRoutePreviewVariantKey = routePreviewOptionKey(route);
@@ -3930,6 +3952,7 @@ function setRouteMapFullscreen(enabled) {
   const button = $("routeFullscreenButton");
   if (!shell || !button) return;
   routeMapFullscreen = Boolean(enabled);
+  if (routeMapFullscreen) $("routeFullscreenModeSelect").value = $("routeModeSelect").value;
   if (routeMapFullscreen && !routeMapPlaceholder) {
     routeMapPlaceholder = document.createComment("route-map-shell-placeholder");
     shell.parentNode.insertBefore(routeMapPlaceholder, shell);
@@ -3943,6 +3966,10 @@ function setRouteMapFullscreen(enabled) {
   document.body.classList.toggle("route-map-fullscreen-open", routeMapFullscreen);
   button.textContent = routeMapFullscreen ? t("exitFullScreen") : t("fullScreen");
   button.setAttribute("aria-label", routeMapFullscreen ? t("exitFullScreen") : t("fullScreen"));
+  if (!routeMapFullscreen && routeMapOpenedFromChat) {
+    routeMapOpenedFromChat = false;
+    if (!$('chatModal')?.hidden) $('chatModalHistory')?.querySelector('[data-chat-route-map]')?.focus();
+  }
   if (mapElement) {
     const defaultHeight = routePreviewDefaultHeight();
     mapElement.style.height = routeMapFullscreen ? "100%" : defaultHeight;
@@ -4464,6 +4491,7 @@ function renderAgentActions(data = null, route = data?.recommended) {
   const actions = $("agentActions");
   const googleLink = $("googleMapsLink");
   if (!actions || !googleLink) return;
+  actions.classList.remove("agent-actions--idle");
   setElementHidden(actions, false);
   const hasRoute = Boolean(data?.origin && data?.destination);
   setElementHidden(googleLink, !hasRoute);
@@ -4471,7 +4499,10 @@ function renderAgentActions(data = null, route = data?.recommended) {
 }
 
 function hideAgentActions() {
-  setElementHidden("agentActions", true);
+  const actions = $("agentActions");
+  if (!actions) return;
+  actions.classList.remove("agent-actions--idle");
+  setElementHidden(actions, true);
 }
 
 function googleMapsPlaceValue(place, fallbackText = "") {
@@ -4519,7 +4550,7 @@ function openChatModal() {
   void modal.offsetWidth;
   modal.classList.remove("closing");
   modal.classList.add("visible");
-  renderChatModalHistory();
+  renderChatModalHistory(agentAnswerPending);
   $("modalUserQuestion").focus();
 }
 
@@ -4548,12 +4579,20 @@ function routeMapButtonHtml() {
   return `<button class="chat-route-map-button" type="button" data-chat-route-map="true">${t("routeMapButton")}</button>`;
 }
 
-function renderChatModalHistory(isLoading = false, loadingMessage = chatLoadingMessage) {
+function googleMapsButtonHtml() {
+  const link = $("googleMapsLink");
+  if (!link || link.hidden || !link.href) return "";
+  return `<a class="chat-route-map-button" href="${escapeHtml(link.href)}" target="_blank" rel="noreferrer" data-chat-google-maps="true">${escapeHtml(t("openGoogleMaps"))}</a>`;
+}
+
+function renderChatModalHistory(isLoading = agentAnswerPending, loadingMessage = chatLoadingMessage) {
   const history = $("chatModalHistory");
   if (!history) return;
   if (!chatHistory.length) {
     lastAnimatedChatMessageKey = "";
-    history.innerHTML = `<div class="chat-message assistant">No conversation yet. Ask the agent something to start.<span class="chat-bubble-tail" aria-hidden="true"></span></div>`;
+    history.innerHTML = isLoading
+      ? `<div class="chat-message assistant typing" role="status" aria-live="polite"><span class="chat-loading-message">${escapeHtml(loadingMessage || t("understandingRequest"))}</span><span class="chat-typing-dots" aria-hidden="true"><span></span><span></span><span></span></span><span class="chat-bubble-tail" aria-hidden="true"></span></div>`
+      : `<div class="chat-message assistant">${escapeHtml(t("chatEmpty"))}<span class="chat-bubble-tail" aria-hidden="true"></span></div>`;
     return;
   }
 
@@ -4567,7 +4606,11 @@ function renderChatModalHistory(isLoading = false, loadingMessage = chatLoadingM
       if (shouldPop) nextAnimatedMessageKey = messageKey;
       const popClass = shouldPop ? " chat-message--pop" : "";
       const routeMapButton = shouldShowRouteMapButton(item, index) ? routeMapButtonHtml() : "";
-      return `<div class="chat-message ${role}${popClass}">${renderChatMessageContent(role, item.content)}${routeMapButton}<span class="chat-bubble-tail" aria-hidden="true"></span></div>`;
+      const googleMapsButton = role === "assistant" && index === lastIndex ? googleMapsButtonHtml() : "";
+      const routeActions = routeMapButton || googleMapsButton
+        ? `<div class="chat-route-actions">${routeMapButton}${googleMapsButton}</div>`
+        : "";
+      return `<div class="chat-message ${role}${popClass}">${renderChatMessageContent(role, item.content)}${routeActions}<span class="chat-bubble-tail" aria-hidden="true"></span></div>`;
     })
     .join("");
   const loading = isLoading
@@ -4580,14 +4623,20 @@ function renderChatModalHistory(isLoading = false, loadingMessage = chatLoadingM
 
 function updateChatLoadingAnswer(message) {
   chatLoadingMessage = String(message || "").trim();
-  if (!$("chatModal")?.hidden) renderChatModalHistory(true);
+  if ($("chatModal")?.hidden) return;
+  const loadingLabel = $("chatModalHistory")?.querySelector(".chat-message.typing .chat-loading-message");
+  if (loadingLabel) {
+    loadingLabel.textContent = chatLoadingMessage || t("understandingRequest");
+  } else {
+    renderChatModalHistory(true);
+  }
 }
 
 function showRouteMapFromChat() {
-  closeChatModal();
-  window.setTimeout(() => {
-    $("routePreview")?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, 220);
+  if (!$('routePreview') || $('routePreview').hidden) return;
+  routeMapOpenedFromChat = true;
+  setRouteMapFullscreen(true);
+  $('routeFullscreenButton')?.focus();
 }
 
 function decodePolyline(encoded) {
@@ -5309,6 +5358,11 @@ if (routeModeSelectEl) {
     drawSelectedRoutePreview();
   });
 }
+$("routeFullscreenModeSelect")?.addEventListener("change", (event) => {
+  $("routeModeSelect").value = event.currentTarget.value;
+  selectedRoutePreviewVariantKey = "";
+  drawSelectedRoutePreview();
+});
 $("routeVariantOptions")?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-route-variant-key]");
   if (!button) return;
@@ -5324,6 +5378,12 @@ $("closeChatButton").addEventListener("click", closeChatModal);
 $("chatModal").addEventListener("click", (event) => {
   if (event.target === $("chatModal")) closeChatModal();
   if (event.target?.matches("[data-chat-route-map]")) showRouteMapFromChat();
+  const googleMapsButton = event.target?.closest("[data-chat-google-maps]");
+  if (googleMapsButton) {
+    event.preventDefault();
+    const link = $("googleMapsLink");
+    if (link && !link.hidden && link.href) showExternalConfirm(link.href);
+  }
 });
 // External Google Maps link: show confirm modal before leaving
 const externalConfirmModalEl = $("externalConfirmModal");
