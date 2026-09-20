@@ -457,10 +457,11 @@ const I18N = {
     chatModelSwitchUnavailable: "Model switching is currently unavailable.",
     externalConfirmTitle: "Open external link",
     externalConfirm: "You are about to leave this page and open a new tab. Continue?",
-    startupWaitTitle: "Waking up the server",
+    startupWaitTitle: "Service is starting",
     startupWaitBodyPrimary: "The backend server is hosted on Render, so it may take around <strong>30 seconds</strong> to wake up after a quiet period.",
     startupWaitBodySecondary: "Please give it a moment while the service comes back online.",
-    startupWaitBodyTertiary: "If this message stays here for more than 30 seconds, try refreshing the page.",
+    startupWaitBodyTertiary: "This should not take this long. Please try refreshing the page.",
+    startupWaitStatus: "Starting the backend takes about 30 seconds",
     openNewTab: "Open in new tab",
     cancel: "Cancel",
     mapPoint: "Map selection {lat}, {lng}",
@@ -497,6 +498,12 @@ const I18N = {
     walkEstimateLabel: "Walk est.",
     minuteUnitShort: "min",
     usingTool: "Using {tool} tool",
+    navigationLoading: "Running navigation. This may take some time.",
+    routeComparisonLoading: "Comparing route options.",
+    interactiveMapLoading: "Generating the interactive map.",
+    weatherLoading: "Fetching current weather information.",
+    webSearchLoading: "Searching for relevant information.",
+    tflStatusLoading: "Fetching TfL service status.",
     understandingRequest: "Understanding your request",
   },
   zh: {
@@ -622,10 +629,11 @@ const I18N = {
     chatModelSwitchUnavailable: "当前暂时无法切换模型。",
     externalConfirmTitle: "打开外部链接",
     externalConfirm: "即将离开当前页面并打开新标签页，是否继续？",
-    startupWaitTitle: "正在唤醒服务器",
+    startupWaitTitle: "服务正在启动中",
     startupWaitBodyPrimary: "后端服务部署在 Render 上，空闲一段时间后再次访问时，通常需要大约 <strong>30 秒</strong> 完成唤醒。",
     startupWaitBodySecondary: "请稍等片刻，服务恢复后会自动继续。",
-    startupWaitBodyTertiary: "如果这个弹窗停留超过 30 秒仍没有变化，请尝试刷新页面。",
+    startupWaitBodyTertiary: "这不该耗费这么长时间，请尝试刷新页面。",
+    startupWaitStatus: "后台启动大约需要 30 秒",
     openNewTab: "打开新标签页",
     cancel: "取消",
     mapPoint: "地图点位 {lat}, {lng}",
@@ -661,6 +669,12 @@ const I18N = {
     walkEstimateLabel: "步行预估",
     minuteUnitShort: "分钟",
     usingTool: "正在使用{tool}工具",
+    navigationLoading: "正在运行导航，这可能耗费一些时间",
+    routeComparisonLoading: "正在比较路线方案",
+    interactiveMapLoading: "正在生成交互式地图",
+    weatherLoading: "正在获取当前天气信息",
+    webSearchLoading: "正在搜索相关信息",
+    tflStatusLoading: "正在获取 TfL 交通状况",
     understandingRequest: "正在理解您的需求",
   },
 };
@@ -763,7 +777,8 @@ function applyLanguage() {
     ["#confirmOpenLink", "openNewTab"],
     ["#cancelOpenLink", "cancel"],
     ["#externalConfirmTitle", "externalConfirmTitle"],
-    ["#startupWaitText .modal-info-title", "startupWaitTitle"],
+    ["#startupWaitTitle", "startupWaitTitle"],
+    ["#startupWaitStatus", "startupWaitStatus"],
     ["#closeToolInfo", "close"],
     [".footer-useful-links-title", "usefulLinks"],
     [".sig-note", "footerNote"],
@@ -1176,7 +1191,8 @@ function relatedLinkLabel(link) {
   const category = String(link?.category || "");
   const title = String(link?.title || "").trim();
   if (currentLanguage !== "zh") return title || "Related link";
-  if (category === "rail_tickets") return title.includes("Trainline") ? "Trainline 火车票" : "National Rail 火车票与班次";
+  if (category === "rail_tickets") return title.replace(/ railway website$/i, " 铁路官网").replace(/ tickets and live services$/i, " 火车票与班次") || "铁路购票渠道";
+  if (category === "rail_search") return "查找当地铁路购票渠道";
   if (category === "tickets") return title.includes("events") ? "活动/门票页面" : "目的地官网";
   if (category === "reservations") return "预约页面";
   if (category === "booking") return "预订页面";
@@ -1191,7 +1207,8 @@ function relatedLinkSentence(link) {
   const label = relatedLinkLabel(link);
   const markdown = `[${label}](${link.url})`;
   if (currentLanguage === "zh") {
-    if (category === "rail_tickets") return `如果需要购买火车票或查看国铁班次，可以点击：${markdown}。`;
+    if (category === "rail_tickets") return `如果需要查看火车班次或购票，可以点击：${markdown}。`;
+    if (category === "rail_search") return `如果需要购买火车票，可以实时查找当地渠道：${markdown}。`;
     if (category === "tickets") return `如果需要购票、预约入场或查看活动余票，可以点击：${markdown}。`;
     if (category === "reservations") return `如果需要预订座位，可以点击：${markdown}。`;
     if (category === "booking") return `如果需要查看住宿预订，可以点击：${markdown}。`;
@@ -1199,7 +1216,8 @@ function relatedLinkSentence(link) {
     if (category === "station_info") return `如果需要查看车站设施和无障碍信息，可以点击：${markdown}。`;
     return `如果需要查看目的地详情，可以点击：${markdown}。`;
   }
-  if (category === "rail_tickets") return `For train tickets or National Rail services, use: ${markdown}.`;
+  if (category === "rail_tickets") return `For train services and tickets, use: ${markdown}.`;
+  if (category === "rail_search") return `Find current local railway ticket options: ${markdown}.`;
   if (category === "tickets") return `For tickets, timed entry, or event availability, use: ${markdown}.`;
   if (category === "reservations") return `For reservations, use: ${markdown}.`;
   if (category === "booking") return `For accommodation booking, use: ${markdown}.`;
@@ -1416,6 +1434,7 @@ let latestTflStatusData = null;
 let latestNavigationData = null;
 const chatHistory = [];
 let lastAnimatedChatMessageKey = "";
+let chatLoadingMessage = "";
 let startupWaitModalShown = false;
 let startupWaitModalTimer = null;
 let startupWaitLongHintTimer = null;
@@ -2609,7 +2628,18 @@ function isStartupCheckingState() {
   return integrationStatus.llm === "Checking" && integrationStatus.routes === "Checking";
 }
 
+function isStartupWaitPreview() {
+  return new URLSearchParams(window.location.search).get("startup-preview") === "1";
+}
+
 function maybeShowStartupWaitModal() {
+  if (isStartupWaitPreview()) {
+    if (!startupWaitModalShown) {
+      startupWaitModalShown = true;
+      showStartupWaitModal();
+    }
+    return;
+  }
   if (!isStartupCheckingState()) {
     if (startupWaitModalTimer) {
       window.clearTimeout(startupWaitModalTimer);
@@ -2946,7 +2976,7 @@ async function answerQuestion(question, options = {}) {
     const isStreamingResponse = contentType.includes("application/x-ndjson");
     if (!isStreamingResponse) await waitForMinimumLoading(minLoadingReadyAt);
     const agentResult = isStreamingResponse
-      ? await readStreamingAnswer(response, { loadingSessionId })
+      ? await readStreamingAnswer(response, { loadingSessionId, showChatLoading: Boolean(options.skipUserPush) })
       : await readJsonAnswer(response);
     const rawAnswer = agentResult.answer || "";
     setLatestAnswerModelLabel(agentResult.model || "");
@@ -2977,6 +3007,7 @@ async function answerQuestion(question, options = {}) {
 
     chatHistory.push({ role: "assistant", content: answer });
     trimChatHistory();
+    chatLoadingMessage = "";
     renderChatModalHistory();
     collapseHowItWorks();
   } catch (error) {
@@ -2992,6 +3023,7 @@ async function answerQuestion(question, options = {}) {
     if (options.skipUserPush) {
       chatHistory.push({ role: "assistant", content: errorMessage });
       trimChatHistory();
+      chatLoadingMessage = "";
       renderChatModalHistory();
     }
   } finally {
@@ -3086,7 +3118,9 @@ async function readStreamingAnswer(response, options = {}) {
       if (event.tool) {
         if (!toolsUsed.includes(event.tool)) toolsUsed.push(event.tool);
         setAgentMode(formatAgentTools(toolsUsed));
-        updateLoadingAnswer(options.loadingSessionId, formatLoadingTools(toolsUsed));
+        const loadingMessage = formatLoadingTools(toolsUsed);
+        updateLoadingAnswer(options.loadingSessionId, loadingMessage);
+        if (options.showChatLoading) updateChatLoadingAnswer(loadingMessage);
       }
       if (event.delta) {
         answer += event.delta;
@@ -3615,6 +3649,15 @@ function formatLoadingTools(tools = []) {
   const normalized = [...new Set((tools || []).filter(Boolean))];
   const latestTool = normalized[normalized.length - 1];
   if (!latestTool) return t("generatingResults");
+  const loadingMessages = {
+    navigate: "navigationLoading",
+    route_matrix: "routeComparisonLoading",
+    render_route_map: "interactiveMapLoading",
+    weather_current: "weatherLoading",
+    web_search: "webSearchLoading",
+    tfl_status: "tflStatusLoading",
+  };
+  if (loadingMessages[latestTool]) return t(loadingMessages[latestTool]);
   return t("usingTool", { tool: labels[latestTool] || latestTool });
 }
 
@@ -4505,7 +4548,7 @@ function routeMapButtonHtml() {
   return `<button class="chat-route-map-button" type="button" data-chat-route-map="true">${t("routeMapButton")}</button>`;
 }
 
-function renderChatModalHistory(isLoading = false) {
+function renderChatModalHistory(isLoading = false, loadingMessage = chatLoadingMessage) {
   const history = $("chatModalHistory");
   if (!history) return;
   if (!chatHistory.length) {
@@ -4528,11 +4571,16 @@ function renderChatModalHistory(isLoading = false) {
     })
     .join("");
   const loading = isLoading
-    ? `<div class="chat-message assistant typing"><span></span><span></span><span></span></div>`
+    ? `<div class="chat-message assistant typing" role="status" aria-live="polite"><span class="chat-loading-message">${escapeHtml(loadingMessage || t("understandingRequest"))}</span><span class="chat-typing-dots" aria-hidden="true"><span></span><span></span><span></span></span><span class="chat-bubble-tail" aria-hidden="true"></span></div>`
     : "";
   history.innerHTML = messages + loading;
   if (nextAnimatedMessageKey) lastAnimatedChatMessageKey = nextAnimatedMessageKey;
   history.scrollTop = history.scrollHeight;
+}
+
+function updateChatLoadingAnswer(message) {
+  chatLoadingMessage = String(message || "").trim();
+  if (!$("chatModal")?.hidden) renderChatModalHistory(true);
 }
 
 function showRouteMapFromChat() {
@@ -5844,6 +5892,7 @@ $("modalChatForm").addEventListener("submit", async (event) => {
   $("userQuestion").value = question;
   input.value = "";
   chatHistory.push({ role: "user", content: question });
+  chatLoadingMessage = t("understandingRequest");
   renderChatModalHistory(true);
   $("modalAskButton").disabled = true;
   try {

@@ -51,6 +51,7 @@ from navigator_core import (
     read_http_error,
     resolve_together_chat_model,
     resolve_location,
+    reverse_geocode_location,
     resolve_route_request_contextual_places,
     strip_reasoning_text,
     valid_lat_lng,
@@ -582,7 +583,8 @@ def route_has_national_rail(route):
             step.get("arrivalStop"),
         ]
         text = " ".join(str(value or "").lower() for value in values)
-        if any(term in text for term in rail_terms) and not any(term in text for term in excluded_london_terms):
+        vehicle_type = str(step.get("vehicleType") or "").upper()
+        if (vehicle_type in {"RAIL", "TRAIN", "COMMUTER_TRAIN", "HIGH_SPEED_TRAIN", "LONG_DISTANCE_TRAIN"} or any(term in text for term in rail_terms)) and not any(term in text for term in excluded_london_terms):
             return True
     return False
 
@@ -599,6 +601,72 @@ def station_search_name(place):
         return ""
     cleaned = re.sub(r"\b(?:railway|train|rail)\s+station\b", "station", name, flags=re.IGNORECASE)
     return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def place_country(place):
+    if not valid_lat_lng(place):
+        return "", ""
+    geocoded = reverse_geocode_location(place["lat"], place["lng"]) or {}
+    for component in geocoded.get("address_components") or []:
+        if "country" in (component.get("types") or []):
+            return str(component.get("short_name") or "").upper(), str(component.get("long_name") or "")
+    return "", ""
+
+
+def railway_operator_links(route):
+    links = []
+    if not isinstance(route, dict):
+        return links
+    for step in route.get("transitSteps") or []:
+        if not isinstance(step, dict) or not route_has_national_rail({"transitSteps": [step]}):
+            continue
+        name = str(step.get("agencyName") or "").strip()
+        url = safe_external_url(step.get("agencyUri"))
+        if name and url and not any(item[1] == url for item in links):
+            links.append((name, url))
+    return links[:2]
+
+
+def live_railway_channel(place, country_name, operator_name=""):
+    """Look up a current railway website; only accept results matching the operator or rail context."""
+    api_key = get_google_maps_api_key()
+    if not api_key:
+        return None
+    locality = str(place.get("address") or place.get("name") or "").strip()[:120]
+    query = f"{operator_name} official train tickets {country_name}" if operator_name else f"official railway train tickets {locality} {country_name}"
+    body = {"textQuery": query, "languageCode": "en", "maxResultCount": 5}
+    request = urllib.request.Request(
+        GOOGLE_PLACES_TEXT_SEARCH_API_URL,
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": api_key,
+            "X-Goog-FieldMask": "places.displayName,places.websiteUri,places.types",
+            "User-Agent": APP_NAME,
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=8) as response:
+            results = json.loads(response.read().decode("utf-8", errors="replace")).get("places") or []
+    except Exception:
+        return None
+    for result in results:
+        if not isinstance(result, dict):
+            continue
+        name = str((result.get("displayName") or {}).get("text") or "").strip()
+        url = safe_external_url(result.get("websiteUri"))
+        if not name or not url:
+            continue
+        name_lower = name.lower()
+        operator_match = operator_name and operator_name.lower() in name_lower
+        types = set(result.get("types") or [])
+        rail_match = not types.intersection({"museum", "tourist_attraction"}) and any(
+            term in name_lower for term in ("rail", "train", "bahn", "sncf", "tren", "ferrov", "铁路", "火车")
+        )
+        if operator_match or rail_match:
+            return name, url
+    return None
 
 
 def route_related_links(origin_place, destination_place, route=None, waypoint_places=None):
@@ -690,27 +758,32 @@ def route_related_links(origin_place, destination_place, route=None, waypoint_pl
 
     needs_rail = bool(flags["railStation"] or route_has_national_rail(route))
     if needs_rail:
-        add_related_link(
-            links,
-            "national_rail",
-            "National Rail tickets and live services",
-            "https://www.nationalrail.co.uk/journey-planner/",
-            "rail_tickets",
-            "national_rail",
-            "Use for UK train times, service details, fares, and retailer handoff.",
-            8,
-        )
-        add_related_link(
-            links,
-            "trainline",
-            "Trainline train tickets",
-            "https://www.thetrainline.com/",
-            "rail_tickets",
-            "trainline",
-            "Alternative retailer for UK train tickets.",
-            22,
-        )
-        if flags["railStation"]:
+        country_code, country_name = place_country(destination_place)
+        operators = railway_operator_links(route)
+        if operators:
+            for index, (name, url) in enumerate(operators):
+                add_related_link(links, f"rail_operator_{index}", f"{name} railway website", url,
+                                 "rail_tickets", "google_routes_agency", "Check the operator website for tickets and service information.", 8 + index)
+        elif country_code == "GB":
+            add_related_link(links, "national_rail", "National Rail tickets and live services",
+                             "https://www.nationalrail.co.uk/journey-planner/", "rail_tickets", "national_rail",
+                             "UK train times, fares, and ticket retailers.", 8)
+        else:
+            operator_name = next((str(step.get("agencyName") or "").strip()
+                                  for step in (route or {}).get("transitSteps") or []
+                                  if isinstance(step, dict) and route_has_national_rail({"transitSteps": [step]})
+                                  and step.get("agencyName")), "")
+            live_channel = live_railway_channel(destination_place, country_name, operator_name)
+            if live_channel:
+                name, url = live_channel
+                add_related_link(links, "local_rail", f"{name} railway website", url,
+                                 "rail_tickets", "google_places_website", "Check this railway website for tickets and services.", 8)
+            else:
+                query = f"official train tickets {station_search_name(destination_place)} {country_name}".strip()
+                search_url = f"https://www.google.com/search?{urllib.parse.urlencode({'q': query})}"
+                add_related_link(links, "local_rail_search", "Find local railway ticket channels", search_url,
+                                 "rail_search", "google_search", "Search current local railway booking options.", 8)
+        if flags["railStation"] and country_code == "GB":
             add_related_link(
                 links,
                 "station_info",
@@ -913,7 +986,7 @@ def agent_system_prompt():
         "as an optional next step. Use the exact routeLink value returned by the tool; do not construct, shorten, re-encode, wrap, or partially copy the URL. If you cannot include the exact full URL, omit the Markdown link from the text because the browser has its own Google Maps action. Make it clear, in wording that fits the surrounding answer, that clicking the link opens this route directly in Google Maps so the user can check real-time route updates or continue navigation. Do not describe this purpose as checking live traffic or traffic conditions. Do not force a fixed phrase or make the whole answer revolve around the link. "
         "When you call weather_current and the tool result includes weatherLink, you should usually include one short, natural Markdown link so the user can open Google to check weather details and forecast data. Use only the provided weatherLink for this purpose; never expose or invent weather.googleapis.com API URLs or API keys. Keep the link phrasing concise and varied so it fits the surrounding answer. "
         "When route results include fare, treat fare.display as the total fare and make it the primary price information in your answer. If fareBreakdown exists, you may briefly mention per-leg prices after the total, but do not let segment prices dominate. Never invent fares; if fare is absent, do not mention price unless the user explicitly asked, and then say it was not available from the tools. "
-        "When navigate or render_route_map returns relatedLinks, you may include a small number of the most useful links naturally near the end of the answer. Prefer direct destination ticket/website links for attractions or venues, National Rail or Trainline links when the destination is a station or a public-transport route includes National Rail, reservation links for restaurants, booking links for hotels, airport official links for airports, and Google Maps destination links for place details. Use the exact URLs from relatedLinks; do not invent ticket links, booking links, or deep checkout URLs. Explain the purpose briefly, for example: '如果需要购买火车票，可以点击：...' or 'For tickets, use: ...'. If no relevant relatedLinks are returned, do not add this section. "
+        "When navigate or render_route_map returns relatedLinks, you may include a small number of the most useful links naturally near the end of the answer. Prefer destination ticket/website links for attractions or venues, local railway operator links or a local rail search link for train journeys and stations, reservation links for restaurants, booking links for hotels, airport official links for airports, and Google Maps destination links for place details. Never suggest UK rail booking sites for a destination outside the UK unless a returned link specifically identifies the route's operator. Use the exact URLs from relatedLinks; do not invent ticket links, booking links, or deep checkout URLs. Explain the purpose briefly, for example: '如果需要购买火车票，可以点击：...' or 'For tickets, use: ...'. If no relevant relatedLinks are returned, do not add this section. "
         "Keep transport-mode comparison separate from public-transport route comparison. Use modeComparison only to compare broad modes such as public transport, walking, cycling, and driving. Use publicTransportChoices or routeChoices only inside a public-transport section to compare specific bus, Tube, rail, tram, or mixed transit options. Do not mix driving or cycling into the public-transport route-choice analysis. When publicTransportChoices are present, compare them according to the user's stated priority, such as fastest, cheapest, fewest transfers, least walking, accessibility, weather comfort, or overall convenience. If the user gives no priority, recommend the best overall public-transport trade-off using duration, total fare, transferCount, walkingMinutesApprox, and line simplicity. Refer to choices by their actual lines, time, fare, and trade-offs, not by hidden IDs alone. "
         "If you want the interactive route map to appear at a specific point in your answer, insert the standalone token [[ROUTE_MAP]] exactly where it should appear; the browser will replace that token with the embedded map. When the answer includes route advice plus other follow-up material such as weather, destination context, travel tips, or service reminders, it is usually more natural to place [[ROUTE_MAP]] soon after the main route explanation and before those secondary details, unless the context strongly suggests another position. A short context-setting phrase or sentence often helps the map feel naturally integrated with the surrounding explanation, but it is not mandatory and should vary with the situation. If you add such a lead-in, keep it brief, mode-neutral, and phrased in a fresh way that matches the nearby text rather than repeating a stock formula across answers. If you do not include [[ROUTE_MAP]], the browser may place the map after the main text. Do not say above or below unless your wording matches where you place [[ROUTE_MAP]]. Avoid repeating the same stock sentence about the map across answers. "
         "Imperial runs a weekday campus shuttle connecting South Kensington, White City, and Hammersmith. "
@@ -947,7 +1020,7 @@ def agent_user_prompt(payload):
     return (
         "Handle this browser request. Use the provided selected start point as contextStart when a route/weather request "
         "has no explicit origin. If the user asks about weather at the destination after a route tool call, use the "
-        "destinationPlace from the route result. For navigation answers, keep the route explanation primary, and weave any embedded map or optional route link in as a natural supporting detail when available. When mentioning the embedded map, use neutral wording rather than naming a specific transport mode unless the user asked for one. After a successful navigate call, you should normally also call render_route_map so the route is embedded with the answer. If render_route_map succeeds, place [[ROUTE_MAP]] where it fits naturally if you want the map embedded at a specific point. First compare broad transport modes using modeComparison when useful. Then, in a separate public-transport discussion, compare publicTransportChoices/routeChoices according to the user's priority; if no priority is stated, recommend the best public-transport trade-off across time, total fare, transfers, walking, and simplicity. Do not include driving or cycling inside that public-transport route-choice comparison. When the answer also includes weather, destination introduction, travel tips, or other extra material, prefer placing [[ROUTE_MAP]] right after the route explanation before moving on, unless another order reads more naturally. If route results include fare, prioritize the total fare.display in the answer; mention fareBreakdown only as a brief supporting detail when present. If relatedLinks are present, pick only the most context-relevant direct links: destination ticket/website links for attractions and venues, National Rail or Trainline for train journeys/stations, reservation links for restaurants, booking links for hotels, airport live-departure links for airports, and Google Maps destination links when useful. Use exact URLs from relatedLinks; do not make up ticket pages or checkout deep links. Add a brief explanation before each important link, such as '如果需要购买火车票，可以点击：...' rather than dumping bare links. If you include routeLink, use the exact full routeLink value from the tool in Markdown and do not modify or manually compose the URL; naturally explain that clicking it opens this route directly in Google Maps for real-time route updates or continued navigation; do not call this live traffic information. If weather_current returns weatherLink, use that exact link if you include a Google weather or forecast link; do not write raw Weather API URLs or any API key-bearing URL. Choose your own concise wording to fit the answer rather than using a stock sentence. A brief transition into the map is often helpful, but it should be optional, concise, and adapted to the exact context instead of sounding templated.\n"
+        "destinationPlace from the route result. For navigation answers, keep the route explanation primary, and weave any embedded map or optional route link in as a natural supporting detail when available. When mentioning the embedded map, use neutral wording rather than naming a specific transport mode unless the user asked for one. After a successful navigate call, you should normally also call render_route_map so the route is embedded with the answer. If render_route_map succeeds, place [[ROUTE_MAP]] where it fits naturally if you want the map embedded at a specific point. First compare broad transport modes using modeComparison when useful. Then, in a separate public-transport discussion, compare publicTransportChoices/routeChoices according to the user's priority; if no priority is stated, recommend the best public-transport trade-off across time, total fare, transfers, walking, and simplicity. Do not include driving or cycling inside that public-transport route-choice comparison. When the answer also includes weather, destination introduction, travel tips, or other extra material, prefer placing [[ROUTE_MAP]] right after the route explanation before moving on, unless another order reads more naturally. If route results include fare, prioritize the total fare.display in the answer; mention fareBreakdown only as a brief supporting detail when present. If relatedLinks are present, pick only the most context-relevant direct links: destination ticket/website links for attractions and venues, local railway operator or local rail search links for train journeys/stations, reservation links for restaurants, booking links for hotels, airport live-departure links for airports, and Google Maps destination links when useful. Use exact URLs from relatedLinks; do not make up ticket pages or checkout deep links. Add a brief explanation before each important link, such as '如果需要购买火车票，可以点击：...' rather than dumping bare links. If you include routeLink, use the exact full routeLink value from the tool in Markdown and do not modify or manually compose the URL; naturally explain that clicking it opens this route directly in Google Maps for real-time route updates or continued navigation; do not call this live traffic information. If weather_current returns weatherLink, use that exact link if you include a Google weather or forecast link; do not write raw Weather API URLs or any API key-bearing URL. Choose your own concise wording to fit the answer rather than using a stock sentence. A brief transition into the map is often helpful, but it should be optional, concise, and adapted to the exact context instead of sounding templated.\n"
         f"{compact_json(safe_payload, limit=6500)}"
     )
 

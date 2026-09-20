@@ -331,21 +331,23 @@
       </div>
     </div>
 
-    <div class="confirm-modal" id="startupWaitModal" hidden>
-      <div class="confirm-modal-panel startup-wait-panel">
-        <div class="confirm-modal-body">
-          <section id="startupWaitText" class="modal-copy modal-copy-centered">
-            <div class="startup-wait-visual" aria-hidden="true">
-              <span class="startup-wait-ring"></span>
-            </div>
-            <h3 class="modal-info-title">Waking up the server</h3>
-            <div class="modal-copy-body">
-              <p id="startupWaitBodyPrimary">The backend server is hosted on Render, so it may take around <strong>30 seconds</strong> to wake up after a quiet period.</p>
-              <p id="startupWaitBodySecondary">Please give it a moment while the service comes back online.</p>
-              <p id="startupWaitBodyTertiary" hidden>If it still has not loaded after a while, try refreshing the page.</p>
-            </div>
-          </section>
-        </div>
+    <div class="confirm-modal startup-wait-modal" id="startupWaitModal" role="dialog" aria-modal="true" aria-labelledby="startupWaitTitle" hidden>
+      <div class="startup-wait-panel">
+        <section id="startupWaitText" class="startup-wait-card">
+          <div class="startup-wait-visual" aria-hidden="true">
+            <span class="startup-stack-shadow"></span>
+            <span class="startup-stack-layer startup-stack-layer--one"></span>
+            <span class="startup-stack-layer startup-stack-layer--two"></span>
+            <span class="startup-stack-layer startup-stack-layer--three"></span>
+          </div>
+          <div class="startup-message">
+            <h3 id="startupWaitTitle">Service is starting</h3>
+            <p class="startup-status" id="startupWaitStatus">Connecting live travel services</p>
+          </div>
+          <p id="startupWaitBodyPrimary" class="startup-wait-accessible">The backend server is hosted on Render, so it may take around 30 seconds to wake up after a quiet period.</p>
+          <p id="startupWaitBodySecondary" class="startup-wait-accessible">Please give it a moment while the service comes back online.</p>
+          <p id="startupWaitBodyTertiary" class="startup-wait-delayed-hint" hidden>This should not take this long. Please try refreshing the page.</p>
+        </section>
       </div>
     </div>
 

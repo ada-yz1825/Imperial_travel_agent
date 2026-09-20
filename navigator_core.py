@@ -560,6 +560,7 @@ def normalize_transit_step(step):
         "statusQuery": line_short_name if vehicle_type.upper() == "BUS" and line_short_name else line_name or line_short_name,
         "vehicleType": vehicle_type,
         "agencyName": clean_route_text(agency.get("name"), limit=120),
+        "agencyUri": str(agency.get("uri") or "").strip(),
         "departureStop": transit_stop_name(departure_stop),
         "departureStopLocation": transit_stop_lat_lng(departure_stop),
         "arrivalStop": transit_stop_name(arrival_stop),
@@ -756,6 +757,7 @@ def compute_route_field_mask(mode):
                 "routes.legs.steps.transitDetails.transitLine.color",
                 "routes.legs.steps.transitDetails.transitLine.textColor",
                 "routes.legs.steps.transitDetails.transitLine.agencies.name",
+                "routes.legs.steps.transitDetails.transitLine.agencies.uri",
                 "routes.legs.steps.transitDetails.transitLine.vehicle.name",
                 "routes.legs.steps.transitDetails.transitLine.vehicle.type",
             ]
